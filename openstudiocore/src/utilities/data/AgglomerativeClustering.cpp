@@ -82,18 +82,38 @@ namespace openstudio{
     return Cluster(newVector);
   }
 
-  ClusteringResult::ClusteringResult(const std::string& name, double score, const std::vector<Cluster>& clusters)
-    : m_name(name), m_score(score), m_clusters(clusters)
-  {}
+  ClusteringResult::ClusteringResult(const std::string& name, const std::vector<Cluster>& clusters, double singleClusterSumOfSquares)
+    : m_name(name), m_clusters(clusters), m_singleClusterSumOfSquares(singleClusterSumOfSquares), m_sumOfSquares(0)
+  {
+    unsigned n = 0; // total number of vectors
+    unsigned p = clusters.size(); // number of clusters
+    for (const Cluster& cluster : m_clusters){
+      n += cluster.vectors().size();
+      m_sumOfSquares += cluster.sumOfSquares();
+    }
+
+    m_rSquared = (m_singleClusterSumOfSquares - m_sumOfSquares) / m_singleClusterSumOfSquares;
+    m_rSquaredAdjusted = m_rSquared - (1 - m_rSquared)*(p / (n - p));
+  }
 
   std::string ClusteringResult::name() const
   {
     return m_name;
   }
 
-  double ClusteringResult::score() const
+  double ClusteringResult::sumOfSquares() const
   {
-    return m_score;
+    return m_sumOfSquares;
+  }
+
+  double ClusteringResult::rSquared() const
+  {
+    return m_rSquared;
+  }
+
+  double ClusteringResult::rSquaredAdjusted() const
+  {
+    return m_rSquaredAdjusted;
   }
 
   std::vector<Cluster> ClusteringResult::clusters() const
@@ -101,7 +121,51 @@ namespace openstudio{
     return m_clusters;
   }
 
+  boost::optional<ClusteringResult> ClusteringResult::nextClusteringResult() const
+  {
+    boost::optional<unsigned> bestI;
+    boost::optional<unsigned> bestJ;
+    boost::optional<Cluster> bestCluster;
+
+    unsigned n = m_clusters.size();
+    for (unsigned i = 0; i < n; ++i){
+      for (unsigned j = i + 1; j < n; ++j){
+        Cluster temp = m_clusters[i].merge(m_clusters[j]);
+        if (!bestCluster){
+          bestI = i;
+          bestJ = j;
+          bestCluster = temp;
+        }else if (temp.sumOfSquares() < bestCluster->sumOfSquares()){
+          bestI = i;
+          bestJ = j;
+          bestCluster = temp;
+        }
+      }
+    }
+
+    if (!bestCluster){
+      return boost::none;
+    }
+
+    std::stringstream ss;
+    ss << "Clustering " << n - 1;
+    std::string name = ss.str();
+      
+    std::vector<Cluster> newClusters;
+    for (unsigned i = 0; i < n; ++i){
+      if (i == bestI.get()){
+        newClusters.push_back(*bestCluster);
+      }else{
+        newClusters.push_back(m_clusters[i]);
+      }
+    }
+    OS_ASSERT(newClusters.size() == n - 1);
+
+    return ClusteringResult(name, newClusters, m_singleClusterSumOfSquares);
+  }
+
   AgglomerativeClusterer::AgglomerativeClusterer(const TimeSeries& timeSeries)
+    : m_singleClusterSumOfSquares(0)
   {
     DateTimeVector dateTimes = timeSeries.dateTimes();
     openstudio::Vector values = timeSeries.values();
@@ -135,64 +199,46 @@ namespace openstudio{
     try{
       // compute a test cluster to ensure these Vectors are all the same size
       Cluster test(m_vectors);
+      m_singleClusterSumOfSquares = test.sumOfSquares();
     } catch (const std::exception& ){
       LOG_AND_THROW("Cannot partition TimeSeries into Vectors of equal length");
     }
   }
 
-  struct BestMerge
-  {
-    unsigned i;
-    unsigned j;
-    Cluster cluster;
-  };
-
   bool AgglomerativeClusterer::solve()
   {
-    // n is number of vectors, p is number of clusters in result
-    unsigned n = m_vectors.size();
-    unsigned p = n;
-    double ss0 = 0;
-
     // start with each vector in its own cluster
     std::vector<Cluster> clusters;
     clusters.reserve(m_vectors.size());
     for (const Vector& vector : m_vectors){
-      Cluster cluster(vector);
-      ss0 += cluster.sumOfSquares();
+      std::vector<Vector> tmp(1, vector);
+      Cluster cluster(tmp);
       clusters.push_back(cluster);
     }
-    ClusteringResult initialClustering("Initial Clustering", ss0, clusters);
-    m_clusteringResults.push_back(initialClustering);
-
-    // now reduce p by 1 until you get to a single cluster
-    // matrix ss is p x p, where ss[i,j] is the ss from merging clusters[i] with clusters[j]
-    Matrix ss(p, p, std::numeric_limits<double>::max());
-    for (unsigned i = 0; i < p; ++i){
-    }
-
-      struct BestMerge
-      {
-        unsigned i;
-        unsigned j;
-        double ss;
-      };
     
-
+    boost::optional<ClusteringResult> clusteringResult = ClusteringResult("Initial Clustering", clusters, m_singleClusterSumOfSquares);
+    while (clusteringResult) {
+      m_clusteringResults.push_back(*clusteringResult);
+      clusteringResult = clusteringResult->nextClusteringResult();
+    }
 
     return true;
   }
 
   void AgglomerativeClusterer::clear()
   {
-    m_clusterResults.clear();
+    m_clusteringResults.clear();
   }
 
-  std::vector<ClusteringResult> AgglomerativeClusterer::clusterResults() const
+  std::vector<ClusteringResult> AgglomerativeClusterer::clusteringResults() const
   {
-    std::vector<ClusteringResult> result(m_clusterResults);
-    result.insert(result.end(), m_specialClusterResults.begin(), m_specialClusterResults.end());
-    return result;
+    return m_clusteringResults;
+  }
+
+  /// returns the special ClusteringResults
+  std::vector<ClusteringResult> AgglomerativeClusterer::specialClusteringResults() const
+  {
+    return m_specialClusteringResults;
   }
 
 } // openstudio

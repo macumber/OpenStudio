@@ -80,7 +80,7 @@ namespace openstudio{
       //@{
 
       /// constructor from Clusters
-      ClusteringResult(const std::string& name, double score, const std::vector<Cluster>& clusters);
+      ClusteringResult(const std::string& name, const std::vector<Cluster>& clusters, double singleClusterSumOfSquares);
 
       //@}
       /** @name Getters */
@@ -89,11 +89,20 @@ namespace openstudio{
       /// returns the name
       std::string name() const;
 
-      /// returns the score
-      double score() const;
+      /// returns the total sum of squares
+      double sumOfSquares() const;
 
-      /// returns the Clusters
+      /// returns the r squared metric
+      double rSquared() const;
+
+      /// returns the adjusted r squared metric
+      double rSquaredAdjusted() const;
+
+      /// returns the current Clusters
       std::vector<Cluster> clusters() const;
+      
+      /// returns the next best ClusteringResult
+      boost::optional<ClusteringResult> nextClusteringResult() const;
 
       //@}
 
@@ -102,8 +111,11 @@ namespace openstudio{
       REGISTER_LOGGER("utilities.ClusteringResult");
 
       std::string m_name;
-      double m_score;
       std::vector<Cluster> m_clusters;
+      double m_singleClusterSumOfSquares;
+      double m_sumOfSquares;
+      double m_rSquared;
+      double m_rSquaredAdjusted;
   };
 
   /** AgglomerativeClusterer computes ClusteringResults and can help choose the best one.
@@ -126,15 +138,19 @@ namespace openstudio{
     void clear ();
 
     /// returns the ClusteringResults
-    std::vector<ClusteringResult> clusterResults() const;
+    std::vector<ClusteringResult> clusteringResults() const;
+
+    /// returns the special ClusteringResults
+    std::vector<ClusteringResult> specialClusteringResults() const;
 
   private:
 
     REGISTER_LOGGER("utilities.AgglomerativeClusterer");
 
     std::vector<Vector> m_vectors;
-    std::vector<ClusteringResult> m_clusterResults;
-    std::vector<ClusteringResult> m_specialClusterResults; // computed in ctor
+    std::vector<ClusteringResult> m_clusteringResults;
+    std::vector<ClusteringResult> m_specialClusteringResults; // computed in ctor
+    double m_singleClusterSumOfSquares;
   };
 
 
