@@ -80,6 +80,8 @@ set(core_src
 
 set(data_src
   data/DataEnums.hpp
+  data/AgglomerativeClustering.hpp
+  data/AgglomerativeClustering.cpp
   data/Attribute.hpp
   data/Attribute_Impl.hpp
   data/Attribute.cpp

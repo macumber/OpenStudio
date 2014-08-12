@@ -48,5 +48,6 @@
 %include <utilities/data/Matrix.i>
 %include <utilities/data/TimeSeries.i>
 %include <utilities/data/Tag.hpp>
+%include <utilities/data/AgglomerativeClustering.i>
 
 #endif //UTILITIES_DATA_DATA_I 
