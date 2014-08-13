@@ -41,7 +41,8 @@ namespace openstudio{
         if (n.get() != vector.size()){
           LOG_AND_THROW("Vectors must be equal length");
         }
-      } else {
+      }
+      else {
         n = vector.size();
         if (n.get() == 0){
           LOG_AND_THROW("Vectors must have length greater than 0");
@@ -104,6 +105,31 @@ namespace openstudio{
     return result;
   }
 
+  //std::string ClusterData::indicesToKey(const std::vector<unsigned>& indices) const
+  //{
+  //  std::stringstream ss;
+  //  for (unsigned i : indices){
+  //    ss << i << ",";
+  //  }
+  //  return ss.str();
+  //}
+
+  boost::optional<Cluster> ClusterData::getCachedCluster(const std::vector<unsigned>& indices)
+  {
+    //std::map<std::string, Cluster>::const_iterator it = m_cachedClusters.find(indicesToKey(indices));
+    std::map<std::vector<unsigned>, Cluster>::const_iterator it = m_cachedClusters.find(indices);
+    if (it != m_cachedClusters.end()){
+      return it->second;
+    }
+    return boost::none;
+  }
+
+  void ClusterData::addCachedCluster(const std::vector<unsigned>& indices, const Cluster& cluster)
+  {
+   // m_cachedClusters.insert(std::make_pair<std::string, Cluster>(indicesToKey(indices), Cluster(cluster)));
+    m_cachedClusters.insert(std::make_pair<std::vector<unsigned>, Cluster>(std::vector<unsigned>(indices), Cluster(cluster)));
+  }
+
   Cluster::Cluster(std::shared_ptr<ClusterData> clusterData, const std::vector<unsigned>& indices)
     : m_clusterData(clusterData), m_indices(indices)
   {
@@ -131,6 +157,8 @@ namespace openstudio{
       Vector error = vector - m_meanVector;
       m_sumOfSquares += pow(boost::numeric::ublas::norm_2(error), 2.0);
     }
+
+    m_clusterData->addCachedCluster(indices, *this);
   }
 
   const std::vector<unsigned>& Cluster::indices() const
@@ -163,6 +191,12 @@ namespace openstudio{
     std::vector<unsigned> newIndices(m_indices);
     std::vector<unsigned> otherIndices(other.indices());
     newIndices.insert(newIndices.end(), otherIndices.begin(), otherIndices.end());
+    std::sort(newIndices.begin(), newIndices.end());
+
+    boost::optional<Cluster> result = m_clusterData->getCachedCluster(newIndices);
+    if (result){
+      return *result;
+    }
 
     return Cluster(m_clusterData, newIndices);
   }
@@ -241,7 +275,7 @@ namespace openstudio{
     std::stringstream ss;
     ss << "Clustering " << n - 1;
     std::string name = ss.str();
-      
+
     std::vector<Cluster> newClusters;
     for (unsigned i = 0; i < n; ++i){
       if (i == bestI.get()){

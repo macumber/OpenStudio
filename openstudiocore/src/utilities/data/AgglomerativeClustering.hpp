@@ -36,6 +36,7 @@ namespace openstudio{
   class TimeSeries;
   class AgglomerativeClusterer;
   class ClusteringResult;
+  class Cluster;
 
   /** ClusterData holds the shared data between several clusters.
   **/
@@ -82,6 +83,10 @@ namespace openstudio{
 
     //@}
 
+    boost::optional<Cluster> getCachedCluster(const std::vector<unsigned>& indices);
+
+    void addCachedCluster(const std::vector<unsigned>& indices, const Cluster& cluster);
+
   private:
 
     REGISTER_LOGGER("utilities.Cluster");
@@ -90,6 +95,12 @@ namespace openstudio{
     std::vector<Vector> m_vectors;
     std::vector<Time> m_times;
     std::vector<Date> m_dates;
+
+    //std::string indicesToKey(const std::vector<unsigned>& indices) const;
+
+    // cache previous clusters
+    //std::map<std::string, Cluster> m_cachedClusters;
+    std::map<std::vector<unsigned>, Cluster> m_cachedClusters;
   };
 
 
