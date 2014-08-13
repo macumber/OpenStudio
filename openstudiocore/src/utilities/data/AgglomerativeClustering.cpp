@@ -19,6 +19,7 @@
 
 #include "AgglomerativeClustering.hpp"
 #include "TimeSeries.hpp"
+#include "../core/Json.hpp"
 #include "../core/Assert.hpp"
 
 #include <exception>
@@ -41,8 +42,7 @@ namespace openstudio{
         if (n.get() != vector.size()){
           LOG_AND_THROW("Vectors must be equal length");
         }
-      }
-      else {
+      } else {
         n = vector.size();
         if (n.get() == 0){
           LOG_AND_THROW("Vectors must have length greater than 0");
@@ -135,6 +135,10 @@ namespace openstudio{
   {
     OS_ASSERT(clusterData);
 
+    if (indices.empty()){
+      LOG_AND_THROW("Cannot create empty cluster.");
+    }
+
     const std::vector<Vector>& allVectors = clusterData->vectors();
     unsigned n = allVectors.size();
     unsigned m = indices.size();
@@ -142,38 +146,51 @@ namespace openstudio{
       if (i > (n - 1)){
         LOG_AND_THROW("Index out of range");
       }
-      Vector vector = allVectors[i];      
-      m_vectors.push_back(vector);
-      Vector scaledVector = (1.0 / m)*vector;
       if (m_meanVector.empty()){
-        m_meanVector = scaledVector;
+        m_meanVector = (1.0 / m)*allVectors[i];
       }else{
-        m_meanVector += scaledVector;
+        m_meanVector += (1.0 / m)*allVectors[i];
       }
     }
 
     m_sumOfSquares = 0;
-    for (const Vector& vector : m_vectors){
-      Vector error = vector - m_meanVector;
+    for (unsigned i : indices){
+      if (i > (n - 1)){
+        LOG_AND_THROW("Index out of range");
+      }
+      Vector error = allVectors[i] - m_meanVector;
       m_sumOfSquares += pow(boost::numeric::ublas::norm_2(error), 2.0);
     }
 
     m_clusterData->addCachedCluster(indices, *this);
   }
 
-  const std::vector<unsigned>& Cluster::indices() const
+  std::vector<unsigned> Cluster::indices() const
   {
     return m_indices;
   }
 
-  const std::vector<Vector>& Cluster::vectors() const
+  std::vector<Vector> Cluster::vectors() const
   {
-    return m_vectors;
+    const std::vector<Vector>& allVectors = m_clusterData->vectors();
+    unsigned n = allVectors.size();
+    unsigned m = m_indices.size();
+
+    std::vector<Vector> result;
+    result.reserve(m);
+
+    for (unsigned i : m_indices){
+      if (i > (n - 1)){
+        LOG_AND_THROW("Index out of range");
+      }
+      result.push_back(allVectors[i]);
+    }
+    return result;
   }
 
   unsigned Cluster::numVectors() const
   {
-    return m_vectors.size();
+    return m_indices.size();
   }
 
   Vector Cluster::meanVector() const
@@ -273,7 +290,7 @@ namespace openstudio{
     OS_ASSERT(bestJ);
 
     std::stringstream ss;
-    ss << "Clustering " << n - 1;
+    ss << n - 1 << " Clustering";
     std::string name = ss.str();
 
     std::vector<Cluster> newClusters;
@@ -286,7 +303,7 @@ namespace openstudio{
         newClusters.push_back(m_clusters[i]);
       }
     }
-    OS_ASSERT(newClusters.size() == n - 1);
+    OS_ASSERT(newClusters.size() == (n - 1));
 
     return ClusteringResult(name, newClusters, m_singleClusterSumOfSquares);
   }
@@ -300,7 +317,7 @@ namespace openstudio{
     OS_ASSERT(dateTimes.size() == n);
 
     std::vector<std::vector<double> > stdVectors;
-    stdVectors.reserve(n);
+    stdVectors.reserve(365);
 
     std::vector<Time> times;
     std::vector<Date> dates;
@@ -316,7 +333,7 @@ namespace openstudio{
           }
           dates.push_back(dateTimes[i].date());
           stdVectors.push_back(std::vector<double>());
-          stdVectors.back().reserve(n);
+          stdVectors.back().reserve(24);
         } else if (dates.size() == 1){
           // still on first day
           times.push_back(dateTimes[i].time());
@@ -330,7 +347,7 @@ namespace openstudio{
         times.push_back(dateTimes[i].time());
         dates.push_back(dateTimes[i].date());
         stdVectors.push_back(std::vector<double>());
-        stdVectors.back().reserve(n);
+        stdVectors.back().reserve(24);
       }
       
       ++timeIndex;
@@ -390,6 +407,11 @@ namespace openstudio{
     m_clusteringResults.clear();
   }
 
+  std::shared_ptr<ClusterData> AgglomerativeClusterer::clusteringData() const
+  {
+    return m_clusterData;
+  }
+
   std::vector<ClusteringResult> AgglomerativeClusterer::clusteringResults() const
   {
     return m_clusteringResults;
@@ -399,6 +421,76 @@ namespace openstudio{
   std::vector<ClusteringResult> AgglomerativeClusterer::specialClusteringResults() const
   {
     return m_specialClusteringResults;
+  }
+
+  QVariant toQVariant(const std::shared_ptr<ClusterData>& clusterData)
+  {
+    return QVariant();
+  }
+
+  QVariant toQVariant(const Cluster& cluster)
+  {
+    QVariantList indicesList;
+    for (unsigned i : cluster.indices()){
+      indicesList << i;
+    }
+
+    Vector meanVector = cluster.meanVector();
+    QVariantList meanVectorList;
+    for (unsigned i = 0; i < meanVector.size(); ++i){
+      meanVectorList << meanVector[i];
+    }
+
+    QVariantMap result;
+    result["indices"] = indicesList;
+    result["mean_vector"] = meanVectorList;
+    result["sum_of_squares"] = cluster.sumOfSquares();
+    return result;
+  }
+
+  QVariant toQVariant(const std::vector<Cluster>& clusters)
+  {
+    QVariantList result;
+    for (const Cluster& cluster : clusters){
+      result << toQVariant(cluster);
+    }
+    return result;
+  }
+
+  QVariant toQVariant(const ClusteringResult& clusterResult)
+  {
+    QVariantMap result;
+    result["name"] = toQString(clusterResult.name());
+    result["clusters"] = toQVariant(clusterResult.clusters());
+    result["sum_of_squares"] = clusterResult.sumOfSquares();
+    result["r_squared"] = clusterResult.rSquared();
+    result["r_squared_adjusted"] = clusterResult.rSquaredAdjusted();
+    return result;
+  }
+
+  QVariant toQVariant(const std::vector<ClusteringResult>& clusterResults)
+  {
+    QVariantList result;
+    for (const ClusteringResult& clusterResult : clusterResults){
+      result << toQVariant(clusterResult);
+    }
+    return result;
+  }
+
+  QVariant toQVariant(const AgglomerativeClusterer& clusterer)
+  {
+    QVariantMap result;
+    result["cluster_data"] = toQVariant(clusterer.clusteringData());
+    result["clustering_results"] = toQVariant(clusterer.clusteringResults());
+    result["special_clustering_results"] = toQVariant(clusterer.specialClusteringResults());
+    return result;
+  }
+
+  std::string toJSON(const AgglomerativeClusterer& clusterer)
+  {
+    QVariantMap result;
+    result["AgglomerativeClusterer"] = toQVariant(clusterer);
+    return openstudio::toJSON(result);
   }
 
 } // openstudio

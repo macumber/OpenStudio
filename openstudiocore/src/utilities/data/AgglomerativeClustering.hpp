@@ -108,12 +108,12 @@ namespace openstudio{
   **/
   class UTILITIES_API Cluster
   {
-
+  public:
     /// returns the indices in this cluster
-    const std::vector<unsigned>& indices() const;
+    std::vector<unsigned> indices() const;
 
     /// returns the Vectors in this cluster
-    const std::vector<Vector>& vectors() const;
+    std::vector<Vector> vectors() const;
 
     /// returns the number of Vectors in this cluster
     unsigned numVectors() const;
@@ -141,7 +141,7 @@ namespace openstudio{
     std::vector<unsigned> m_indices;
    
     // cached
-    std::vector<Vector> m_vectors;
+    //std::vector<Vector> m_vectors;
     Vector m_meanVector;
     double m_sumOfSquares;
   };
@@ -212,6 +212,9 @@ namespace openstudio{
     /// clears the current ClusteringResults
     void clear ();
 
+    /// returns the ClusteringData
+    std::shared_ptr<ClusterData> clusteringData() const;
+
     /// returns the ClusteringResults, must call solve before calling this
     std::vector<ClusteringResult> clusteringResults() const;
 
@@ -228,6 +231,8 @@ namespace openstudio{
     double m_singleClusterSumOfSquares;
   };
 
+  /** Returns AgglomerativeClusterer state in JSON format, usually want to call solve before printing to JSON.*/
+  UTILITIES_API std::string toJSON(const AgglomerativeClusterer& clusterer);
 
 } // openstudio
 

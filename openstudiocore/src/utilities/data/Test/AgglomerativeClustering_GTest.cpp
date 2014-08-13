@@ -44,4 +44,5 @@ TEST_F(DataFixture, AgglomerativeClustering_TimeSeriesConstructor)
     std::cout << clusteringResult.name() << " " << clusteringResult.sumOfSquares() << " " << clusteringResult.rSquared() << " " << clusteringResult.rSquaredAdjusted() << std::endl;
   }
 
+  std::cout << toJSON(clusterer) << std::endl;
 }
