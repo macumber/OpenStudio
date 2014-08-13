@@ -31,27 +31,81 @@
 
 namespace openstudio{
 
+  class Time;
+  class Date;
   class TimeSeries;
+  class AgglomerativeClusterer;
+  class ClusteringResult;
 
-  /** A Cluster is a vector of Vectors that have been combined together.
+  /** ClusterData holds the shared data between several clusters.
   **/
-  class UTILITIES_API Cluster
+  class UTILITIES_API ClusterData
   {
   public:
     /** @name Constructors */
     //@{
 
-    /// constructor from Vectors, throws if all vectors are not the same length or if length is 0
-    Cluster(const std::vector<Vector>& vectors);
+    /// constructor from Vectors, throws if all Vectors are not the same length or if length is 0
+    ClusterData(const std::vector<Vector>& vectors);
 
     //@}
     /** @name Getters */
     //@{
 
-    /// returns the Vectors in this cluster
-    std::vector<Vector> vectors() const;
+    /// returns the number of Vectors in this ClusterData
+    unsigned numVectors() const;
+
+    /// returns the units associated with each value
+    std::string units() const;
+
+    /// returns the Vectors in this ClusterData
+    const std::vector<Vector>& vectors() const;
+
+    /// returns the Times in this ClusterData
+    const std::vector<Time>& times() const;
+
+    /// returns the Dates in this ClusterData
+    const std::vector<Date>& dates() const;
 
     //@}
+    /** @name Setters */
+    //@{
+
+    /// sets the units associated with each value
+    void setUnits(const std::string& units);
+
+    /// sets the Times associated with each Vector, returns false if not the same length as all Vectors
+    bool setTimes(const std::vector<Time>& times);
+
+    /// sets the Dates associated with each Vector, returns false if not the same length as number of Vectors
+    bool setDates(const std::vector<Date>& dates);
+
+    //@}
+
+  private:
+
+    REGISTER_LOGGER("utilities.Cluster");
+
+    std::string m_units;
+    std::vector<Vector> m_vectors;
+    std::vector<Time> m_times;
+    std::vector<Date> m_dates;
+  };
+
+
+  /** A Cluster is a vector of Vectors that have been combined together.
+  **/
+  class UTILITIES_API Cluster
+  {
+
+    /// returns the indices in this cluster
+    const std::vector<unsigned>& indices() const;
+
+    /// returns the Vectors in this cluster
+    const std::vector<Vector>& vectors() const;
+
+    /// returns the number of Vectors in this cluster
+    unsigned numVectors() const;
 
     /// computes the mean vector, $\hat x_{j} = \frac{1}{n} \sum_{i=0}^n x_{j}
     Vector meanVector() const;
@@ -65,7 +119,17 @@ namespace openstudio{
   private:
 
     REGISTER_LOGGER("utilities.Cluster");
+
+    friend class AgglomerativeClusterer;
+    friend class ClusteringResult;
     
+    /// constructor from ClusterData, throws if any index is out of range
+    Cluster(std::shared_ptr<ClusterData> clusterData, const std::vector<unsigned>& indices);
+
+    std::shared_ptr<ClusterData> m_clusterData;
+    std::vector<unsigned> m_indices;
+   
+    // cached
     std::vector<Vector> m_vectors;
     Vector m_meanVector;
     double m_sumOfSquares;
@@ -137,7 +201,7 @@ namespace openstudio{
     /// clears the current ClusteringResults
     void clear ();
 
-    /// returns the ClusteringResults
+    /// returns the ClusteringResults, must call solve before calling this
     std::vector<ClusteringResult> clusteringResults() const;
 
     /// returns the special ClusteringResults
@@ -147,7 +211,7 @@ namespace openstudio{
 
     REGISTER_LOGGER("utilities.AgglomerativeClusterer");
 
-    std::vector<Vector> m_vectors;
+    std::shared_ptr<ClusterData> m_clusterData;
     std::vector<ClusteringResult> m_clusteringResults;
     std::vector<ClusteringResult> m_specialClusteringResults; // computed in ctor
     double m_singleClusterSumOfSquares;

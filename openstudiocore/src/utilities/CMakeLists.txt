@@ -387,6 +387,7 @@ set(${target_name}_test_src
   data/Test/Matrix_GTest.cpp
   data/Test/TimeSeries_GTest.cpp
   data/Test/Vector_GTest.cpp
+  data/Test/AgglomerativeClustering_GTest.cpp
   economics/test/Economics_GTest.cpp
   filetypes/test/EpwFile_GTest.cpp
   filetypes/test/TimeDependentValuationFile_GTest.cpp
