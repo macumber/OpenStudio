@@ -1,21 +1,31 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
+
 #ifndef MODEL_ACCESSPOLICYSTORE_HPP
 #define MODEL_ACCESSPOLICYSTORE_HPP
 
@@ -23,7 +33,6 @@
 
 #include <map>
 
-#include <QFile>
 #include <QString>
 
 #include "../utilities/idd/IddObject.hpp"
@@ -41,7 +50,7 @@ namespace openstudio
      *
      * The Policy will restrict your access to ModelObject data.
      * Workspace objects have fields. you can index into those fields and
-     * get the value, change the value, ect. ModelObjects may not want to
+     * get the value, change the value, etc. ModelObjects may not want to
      * allow you to change things, or even show them. The policy is used to
      * build GUIs, it is not really something for general use in the backend
      * data manipulation side of things. The idea is that each program might have its
@@ -65,9 +74,9 @@ namespace openstudio
         \param index the index into the field vector
         \return defaults to FREE
         *
-        * If you send in an erronious index, or the policy didn't
+        * If you send in an erroneous index, or the policy didn't
         * load information for that index, you will get FREE back.
-        * (You might get suprising results when you ask a workspace object
+        * (You might get surprising results when you ask a workspace object
         * for that bogus index though. :) )
         */
       ACCESS_LEVEL getAccess(unsigned int index) const;
@@ -93,8 +102,9 @@ namespace openstudio
 
       /*! loads an xml with the policy rules
        */
-      bool loadFile( QFile& file );
+      bool loadFile( openstudio::filesystem::ifstream & file );
       bool loadFile( const openstudio::path& path );
+      bool loadFile( const QByteArray &data );
 
       /*!Each IddObjectType has a uniqueAcessPolicy. This function will retrieve it*/
       const AccessPolicy* getPolicy( const openstudio::IddObjectType& )const;

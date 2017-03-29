@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_COMPONENT_IMPL_HPP
 #define MODEL_COMPONENT_IMPL_HPP
@@ -33,7 +42,7 @@ namespace detail {
    *  most derived setters to avoid invalidating the Component. Also does not support SqlFile
    *  attachment. */
   class MODEL_API Component_Impl : public Model_Impl {
-    Q_OBJECT;
+
    public:
 
     /** @name Constructors and Destructors */
@@ -52,13 +61,13 @@ namespace detail {
 
     /** Implementation of openstudio::detail::Workspace_Impl::clone for Component_Impl. The returned
      *  value may be cast to type Component. */
-    virtual Workspace clone(bool keepHandles=false) const;
+    virtual Workspace clone(bool keepHandles=false) const override;
 
     /** Invalid to partially clone a Component. Always throws. In some cases, it may be possible to
      *  clone(), and then remove objects as desired. */
     virtual Workspace cloneSubset(const std::vector<Handle>& handles,
                                   bool keepHandles = false,
-                                  StrictnessLevel level = StrictnessLevel::Draft) const;
+                                  StrictnessLevel level = StrictnessLevel::Draft) const override;
 
     // no swap method here because no component-level data
 
@@ -80,49 +89,49 @@ namespace detail {
     //@{
 
     /** Override to return false. Components are always at Draft StrictnessLevel. */
-    virtual bool setStrictnessLevel(StrictnessLevel level);
+    virtual bool setStrictnessLevel(StrictnessLevel level) override;
 
     /** Override to return boost::none. */
-    virtual boost::optional<WorkspaceObject> addObject(const IdfObject& idfObject);
+    virtual boost::optional<WorkspaceObject> addObject(const IdfObject& idfObject) override;
 
     /** Override to return boost::none. */
-    virtual boost::optional<WorkspaceObject> insertObject(const IdfObject& idfObject);
+    virtual boost::optional<WorkspaceObject> insertObject(const IdfObject& idfObject) override;
 
     /** Override to return empty vector. */
-    virtual std::vector<WorkspaceObject> addObjects(const std::vector<IdfObject>& idfObjects);
+    virtual std::vector<WorkspaceObject> addObjects(const std::vector<IdfObject>& idfObjects) override;
 
     /** Override to return empty vector. */
-    virtual std::vector<WorkspaceObject> insertObjects(const std::vector<IdfObject>& idfObjects);
+    virtual std::vector<WorkspaceObject> insertObjects(const std::vector<IdfObject>& idfObjects) override;
 
     /** Override to return empty vector. */
     virtual std::vector<WorkspaceObject> addAndInsertObjects(const std::vector<IdfObject>& objectsToAdd,
-                                                             const std::vector<IdfObject>& objectsToInsert);
+                                                             const std::vector<IdfObject>& objectsToInsert) override;
 
     /** Override to return empty vector. */
-    virtual std::vector<WorkspaceObject> addObjects(const std::vector<WorkspaceObject>& objects);
+    virtual std::vector<WorkspaceObject> addObjects(const std::vector<WorkspaceObject>& objects) override;
 
     /** Override to return empty vector. */
-    virtual std::vector<WorkspaceObject> insertObjects(const std::vector<WorkspaceObject>& objects);
-
-    /** Override to return empty vector. */
-    virtual std::vector<WorkspaceObject> addAndInsertObjects(
-        const std::vector<WorkspaceObject>& objectsToAdd,
-        const std::vector<WorkspaceObject>& objectsToInsert);
+    virtual std::vector<WorkspaceObject> insertObjects(const std::vector<WorkspaceObject>& objects) override;
 
     /** Override to return empty vector. */
     virtual std::vector<WorkspaceObject> addAndInsertObjects(
         const std::vector<WorkspaceObject>& objectsToAdd,
-        const std::vector< std::vector<WorkspaceObject> >& objectsToInsert);
+        const std::vector<WorkspaceObject>& objectsToInsert) override;
+
+    /** Override to return empty vector. */
+    virtual std::vector<WorkspaceObject> addAndInsertObjects(
+        const std::vector<WorkspaceObject>& objectsToAdd,
+        const std::vector< std::vector<WorkspaceObject> >& objectsToInsert) override;
 
     /** Override to return false. */
-    virtual bool setSqlFile(const openstudio::SqlFile& sqlFile);
+    virtual bool setSqlFile(const openstudio::SqlFile& sqlFile) override;
 
     /** Override to return boost::none. */
-    virtual boost::optional<ComponentData> insertComponent(const Component& component);
+    virtual boost::optional<ComponentData> insertComponent(const Component& component) override;
 
     /** Override to return empty vector. */
-    virtual std::vector<openstudio::IdfObject> purgeUnusedResourceObjects();
-    virtual std::vector<openstudio::IdfObject> purgeUnusedResourceObjects(IddObjectType iddObjectType);
+    virtual std::vector<openstudio::IdfObject> purgeUnusedResourceObjects() override;
+    virtual std::vector<openstudio::IdfObject> purgeUnusedResourceObjects(IddObjectType iddObjectType) override;
 
     //@}
     /** @name Serialization */
@@ -131,12 +140,11 @@ namespace detail {
     /** Save Component to path. Will construct parent folder, but no further up the chain. Will
      *  only overwrite an existing file if overwrite==true. Will set extension to
      *  componentFileExtension(). */
-    virtual bool save(const openstudio::path& p, bool overwrite=false);
+    virtual bool save(const openstudio::path& p, bool overwrite=false) override;
 
     //@}
-   public slots :
 
-    virtual void obsoleteComponentWatcher(const ComponentWatcher& watcher);
+    virtual void obsoleteComponentWatcher(const ComponentWatcher& watcher) override;
 
    private:
 

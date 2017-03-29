@@ -1,56 +1,70 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef OPENSTUDIO_INSPECTORVIEW_HPP
 #define OPENSTUDIO_INSPECTORVIEW_HPP
 
-#include <QWidget>
 #include <QDialog>
-#include "../model/ModelObject.hpp"
-#include "../model/WaterToAirComponent.hpp"
-#include "../model/WaterToAirComponent_Impl.hpp"
-#include "../model/StraightComponent.hpp"
-#include "../model/StraightComponent_Impl.hpp"
+#include <QWidget>
+
 #include "../model/HVACComponent.hpp"
 #include "../model/HVACComponent_Impl.hpp"
+#include "../model/ModelObject.hpp"
+#include "../model/StraightComponent.hpp"
+#include "../model/StraightComponent_Impl.hpp"
+#include "../model/WaterToAirComponent.hpp"
+#include "../model/WaterToAirComponent_Impl.hpp"
+#include <nano/nano_signal_slot.hpp> // Signal-Slot replacement
+
 
 class InspectorGadget;
-class QStackedWidget;
-class QVBoxLayout;
-class QTimer;
+
 class QComboBox;
 class QPushButton;
+class QStackedWidget;
+class QTimer;
 class QToolButton;
+class QVBoxLayout;
 
 namespace openstudio {
 
 namespace model {
 
-class ThermalZone;
 class Loop;
+class ThermalZone;
 
 }
 
-class ZoneChooserView;
 class BaseInspectorView;
 class LibraryTabWidget;
 class LoopChooserView;
+class ZoneChooserView;
+class OSItem;
 
 class InspectorView : public QWidget
 {
@@ -58,10 +72,14 @@ class InspectorView : public QWidget
 
   public:
 
-  InspectorView(QWidget* parent = 0);
+  InspectorView(QWidget* parent = nullptr);
   virtual ~InspectorView() {}
 
   void update();
+
+  BaseInspectorView * currentView() { return m_currentView; }
+
+  bool mouseOverInspectorView() { return m_mouseOverInspectorView; };
 
   signals:
 
@@ -70,6 +88,9 @@ class InspectorView : public QWidget
   void addToLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
   void removeFromLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
   void toggleUnitsClicked(bool displayIP);
+  void itemRemoveClicked(OSItem *);
+  void removeButtonClicked(bool);
+  void workspaceObjectRemoved();
 
   void moveBranchForZoneSupplySelected(model::ThermalZone & zone, const Handle & newPlenumHandle);
   void moveBranchForZoneReturnSelected(model::ThermalZone & zone, const Handle & newPlenumHandle);
@@ -79,25 +100,29 @@ class InspectorView : public QWidget
   public slots:
 
   void layoutModelObject( model::OptionalModelObject &, bool readOnly, bool displayIP );
-
   virtual void toggleUnits(bool displayIP);
 
-  protected:
+  protected slots:
+
+  virtual void enterEvent(QEvent * event) override;
+  virtual void leaveEvent(QEvent * event) override;
 
   private:
 
   QVBoxLayout * m_vLayout;
   BaseInspectorView * m_currentView;
   QStackedWidget * m_stackedWidget;
+  boost::optional<model::ModelObject> m_modelObject;
+  bool m_mouseOverInspectorView = false;
 };
 
-class BaseInspectorView : public QWidget
+class BaseInspectorView : public QWidget, public Nano::Observer
 {
   Q_OBJECT;
 
   public:
 
-  BaseInspectorView(QWidget * parent = 0);
+  BaseInspectorView(QWidget * parent = nullptr);
 
   virtual ~BaseInspectorView() {}
 
@@ -107,13 +132,15 @@ class BaseInspectorView : public QWidget
 
   virtual void update() {}
 
+  LibraryTabWidget * m_libraryTabWidget;
+
   signals:
 
   void toggleUnitsClicked(bool displayIP); 
 
-  protected:
+  void removeButtonClicked(bool);
 
-  LibraryTabWidget * m_libraryTabWidget;
+  void workspaceObjectRemoved();
 
   private:
 
@@ -130,15 +157,19 @@ class GenericInspectorView : public BaseInspectorView
 
   public:
   
-  GenericInspectorView(QWidget * parent = 0);
+  GenericInspectorView(QWidget * parent = nullptr);
 
   virtual ~GenericInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   private:
 
   InspectorGadget * m_inspectorGadget;
+
+  signals:
+
+  void removeButtonClicked(bool);
 };
 
 class SplitterMixerInspectorView : public BaseInspectorView
@@ -147,11 +178,11 @@ class SplitterMixerInspectorView : public BaseInspectorView
 
   public:
 
-  SplitterMixerInspectorView(QWidget * parent = 0);
+  SplitterMixerInspectorView(QWidget * parent = nullptr);
 
   virtual ~SplitterMixerInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   signals:
 
@@ -170,7 +201,7 @@ class NewPlenumDialog : public QDialog
 
   public:
 
-  NewPlenumDialog(QWidget * parent = 0);
+  NewPlenumDialog(QWidget * parent = nullptr);
 
   virtual ~NewPlenumDialog() {}
 
@@ -188,7 +219,7 @@ class PlenumChooserView : public QWidget
 
   public:
   
-  PlenumChooserView(QWidget * parent = 0);
+  PlenumChooserView(QWidget * parent = nullptr);
 
   virtual ~PlenumChooserView() {}
 
@@ -204,11 +235,11 @@ class RefrigerationWalkinInspectorView : public BaseInspectorView
 
   public:
 
-  RefrigerationWalkinInspectorView(QWidget * parent = 0);
+  RefrigerationWalkinInspectorView(QWidget * parent = nullptr);
 
   virtual ~RefrigerationWalkinInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   private:
 
@@ -224,11 +255,11 @@ class ThermalZoneInspectorView : public BaseInspectorView
 
   public:
 
-  ThermalZoneInspectorView(QWidget * parent = 0);
+  ThermalZoneInspectorView(QWidget * parent = nullptr);
 
   virtual ~ThermalZoneInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   signals:
 
@@ -245,7 +276,7 @@ class ThermalZoneInspectorView : public BaseInspectorView
 
   private:
 
-  void update();
+  void update() override;
   InspectorGadget * m_inspectorGadget;
   PlenumChooserView * m_plenumChooser;
   bool m_displayIP;
@@ -258,11 +289,11 @@ class WaterToAirInspectorView : public BaseInspectorView
 
   public:
 
-  WaterToAirInspectorView(QWidget * parent = 0);
+  WaterToAirInspectorView(QWidget * parent = nullptr);
 
   virtual ~WaterToAirInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   signals:
 
@@ -295,11 +326,11 @@ class AirTerminalSingleDuctConstantVolumeCooledBeamInspectorView : public BaseIn
 
   public:
 
-  AirTerminalSingleDuctConstantVolumeCooledBeamInspectorView(QWidget * parent = 0);
+  AirTerminalSingleDuctConstantVolumeCooledBeamInspectorView(QWidget * parent = nullptr);
 
   virtual ~AirTerminalSingleDuctConstantVolumeCooledBeamInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   signals:
 
@@ -322,7 +353,7 @@ class AirTerminalInspectorView : public BaseInspectorView
 
   public:
 
-  AirTerminalInspectorView(QWidget * parent = 0);
+  AirTerminalInspectorView(QWidget * parent = nullptr);
 
   virtual ~AirTerminalInspectorView() {}
 
@@ -352,11 +383,11 @@ class AirTerminalSingleDuctConstantVolumeReheatInspectorView : public AirTermina
 
   public:
 
-  AirTerminalSingleDuctConstantVolumeReheatInspectorView(QWidget * parent = 0);
+  AirTerminalSingleDuctConstantVolumeReheatInspectorView(QWidget * parent = nullptr);
 
   virtual ~AirTerminalSingleDuctConstantVolumeReheatInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 };
 
 class AirTerminalSingleDuctVAVReheatInspectorView : public AirTerminalInspectorView
@@ -365,11 +396,50 @@ class AirTerminalSingleDuctVAVReheatInspectorView : public AirTerminalInspectorV
 
   public:
 
-  AirTerminalSingleDuctVAVReheatInspectorView(QWidget * parent = 0);
+  AirTerminalSingleDuctVAVReheatInspectorView(QWidget * parent = nullptr);
 
   virtual ~AirTerminalSingleDuctVAVReheatInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
+};
+
+class AirTerminalSingleDuctParallelPIUReheatInspectorView : public AirTerminalInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  AirTerminalSingleDuctParallelPIUReheatInspectorView(QWidget * parent = nullptr);
+
+  virtual ~AirTerminalSingleDuctParallelPIUReheatInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
+};
+
+class AirTerminalSingleDuctSeriesPIUReheatInspectorView : public AirTerminalInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  AirTerminalSingleDuctSeriesPIUReheatInspectorView(QWidget * parent = nullptr);
+
+  virtual ~AirTerminalSingleDuctSeriesPIUReheatInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
+};
+
+class AirTerminalSingleDuctVAVHeatAndCoolReheatInspectorView : public AirTerminalInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  AirTerminalSingleDuctVAVHeatAndCoolReheatInspectorView(QWidget * parent = nullptr);
+
+  virtual ~AirTerminalSingleDuctVAVHeatAndCoolReheatInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 };
 
 class ZoneHVACPackagedTerminalAirConditionerInspectorView : public BaseInspectorView
@@ -378,11 +448,65 @@ class ZoneHVACPackagedTerminalAirConditionerInspectorView : public BaseInspector
 
   public:
 
-  ZoneHVACPackagedTerminalAirConditionerInspectorView(QWidget * parent = 0);
+  ZoneHVACPackagedTerminalAirConditionerInspectorView(QWidget * parent = nullptr);
 
   virtual ~ZoneHVACPackagedTerminalAirConditionerInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP);
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
+
+  signals:
+
+  void addToLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  void removeFromLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  private:
+
+  boost::optional<model::ModelObject> m_modelObject;
+
+  InspectorGadget * m_inspectorGadget;
+
+  LoopChooserView * m_loopChooserView;
+};
+
+class ZoneHVACPackagedTerminalHeatPumpInspectorView : public BaseInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  ZoneHVACPackagedTerminalHeatPumpInspectorView(QWidget * parent = nullptr);
+
+  virtual ~ZoneHVACPackagedTerminalHeatPumpInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
+
+  signals:
+
+  void addToLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  void removeFromLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  private:
+
+  boost::optional<model::ModelObject> m_modelObject;
+
+  InspectorGadget * m_inspectorGadget;
+
+  LoopChooserView * m_loopChooserView;
+};
+
+class WaterHeaterHeatPumpInspectorView : public BaseInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  WaterHeaterHeatPumpInspectorView(QWidget * parent = nullptr);
+
+  virtual ~WaterHeaterHeatPumpInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP) override;
 
   signals:
 
@@ -405,11 +529,11 @@ class ZoneHVACFourPipeFanCoilInspectorView : public BaseInspectorView
 
   public:
 
-  ZoneHVACFourPipeFanCoilInspectorView(QWidget * parent = 0);
+  ZoneHVACFourPipeFanCoilInspectorView(QWidget * parent = nullptr);
 
   virtual ~ZoneHVACFourPipeFanCoilInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -434,9 +558,9 @@ class ZoneHVACLowTempRadiantConstFlowInspectorView : public BaseInspectorView
 
   public:
 
-  ZoneHVACLowTempRadiantConstFlowInspectorView(QWidget * parent = 0);
+  ZoneHVACLowTempRadiantConstFlowInspectorView(QWidget * parent = nullptr);
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -461,9 +585,9 @@ class ZoneHVACLowTempRadiantVarFlowInspectorView : public BaseInspectorView
 
   public:
 
-  ZoneHVACLowTempRadiantVarFlowInspectorView(QWidget * parent = 0);
+  ZoneHVACLowTempRadiantVarFlowInspectorView(QWidget * parent = nullptr);
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -488,11 +612,11 @@ class ZoneHVACWaterToAirHeatPumpInspectorView : public BaseInspectorView
 
   public:
 
-  ZoneHVACWaterToAirHeatPumpInspectorView(QWidget * parent = 0);
+  ZoneHVACWaterToAirHeatPumpInspectorView(QWidget * parent = nullptr);
 
   virtual ~ZoneHVACWaterToAirHeatPumpInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -519,11 +643,39 @@ class ZoneHVACBaseboardConvectiveWaterInspectorView : public BaseInspectorView
 
   public:
 
-  ZoneHVACBaseboardConvectiveWaterInspectorView(QWidget * parent = 0);
+  ZoneHVACBaseboardConvectiveWaterInspectorView(QWidget * parent = nullptr);
 
   virtual ~ZoneHVACBaseboardConvectiveWaterInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
+
+  signals:
+
+  void addToLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  void removeFromLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  private:
+
+  boost::optional<model::ModelObject> m_modelObject;
+
+  InspectorGadget * m_inspectorGadget;
+
+  LoopChooserView * m_heatingLoopChooserView;
+
+};
+
+class ZoneHVACBaseboardRadiantConvectiveWaterInspectorView : public BaseInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  ZoneHVACBaseboardRadiantConvectiveWaterInspectorView(QWidget * parent = nullptr);
+
+  virtual ~ZoneHVACBaseboardRadiantConvectiveWaterInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -547,11 +699,11 @@ class ZoneHVACUnitHeaterInspectorView : public BaseInspectorView
 
   public:
 
-  ZoneHVACUnitHeaterInspectorView(QWidget * parent = 0);
+  ZoneHVACUnitHeaterInspectorView(QWidget * parent = nullptr);
 
   virtual ~ZoneHVACUnitHeaterInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -569,17 +721,47 @@ class ZoneHVACUnitHeaterInspectorView : public BaseInspectorView
 
 };
 
+class ZoneHVACUnitVentilatorInspectorView : public BaseInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  ZoneHVACUnitVentilatorInspectorView(QWidget * parent = nullptr);
+
+  virtual ~ZoneHVACUnitVentilatorInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
+
+  signals:
+
+  void addToLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  void removeFromLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  private:
+
+  boost::optional<model::ModelObject> m_modelObject;
+
+  InspectorGadget * m_inspectorGadget;
+
+  LoopChooserView * m_heatingLoopChooserView;
+
+  LoopChooserView * m_coolingLoopChooserView;
+
+};
+
 class AirLoopHVACUnitarySystemInspectorView : public BaseInspectorView
 {
   Q_OBJECT;
 
   public:
 
-  AirLoopHVACUnitarySystemInspectorView(QWidget * parent = 0);
+  AirLoopHVACUnitarySystemInspectorView(QWidget * parent = nullptr);
 
   virtual ~AirLoopHVACUnitarySystemInspectorView() {}
 
-  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP );
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
 
   signals:
 
@@ -596,6 +778,49 @@ class AirLoopHVACUnitarySystemInspectorView : public BaseInspectorView
   LoopChooserView * m_heatingLoopChooserView;
   LoopChooserView * m_coolingLoopChooserView;
   LoopChooserView * m_secondaryLoopChooserView;
+
+};
+
+class AirTerminalSingleDuctConstantVolumeFourPipeInductionInspectorView : public BaseInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  AirTerminalSingleDuctConstantVolumeFourPipeInductionInspectorView(QWidget * parent = nullptr);
+
+  virtual ~AirTerminalSingleDuctConstantVolumeFourPipeInductionInspectorView() {}
+
+  void layoutModelObject( model::ModelObject &, bool readOnly, bool displayIP ) override;
+
+  signals:
+
+  void addToLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  void removeFromLoopClicked(model::Loop &, boost::optional<model::HVACComponent> &);
+
+  private:
+
+  boost::optional<model::ModelObject> m_modelObject;
+
+  InspectorGadget * m_inspectorGadget;
+
+  LoopChooserView * m_heatingLoopChooserView;
+  LoopChooserView * m_coolingLoopChooserView;
+
+};
+
+class ScheduleRulesetInspectorView : public BaseInspectorView
+{
+  Q_OBJECT;
+
+  public:
+
+  ScheduleRulesetInspectorView(QWidget * parent = nullptr);
+
+  virtual ~ScheduleRulesetInspectorView() {}
+
+  virtual void layoutModelObject(model::ModelObject & modelObject, bool readOnly, bool displayIP) override;
 
 };
 

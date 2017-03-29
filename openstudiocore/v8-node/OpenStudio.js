@@ -26,8 +26,6 @@ var OpenStudioUtilitiesBCL = require('OpenStudioUtilitiesBCL');
 if (typeof OpenStudioUtilitiesBCL.OpenStudioUtilitiesBCL != 'undefined') OpenStudioUtilitiesBCL = OpenStudioUtilitiesBCL.OpenStudioUtilitiesBCL;
 var OpenStudioUtilitiesUnits = require('OpenStudioUtilitiesUnits');
 if (typeof OpenStudioUtilitiesUnits.OpenStudioUtilitiesUnits != 'undefined') OpenStudioUtilitiesUnits = OpenStudioUtilitiesUnits.OpenStudioUtilitiesUnits;
-var OpenStudioUtilitiesDocument = require('OpenStudioUtilitiesDocument');
-if (typeof OpenStudioUtilitiesDocument.OpenStudioUtilitiesDocument != 'undefined') OpenStudioUtilitiesDocument = OpenStudioUtilitiesDocument.OpenStudioUtilitiesDocument;
 var OpenStudioUtilitiesIdd = require('OpenStudioUtilitiesIdd');
 if (typeof OpenStudioUtilitiesIdd.OpenStudioUtilitiesIdd != 'undefined') OpenStudioUtilitiesIdd = OpenStudioUtilitiesIdd.OpenStudioUtilitiesIdd;
 var OpenStudioUtilitiesIdf = require('OpenStudioUtilitiesIdf');
@@ -56,8 +54,8 @@ var OpenStudioModel = require('OpenStudioModel');
 if (typeof OpenStudioModel.OpenStudioModel != 'undefined') OpenStudioModel = OpenStudioModel.OpenStudioModel;
 var OpenStudioOSVersion = require('OpenStudioOSVersion');
 if (typeof OpenStudioOSVersion.OpenStudioOSVersion != 'undefined') OpenStudioOSVersion = OpenStudioOSVersion.OpenStudioOSVersion;
-var OpenStudioRuleset = require('OpenStudioRuleset');
-if (typeof OpenStudioRuleset.OpenStudioRuleset != 'undefined') OpenStudioRuleset = OpenStudioRuleset.OpenStudioRuleset;
+var OpenStudioMeasure = require('OpenStudioMeasure');
+if (typeof OpenStudioMeasure.OpenStudioMeasure != 'undefined') OpenStudioMeasure = OpenStudioMeasure.OpenStudioMeasure;
 var OpenStudioISOModel = require('OpenStudioISOModel');
 if (typeof OpenStudioISOModel.OpenStudioISOModel != 'undefined') OpenStudioISOModel = OpenStudioISOModel.OpenStudioISOModel;
 var OpenStudioRunManager = require('OpenStudioRunManager');
@@ -85,7 +83,6 @@ openstudio = merge_objects(openstudio, OpenStudioUtilitiesGeometry);
 openstudio = merge_objects(openstudio, OpenStudioUtilitiesSql);
 openstudio = merge_objects(openstudio, OpenStudioUtilitiesBCL);
 openstudio = merge_objects(openstudio, OpenStudioUtilitiesUnits);
-openstudio = merge_objects(openstudio, OpenStudioUtilitiesDocument);
 openstudio = merge_objects(openstudio, OpenStudioUtilitiesIdd);
 openstudio = merge_objects(openstudio, OpenStudioUtilitiesIdf);
 openstudio = merge_objects(openstudio, OpenStudioUtilitiesFileTypes);
@@ -106,7 +103,7 @@ openstudio.model = merge_objects(openstudio.model, OpenStudioModel);
 
 openstudio.osversion = OpenStudioOSVersion;
 
-openstudio.ruleset = OpenStudioRuleset;
+openstudio.measure = OpenStudioMeasure;
 
 openstudio.isomodel = OpenStudioISOModel;
 

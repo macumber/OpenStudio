@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Geometry.hpp"
 #include "Intersection.hpp"
@@ -32,6 +41,7 @@
 #include <boost/geometry/geometries/adapted/boost_tuple.hpp>
 #include <boost/geometry/strategies/cartesian/point_in_poly_franklin.hpp> 
 #include <boost/geometry/strategies/cartesian/point_in_poly_crossings_multiply.hpp> 
+#include <boost/geometry/algorithms/within.hpp> 
 
 typedef boost::geometry::model::d2::point_xy<double> BoostPoint;
 typedef boost::geometry::model::polygon<BoostPoint> BoostPolygon;
@@ -141,8 +151,6 @@ struct range_remove_spikes
         {
             return;
         }
-
-        typedef typename boost::range_iterator<Range>::type iterator;
 
         std::deque<point_type> cleaned;
         for (typename boost::range_iterator<Range const>::type it = boost::begin(range);
@@ -566,6 +574,39 @@ namespace openstudio{
     return result;
   }
 
+  // convert a boost ring to vertices
+  std::vector<Point3d> verticesFromBoostRing(const BoostRing& ring, std::vector<Point3d>& allPoints, double tol)
+  {
+    std::vector<Point3d> result;
+
+    // add point for each vertex except final vertex
+    for (unsigned i = 0; i < ring.size() - 1; ++i){
+      Point3d point3d(ring[i].x(), ring[i].y(), 0.0);
+
+      // try to combine points within tolerance
+      Point3d resultPoint = getCombinedPoint(point3d, allPoints, tol);
+
+      // don't keep repeated vertices
+      if ((i > 0) && (result.back() == resultPoint)){
+        continue;
+      }
+      result.push_back(resultPoint);
+    }
+
+    result = removeCollinear(result);
+
+    // don't keep repeated vertices
+    if (result.front() == result.back()){
+      result.pop_back();
+    }
+
+    if (result.size() < 3){
+      return std::vector<Point3d>();
+    }
+
+    return result;
+  }
+
   // struct used to sort polygons in descending order by area
   struct BoostPolygonAreaGreater{
     bool operator()(const BoostPolygon& left, const BoostPolygon& right){
@@ -924,6 +965,133 @@ namespace openstudio{
     }
 
     return IntersectionResult(resultPolygon1, resultPolygon2, newPolygons1, newPolygons2);
+  }
+
+  std::vector<std::vector<Point3d> > subtract(const std::vector<Point3d>& polygon, const std::vector<std::vector<Point3d> >& holes, double tol)
+  {
+    std::vector<std::vector<Point3d> > result;
+
+    // convert vertices to boost rings
+    std::vector<Point3d> allPoints;
+
+    boost::optional<BoostPolygon> initialBoostPolygon = nonIntersectingBoostPolygonFromVertices(polygon, allPoints, tol);
+    if (!initialBoostPolygon){
+      return result;
+    }
+
+    std::vector<BoostPolygon> boostPolygons;
+    boostPolygons.push_back(*initialBoostPolygon);
+
+    std::vector<BoostPolygon> newBoostPolygons;
+    for (const std::vector<Point3d>& hole : holes){
+      boost::optional<BoostPolygon> boostHole = nonIntersectingBoostPolygonFromVertices(hole, allPoints, tol);
+      if (!boostHole){
+        return result;
+      }
+      
+      for (const BoostPolygon& boostPolygon : boostPolygons){
+        std::vector<BoostPolygon> diffResult;
+        boost::geometry::difference(boostPolygon, *boostHole, diffResult);
+        diffResult = removeSpikes(diffResult);
+        diffResult = removeHoles(diffResult);
+        newBoostPolygons.insert(newBoostPolygons.end(), diffResult.begin(), diffResult.end());
+      }
+      boostPolygons.swap(newBoostPolygons);
+    }
+
+    for (const BoostPolygon& boostPolygon : boostPolygons){
+      result.push_back(verticesFromBoostPolygon(boostPolygon, allPoints, tol));
+    }
+
+    return result;
+  }
+
+  bool selfIntersects(const std::vector<Point3d>& polygon, double tol)
+  {
+    // convert vertices to boost rings
+    std::vector<Point3d> allPoints;
+
+    boost::optional<BoostPolygon> bp = nonIntersectingBoostPolygonFromVertices(polygon, allPoints, tol);
+    if (bp){
+      // able to get a non intersecting polygon, so does not self intersect
+      return false;
+    }
+    return true;
+  }
+
+  bool intersects(const std::vector<Point3d>& polygon1, const std::vector<Point3d>& polygon2, double tol)
+  {
+    // convert vertices to boost rings
+    std::vector<Point3d> allPoints;
+
+    boost::optional<BoostPolygon> bp1 = boostPolygonFromVertices(polygon1, allPoints, tol);
+    boost::optional<BoostPolygon> bp2 = boostPolygonFromVertices(polygon2, allPoints, tol);
+
+    if (bp1 && bp2){
+      return boost::geometry::intersects(*bp1, *bp2);
+    }
+
+    return false;
+  }
+
+  bool within(const Point3d& point1, const std::vector<Point3d>& polygon2, double tol)
+  {
+    std::vector<Point3d> geometry1;
+    geometry1.push_back(point1);
+    return within(geometry1, polygon2, tol);
+  }
+
+  bool within(const std::vector<Point3d>& geometry1, const std::vector<Point3d>& polygon2, double tol)
+  {
+    // convert vertices to boost rings
+    std::vector<Point3d> allPoints;
+
+    if (geometry1.size() == 1){
+      if (geometry1[0].z() > tol){
+        return false;
+      }
+
+      boost::tuple<double, double> p = boostPointFromPoint3d(geometry1[0], allPoints, tol);
+      BoostPoint boostPoint(p.get<0>(), p.get<1>());
+
+      boost::optional<BoostPolygon> bp2 = boostPolygonFromVertices(polygon2, allPoints, tol);
+
+      if (bp2){
+        return boost::geometry::within(boostPoint, *bp2);
+      }
+
+      return false;
+    }
+
+    /*
+    // DLM: this is the better implementation, requires boost 1.57
+    boost::optional<BoostPolygon> bp1 = boostPolygonFromVertices(geometry1, allPoints, tol);
+    boost::optional<BoostPolygon> bp2 = boostPolygonFromVertices(polygon2, allPoints, tol);
+    if (bp1 && bp2){
+      return boost::geometry::within(*bp1, *bp2);
+    }
+    */
+
+    // DLM: temp code
+    if (geometry1.size() < 3){
+      return false;
+    }
+    boost::optional<BoostPolygon> bp2 = boostPolygonFromVertices(polygon2, allPoints, tol);
+    if (bp2){
+      for (const Point3d& point : geometry1)
+      {
+        boost::tuple<double, double> p = boostPointFromPoint3d(point, allPoints, tol);
+        BoostPoint boostPoint(p.get<0>(), p.get<1>());
+
+        if (!boost::geometry::within(boostPoint, *bp2)){
+          return false;
+        }
+      }
+    } else{
+      return false;
+    }
+
+    return true;
   }
 
 } // openstudio

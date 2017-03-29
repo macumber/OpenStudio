@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "CoilHeatingDXSingleSpeed.hpp"
 #include "CoilHeatingDXSingleSpeed_Impl.hpp"
@@ -35,6 +44,8 @@
 #include "AirLoopHVACUnitaryHeatPumpAirToAir_Impl.hpp"
 #include "AirLoopHVACUnitarySystem.hpp"
 #include "AirLoopHVACUnitarySystem_Impl.hpp"
+#include "AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass.hpp"
+#include "AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass_Impl.hpp"
 #include "ZoneHVACComponent.hpp"
 #include "ZoneHVACComponent_Impl.hpp"
 #include "ZoneHVACPackagedTerminalHeatPump.hpp"
@@ -44,7 +55,9 @@
 #include "AirLoopHVAC.hpp"
 #include "AirLoopHVAC_Impl.hpp"
 #include <utilities/idd/IddFactory.hxx>
+
 #include <utilities/idd/OS_Coil_Heating_DX_SingleSpeed_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 #include "../utilities/core/Assert.hpp"
 
 namespace openstudio {
@@ -616,21 +629,6 @@ namespace detail {
   {
     CoilHeatingDXSingleSpeed newCoil = StraightComponent_Impl::clone(model).cast<CoilHeatingDXSingleSpeed>();
 
-    Curve curve1 = totalHeatingCapacityFunctionofTemperatureCurve();
-    newCoil.setTotalHeatingCapacityFunctionofTemperatureCurve(curve1.clone(model).cast<Curve>());
-
-    Curve curve2 = totalHeatingCapacityFunctionofFlowFractionCurve();
-    newCoil.setTotalHeatingCapacityFunctionofFlowFractionCurve(curve2.clone(model).cast<Curve>());
-
-    Curve curve3 = energyInputRatioFunctionofTemperatureCurve();
-    newCoil.setEnergyInputRatioFunctionofTemperatureCurve(curve3.clone(model).cast<Curve>());
-
-    Curve curve4 = energyInputRatioFunctionofFlowFractionCurve();
-    newCoil.setEnergyInputRatioFunctionofFlowFractionCurve(curve4.clone(model).cast<Curve>());
-
-    Curve curve5 = partLoadFractionCorrelationCurve();
-    newCoil.setPartLoadFractionCorrelationCurve(curve5.clone(model).cast<Curve>());
-
     return newCoil;
   }
 
@@ -646,6 +644,20 @@ namespace detail {
         if( heatingCoil->handle() == this->handle() )
         {
           return airLoopHVACUnitarySystem;
+        }
+      }
+    }
+
+    // AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass
+    std::vector<AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass> bypassSystems = this->model().getConcreteModelObjects<AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass>();
+
+    for( const auto & bypassSystem : bypassSystems )
+    {
+      if( boost::optional<HVACComponent> heatingCoil = bypassSystem.heatingCoil() )
+      {
+        if( heatingCoil->handle() == this->handle() )
+        {
+          return bypassSystem;
         }
       }
     }
@@ -734,6 +746,17 @@ namespace detail {
     return false;
   }
 
+  double CoilHeatingDXSingleSpeed_Impl::ratedSupplyFanPowerPerVolumeFlowRate() const {
+    boost::optional<double> value = getDouble(OS_Coil_Heating_DX_SingleSpeedFields::RatedSupplyFanPowerPerVolumeFlowRate,true);
+    OS_ASSERT(value);
+    return value.get();
+  }
+
+  bool CoilHeatingDXSingleSpeed_Impl::setRatedSupplyFanPowerPerVolumeFlowRate(double ratedSupplyFanPowerPerVolumeFlowRate) {
+    bool result = setDouble(OS_Coil_Heating_DX_SingleSpeedFields::RatedSupplyFanPowerPerVolumeFlowRate, ratedSupplyFanPowerPerVolumeFlowRate);
+    return result;
+  }
+
 } // detail
 
 CoilHeatingDXSingleSpeed::CoilHeatingDXSingleSpeed( const Model& model,
@@ -764,6 +787,8 @@ CoilHeatingDXSingleSpeed::CoilHeatingDXSingleSpeed( const Model& model,
 
   autosizeRatedAirFlowRate();
 
+  setRatedSupplyFanPowerPerVolumeFlowRate(773.3);
+
   setRatedCOP(5.0);
 
   setDefrostStrategy("Resistive");
@@ -774,6 +799,80 @@ CoilHeatingDXSingleSpeed::CoilHeatingDXSingleSpeed( const Model& model,
 
   setResistiveDefrostHeaterCapacity(2000.0);
 }
+
+CoilHeatingDXSingleSpeed::CoilHeatingDXSingleSpeed(const Model& model)
+  : StraightComponent(CoilHeatingDXSingleSpeed::iddObjectType(),model)
+{
+  OS_ASSERT(getImpl<detail::CoilHeatingDXSingleSpeed_Impl>());
+
+  auto availabilitySchedule = model.alwaysOnDiscreteSchedule();
+  setAvailabilitySchedule(availabilitySchedule);
+
+  CurveCubic totalHeatingCapacityFunctionofTemperatureCurve(model);
+  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient1Constant(0.758746);
+  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient2x(0.027626);
+  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient3xPOW2(0.000148716);
+  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient4xPOW3(0.0000034992);
+  totalHeatingCapacityFunctionofTemperatureCurve.setMinimumValueofx(-20.0);
+  totalHeatingCapacityFunctionofTemperatureCurve.setMaximumValueofx(20.0);
+
+  CurveCubic totalHeatingCapacityFunctionofFlowFractionCurve(model);
+  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient1Constant(0.84);
+  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient2x(0.16);
+  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient3xPOW2(0.0);
+  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient4xPOW3(0.0);
+  totalHeatingCapacityFunctionofFlowFractionCurve.setMinimumValueofx(0.5);
+  totalHeatingCapacityFunctionofFlowFractionCurve.setMaximumValueofx(1.5);
+
+  CurveCubic energyInputRatioFunctionofTemperatureCurve(model);
+  energyInputRatioFunctionofTemperatureCurve.setCoefficient1Constant(1.19248);
+  energyInputRatioFunctionofTemperatureCurve.setCoefficient2x(-0.0300438);
+  energyInputRatioFunctionofTemperatureCurve.setCoefficient3xPOW2(0.00103745);
+  energyInputRatioFunctionofTemperatureCurve.setCoefficient4xPOW3(-0.000023328);
+  energyInputRatioFunctionofTemperatureCurve.setMinimumValueofx(-20.0);
+  energyInputRatioFunctionofTemperatureCurve.setMaximumValueofx(20.0);
+
+  CurveQuadratic energyInputRatioFunctionofFlowFractionCurve(model);
+  energyInputRatioFunctionofFlowFractionCurve.setCoefficient1Constant(1.3824);
+  energyInputRatioFunctionofFlowFractionCurve.setCoefficient2x(-0.4336);
+  energyInputRatioFunctionofFlowFractionCurve.setCoefficient3xPOW2(0.0512);
+  energyInputRatioFunctionofFlowFractionCurve.setMinimumValueofx(0.0);
+  energyInputRatioFunctionofFlowFractionCurve.setMaximumValueofx(1.0);
+
+  CurveQuadratic partLoadFractionCorrelationCurve(model);
+  partLoadFractionCorrelationCurve.setCoefficient1Constant(0.75);
+  partLoadFractionCorrelationCurve.setCoefficient2x(0.25);
+  partLoadFractionCorrelationCurve.setCoefficient3xPOW2(0.0);
+  partLoadFractionCorrelationCurve.setMinimumValueofx(0.0);
+  partLoadFractionCorrelationCurve.setMaximumValueofx(1.0);
+
+  setTotalHeatingCapacityFunctionofTemperatureCurve(totalHeatingCapacityFunctionofTemperatureCurve);
+
+  setTotalHeatingCapacityFunctionofFlowFractionCurve(totalHeatingCapacityFunctionofFlowFractionCurve);
+
+  setEnergyInputRatioFunctionofTemperatureCurve(energyInputRatioFunctionofTemperatureCurve);
+
+  setEnergyInputRatioFunctionofFlowFractionCurve(energyInputRatioFunctionofFlowFractionCurve);
+
+  setPartLoadFractionCorrelationCurve(partLoadFractionCorrelationCurve);
+
+  autosizeRatedTotalHeatingCapacity();
+
+  autosizeRatedAirFlowRate();
+
+  setRatedSupplyFanPowerPerVolumeFlowRate(773.3);
+
+  setRatedCOP(5.0);
+
+  setDefrostStrategy("Resistive");
+
+  setDefrostControl("Timed");
+
+  setDefrostTimePeriodFraction(0.166667);
+
+  setResistiveDefrostHeaterCapacity(2000.0);
+}
+
 
 IddObjectType CoilHeatingDXSingleSpeed::iddObjectType() {
   IddObjectType result(IddObjectType::OS_Coil_Heating_DX_SingleSpeed);
@@ -1045,6 +1144,13 @@ void CoilHeatingDXSingleSpeed::resetDefrostEnergyInputRatioFunctionofTemperature
   getImpl<detail::CoilHeatingDXSingleSpeed_Impl>()->setDefrostEnergyInputRatioFunctionofTemperatureCurve(boost::none);
 }
 
+double CoilHeatingDXSingleSpeed::ratedSupplyFanPowerPerVolumeFlowRate() const {
+  return getImpl<detail::CoilHeatingDXSingleSpeed_Impl>()->ratedSupplyFanPowerPerVolumeFlowRate();
+}
+
+bool CoilHeatingDXSingleSpeed::setRatedSupplyFanPowerPerVolumeFlowRate(double ratedSupplyFanPowerPerVolumeFlowRate) {
+  return getImpl<detail::CoilHeatingDXSingleSpeed_Impl>()->setRatedSupplyFanPowerPerVolumeFlowRate(ratedSupplyFanPowerPerVolumeFlowRate);
+}
 
 /// @cond
 CoilHeatingDXSingleSpeed::CoilHeatingDXSingleSpeed(std::shared_ptr<detail::CoilHeatingDXSingleSpeed_Impl> impl)

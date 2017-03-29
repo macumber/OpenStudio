@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "../ForwardTranslator.hpp"
 
@@ -29,6 +38,8 @@
 #include "../../model/PortList_Impl.hpp"
 #include "../../model/ZoneHVACEquipmentList.hpp"
 #include "../../model/ZoneHVACEquipmentList_Impl.hpp"
+#include "../../model/ZoneVentilationDesignFlowRate.hpp"
+#include "../../model/ZoneVentilationDesignFlowRate_Impl.hpp"
 #include "../../model/SizingZone.hpp"
 #include "../../model/SizingZone_Impl.hpp"
 #include "../../model/Schedule.hpp"
@@ -39,13 +50,19 @@
 #include "../../model/SetpointManagerSingleZoneReheat.hpp"
 #include "../../model/AirLoopHVAC.hpp"
 #include "../../model/AirLoopHVAC_Impl.hpp"
+#include "../../model/Thermostat.hpp"
+#include "../../model/Thermostat_Impl.hpp"
 #include "../../model/ThermostatSetpointDualSetpoint.hpp"
 #include "../../model/ThermostatSetpointDualSetpoint_Impl.hpp"
+#include "../../model/ZoneControlContaminantController.hpp"
 #include "../../model/ZoneControlHumidistat.hpp"
+#include "../../model/ZoneControlThermostatStagedDualSetpoint.hpp"
 #include "../../model/DesignSpecificationOutdoorAir.hpp"
 #include "../../model/DesignSpecificationOutdoorAir_Impl.hpp"
 #include "../../model/SizingPeriod.hpp"
 #include "../../model/SizingPeriod_Impl.hpp"
+#include "../../model/ModelObject.hpp"
+#include "../../model/ModelObject_Impl.hpp"
 
 #include "../../model/Space.hpp"
 #include "../../model/Space_Impl.hpp"
@@ -106,15 +123,18 @@
 #include "../../model/GlareSensor.hpp"
 #include "../../model/GlareSensor_Impl.hpp"
 #include "../../model/LifeCycleCost.hpp"
+#include "../../model/ZoneMixing.hpp"
 
 #include "../../utilities/idf/IdfExtensibleGroup.hpp"
 #include "../../utilities/idf/Workspace.hpp"
 #include "../../utilities/idf/WorkspaceObjectOrder.hpp"
 #include "../../utilities/core/Logger.hpp"
 #include "../../utilities/core/Assert.hpp"
+#include <utilities/idd/OS_ThermalZone_FieldEnums.hxx>
 #include <utilities/idd/Zone_FieldEnums.hxx>
 #include <utilities/idd/HVACTemplate_Zone_IdealLoadsAirSystem_FieldEnums.hxx>
 #include <utilities/idd/Daylighting_Controls_FieldEnums.hxx>
+#include <utilities/idd/Daylighting_ReferencePoint_FieldEnums.hxx>
 #include <utilities/idd/Output_IlluminanceMap_FieldEnums.hxx>
 #include <utilities/idd/Schedule_Compact_FieldEnums.hxx>
 #include <utilities/idd/ZoneHVAC_EquipmentConnections_FieldEnums.hxx>
@@ -124,9 +144,11 @@
 #include <utilities/idd/DesignSpecification_OutdoorAir_FieldEnums.hxx>
 #include <utilities/idd/ZoneVentilation_DesignFlowRate_FieldEnums.hxx>
 
+#include "../../utilities/idd/IddEnums.hpp"
 #include <utilities/idd/IddEnums.hxx>
 #include <utilities/idd/IddFactory.hxx>
 #include "../../utilities/geometry/Geometry.hpp"
+#include <algorithm>
 
 using namespace openstudio::model;
 
@@ -161,6 +183,12 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
   if (modelObject.volume()){
     idfObject.setDouble(openstudio::ZoneFields::Volume,modelObject.volume().get());
   }
+
+  // DLM: currently there is no setter for floorArea and the getter does not return the value from this field
+  if (modelObject.getDouble(openstudio::OS_ThermalZoneFields::FloorArea)){
+    idfObject.setDouble(openstudio::ZoneFields::FloorArea, modelObject.getDouble(openstudio::OS_ThermalZoneFields::FloorArea).get());
+  }
+
 
   if (modelObject.zoneInsideConvectionAlgorithm()){
     idfObject.setString(openstudio::ZoneFields::ZoneInsideConvectionAlgorithm,modelObject.zoneInsideConvectionAlgorithm().get());
@@ -305,83 +333,119 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
 
       daylightingControlObject.setString(
           Daylighting_ControlsFields::ZoneName,
-          modelObject.name().get());
-
-      daylightingControlObject.setInt(
-          Daylighting_ControlsFields::TotalDaylightingReferencePoints,
-          numPoints);
+          modelObject.nameString());
 
       // Primary Control
-      daylightingControlObject.setDouble(
-          Daylighting_ControlsFields::XCoordinateofFirstReferencePoint,
+      IdfObject primaryReferencePoint(openstudio::IddObjectType::Daylighting_ReferencePoint);
+      primaryReferencePoint.setName(primaryDaylightingControl->nameString());
+      m_idfObjects.push_back(primaryReferencePoint);
+
+      OptionalSpace refSpace = primaryDaylightingControl->space();
+      if (refSpace){
+        OptionalThermalZone refThermalZone = refSpace->thermalZone();
+        if (refThermalZone){
+          primaryReferencePoint.setString(Daylighting_ReferencePointFields::ZoneName, refThermalZone->nameString());
+        }
+      }
+      
+      primaryReferencePoint.setDouble(
+          Daylighting_ReferencePointFields::XCoordinateofReferencePoint,
           primaryDaylightingControl->positionXCoordinate());
-      daylightingControlObject.setDouble(
-          Daylighting_ControlsFields::YCoordinateofFirstReferencePoint,
+      primaryReferencePoint.setDouble(
+          Daylighting_ReferencePointFields::YCoordinateofReferencePoint,
           primaryDaylightingControl->positionYCoordinate());
-      daylightingControlObject.setDouble(
-          Daylighting_ControlsFields::ZCoordinateofFirstReferencePoint,
+      primaryReferencePoint.setDouble(
+          Daylighting_ReferencePointFields::ZCoordinateofReferencePoint,
           primaryDaylightingControl->positionZCoordinate());
       
+      std::string fractionofZoneControlledbyFirstReferencePoint;
       if (istringEqual("None", primaryDaylightingControl->lightingControlType())){
-        daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::FractionofZoneControlledbyFirstReferencePoint,
-            0.0);
+        fractionofZoneControlledbyFirstReferencePoint = "0.0";
       }else{
-        daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::FractionofZoneControlledbyFirstReferencePoint,
-            modelObject.fractionofZoneControlledbyPrimaryDaylightingControl());
+        std::stringstream ss;
+        ss << modelObject.fractionofZoneControlledbyPrimaryDaylightingControl();
+        fractionofZoneControlledbyFirstReferencePoint = ss.str();
       }
       
+      std::string illuminanceSetpointatFirstReferencePoint;
       if (!primaryDaylightingControl->isIlluminanceSetpointDefaulted()){
-        daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::IlluminanceSetpointatFirstReferencePoint,
-            primaryDaylightingControl->illuminanceSetpoint());
+        std::stringstream ss;
+        ss << primaryDaylightingControl->illuminanceSetpoint();
+        illuminanceSetpointatFirstReferencePoint = ss.str();
       }
+
+      std::vector<std::string> firstGroup;
+      firstGroup.push_back(primaryReferencePoint.nameString());
+      firstGroup.push_back(fractionofZoneControlledbyFirstReferencePoint);
+      firstGroup.push_back(illuminanceSetpointatFirstReferencePoint);
+      daylightingControlObject.pushExtensibleGroup(firstGroup);
 
       // Secondary Control
       if (secondaryDaylightingControl){
-        daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::XCoordinateofSecondReferencePoint,
-            secondaryDaylightingControl->positionXCoordinate());
-        daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::YCoordinateofSecondReferencePoint,
-            secondaryDaylightingControl->positionYCoordinate());
-        daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::ZCoordinateofSecondReferencePoint,
-            secondaryDaylightingControl->positionZCoordinate());
-        
-        if (istringEqual("None", secondaryDaylightingControl->lightingControlType())){
-          daylightingControlObject.setDouble(
-              Daylighting_ControlsFields::FractionofZoneControlledbySecondReferencePoint,
-              0.0);
-        }else{
-          daylightingControlObject.setDouble(
-              Daylighting_ControlsFields::FractionofZoneControlledbySecondReferencePoint,
-              modelObject.fractionofZoneControlledbySecondaryDaylightingControl());
+        IdfObject secondaryReferencePoint(openstudio::IddObjectType::Daylighting_ReferencePoint);
+        secondaryReferencePoint.setName(secondaryDaylightingControl->nameString());
+        m_idfObjects.push_back(secondaryReferencePoint);
+
+        refSpace = secondaryDaylightingControl->space();
+        if (refSpace){
+          OptionalThermalZone refThermalZone = refSpace->thermalZone();
+          if (refThermalZone){
+            secondaryReferencePoint.setString(Daylighting_ReferencePointFields::ZoneName, refThermalZone->nameString());
+          }
         }
 
-        if (!secondaryDaylightingControl->isIlluminanceSetpointDefaulted()){
-          daylightingControlObject.setDouble(
-              Daylighting_ControlsFields::IlluminanceSetpointatSecondReferencePoint,
-              secondaryDaylightingControl->illuminanceSetpoint());
+        secondaryReferencePoint.setString(Daylighting_ReferencePointFields::ZoneName, modelObject.nameString());
+        secondaryReferencePoint.setDouble(
+            Daylighting_ReferencePointFields::XCoordinateofReferencePoint,
+            secondaryDaylightingControl->positionXCoordinate());
+        secondaryReferencePoint.setDouble(
+            Daylighting_ReferencePointFields::YCoordinateofReferencePoint,
+            secondaryDaylightingControl->positionYCoordinate());
+        secondaryReferencePoint.setDouble(
+            Daylighting_ReferencePointFields::ZCoordinateofReferencePoint,
+            secondaryDaylightingControl->positionZCoordinate());
+        
+        std::string fractionofZoneControlledbySecondReferencePoint;
+        if (istringEqual("None", secondaryDaylightingControl->lightingControlType())){
+          fractionofZoneControlledbySecondReferencePoint = "0.0";
+        }else{
+          std::stringstream ss;
+          ss << modelObject.fractionofZoneControlledbySecondaryDaylightingControl();
+          fractionofZoneControlledbySecondReferencePoint = ss.str();
         }
+
+        std::string illuminanceSetpointatSecondReferencePoint;
+        if (!secondaryDaylightingControl->isIlluminanceSetpointDefaulted()){
+          std::stringstream ss;
+          ss << secondaryDaylightingControl->illuminanceSetpoint();
+          illuminanceSetpointatSecondReferencePoint = ss.str();      
+        }
+
+        std::vector<std::string> secondGroup;
+        secondGroup.push_back(secondaryReferencePoint.nameString());
+        secondGroup.push_back(fractionofZoneControlledbySecondReferencePoint);
+        secondGroup.push_back(illuminanceSetpointatSecondReferencePoint);
+        daylightingControlObject.pushExtensibleGroup(secondGroup);
+
       }
 
       // Shared Data
       std::string lightingControlType = primaryDaylightingControl->lightingControlType();
       if (istringEqual("None", lightingControlType)){
-        // fraction for first point have been set to 0, get control type from second point
-        lightingControlType = secondaryDaylightingControl->lightingControlType();
+        // fraction for first point have been set to 0, try to get control type from second point
+        if (secondaryDaylightingControl){
+          lightingControlType = secondaryDaylightingControl->lightingControlType();
+        }
       }
 
       if (istringEqual("None", lightingControlType)){
         // both fractions are 0
       }else if (istringEqual("Continuous", lightingControlType)){
-        daylightingControlObject.setInt(Daylighting_ControlsFields::LightingControlType, 1);
+        daylightingControlObject.setString(Daylighting_ControlsFields::LightingControlType, "Continuous");
       }else if(istringEqual("Stepped", lightingControlType)){
-        daylightingControlObject.setInt(Daylighting_ControlsFields::LightingControlType, 2);
+        daylightingControlObject.setString(Daylighting_ControlsFields::LightingControlType, "Stepped");
       }else if(istringEqual("Continuous/Off", lightingControlType)){
-        daylightingControlObject.setInt(Daylighting_ControlsFields::LightingControlType, 3);
+        daylightingControlObject.setString(Daylighting_ControlsFields::LightingControlType, "ContinuousOff");
       }else{
         LOG(Warn, "Unknown lighting control type '" << lightingControlType << "' for OS:Daylighting:Control " << primaryDaylightingControl->name().get());
       }
@@ -394,6 +458,7 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
         LOG(Warn, "Rotation of " << primaryDaylightingControl->phiRotationAroundZAxis() << " degrees about Z axis not mapped for OS:Daylighting:Control " << primaryDaylightingControl->name().get());
       }
 
+      // glare 
       double glareAngle = -openstudio::radToDeg(primaryDaylightingControl->thetaRotationAroundYAxis());
       daylightingControlObject.setDouble(
           Daylighting_ControlsFields::GlareCalculationAzimuthAngleofViewDirectionClockwisefromZoneyAxis,
@@ -401,19 +466,24 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
 
       if (OptionalDouble d = primaryDaylightingControl->maximumAllowableDiscomfortGlareIndex()){
         daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::MaximumAllowableDiscomfortGlareIndex,
-            *d);
+          Daylighting_ControlsFields::MaximumAllowableDiscomfortGlareIndex,
+          *d);
       }
+      
+      daylightingControlObject.setString(
+        Daylighting_ControlsFields::GlareCalculationDaylightingReferencePointName,
+        primaryReferencePoint.nameString());
+      
 
       if (!primaryDaylightingControl->isMinimumInputPowerFractionforContinuousDimmingControlDefaulted()){
         daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::MinimumInputPowerFractionforContinuousDimmingControl,
+            Daylighting_ControlsFields::MinimumInputPowerFractionforContinuousorContinuousOffDimmingControl,
             primaryDaylightingControl->minimumInputPowerFractionforContinuousDimmingControl());
       }
 
       if (!primaryDaylightingControl->isMinimumLightOutputFractionforContinuousDimmingControlDefaulted()) {
         daylightingControlObject.setDouble(
-            Daylighting_ControlsFields::MinimumLightOutputFractionforContinuousDimmingControl,
+            Daylighting_ControlsFields::MinimumLightOutputFractionforContinuousorContinuousOffDimmingControl,
             primaryDaylightingControl->minimumLightOutputFractionforContinuousDimmingControl());
       }
 
@@ -435,19 +505,29 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
     boost::optional<IlluminanceMap> illuminanceMap = modelObject.illuminanceMap();
     if (illuminanceMap){
 
+      
       if (!primaryDaylightingControl){
         LOG(Warn, "Daylighting:Controls object is required to trigger daylighting calculations in EnergyPlus, adding a minimal one to Zone " << modelObject.name().get());
+        
+        IdfObject referencePoint(openstudio::IddObjectType::Daylighting_ReferencePoint);
+        referencePoint.setName(modelObject.nameString() + " Daylighting Reference Point");
+        m_idfObjects.push_back(referencePoint);
+        referencePoint.setString(Daylighting_ReferencePointFields::ZoneName, modelObject.nameString());
+        referencePoint.setDouble(Daylighting_ReferencePointFields::XCoordinateofReferencePoint, illuminanceMap->originXCoordinate() + 0.5*illuminanceMap->xLength());
+        referencePoint.setDouble(Daylighting_ReferencePointFields::YCoordinateofReferencePoint, illuminanceMap->originYCoordinate() + 0.5*illuminanceMap->yLength());
+        referencePoint.setDouble(Daylighting_ReferencePointFields::ZCoordinateofReferencePoint, illuminanceMap->originZCoordinate());
 
         IdfObject daylightingControlObject(openstudio::IddObjectType::Daylighting_Controls);
         m_idfObjects.push_back(daylightingControlObject);
 
-        daylightingControlObject.setString(Daylighting_ControlsFields::ZoneName, modelObject.name().get());
-        daylightingControlObject.setInt(Daylighting_ControlsFields::TotalDaylightingReferencePoints, 1);
-        daylightingControlObject.setDouble(Daylighting_ControlsFields::XCoordinateofFirstReferencePoint, 0.0);
-        daylightingControlObject.setDouble(Daylighting_ControlsFields::YCoordinateofFirstReferencePoint, 0.0);
-        daylightingControlObject.setDouble(Daylighting_ControlsFields::FractionofZoneControlledbyFirstReferencePoint, 0.0);
+        daylightingControlObject.setString(Daylighting_ControlsFields::ZoneName, modelObject.nameString());
+        std::vector<std::string> group;
+        group.push_back(referencePoint.nameString()); // ref point name
+        group.push_back("0.0"); // fraction controlled
+        group.push_back(""); // illuminance setpoint
+        daylightingControlObject.pushExtensibleGroup(group);
       }
-
+      
 
       IdfObject illuminanceMapObject(openstudio::IddObjectType::Output_IlluminanceMap);
       m_idfObjects.push_back(illuminanceMapObject);
@@ -495,41 +575,79 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
     }
   }
 
+  // translate zone mixing objects which supply air to this zone
+  ZoneMixingVector supplyZoneMixing = modelObject.supplyZoneMixing();
+  std::sort(supplyZoneMixing.begin(), supplyZoneMixing.end(), WorkspaceObjectNameLess());
+  for (ZoneMixing& mixing : supplyZoneMixing){
+    translateAndMapModelObject(mixing);
+  }
+
+  auto zoneEquipment = modelObject.equipment();
+
+  // In OS ZoneVentilationDesignFlowRate is considered zone equipment,
+  // but for the E+ perspective it is not so we have to remove them,
+  // and treat them differently.
+  auto isZoneVentilationDesignFlowRate = [](const ModelObject & mo) {
+    return (mo.iddObjectType() == ZoneVentilationDesignFlowRate::iddObjectType());
+  };
+
+  std::vector<model::ModelObject> zoneVentilationObjects;
+  std::copy_if(zoneEquipment.begin(),zoneEquipment.end(),std::back_inserter(zoneVentilationObjects),isZoneVentilationDesignFlowRate);
+
+  auto zoneVentilationBegin = std::remove_if(zoneEquipment.begin(),zoneEquipment.end(),isZoneVentilationDesignFlowRate);
+  zoneEquipment.erase(zoneVentilationBegin,zoneEquipment.end());
+
   // translate thermostat and/or humidistat
-  if( ( modelObject.equipment().size() > 0 ) || modelObject.useIdealAirLoads() )
+  if( ( zoneEquipment.size() > 0 ) || modelObject.useIdealAirLoads() )
   {
     // Thermostat
-    if( boost::optional<ThermostatSetpointDualSetpoint> thermostat = modelObject.thermostatSetpointDualSetpoint() )
+    if( auto thermostat = modelObject.thermostat() )
     {
-      IdfObject zoneControlThermostat(openstudio::IddObjectType::ZoneControl_Thermostat);
-      zoneControlThermostat.setString(ZoneControl_ThermostatFields::Name,modelObject.name().get() + " Thermostat");
-      zoneControlThermostat.setString(ZoneControl_ThermostatFields::ZoneorZoneListName,modelObject.name().get());
-      m_idfObjects.push_back(zoneControlThermostat);
-
-      IdfObject scheduleCompact(openstudio::IddObjectType::Schedule_Compact);
-      scheduleCompact.setName(modelObject.name().get() + " Thermostat Schedule");
-      m_idfObjects.push_back(scheduleCompact);
-      scheduleCompact.setString(1,modelObject.name().get() + " Thermostat Schedule Type Limits");
-      scheduleCompact.setString(2,"Through: 12/31");
-      scheduleCompact.setString(3,"For: AllDays");
-      scheduleCompact.setString(4,"Until: 24:00");
-      scheduleCompact.setString(5,"4");
-
-      IdfObject scheduleTypeLimits(openstudio::IddObjectType::ScheduleTypeLimits);
-      scheduleTypeLimits.setName(modelObject.name().get() + " Thermostat Schedule Type Limits");
-      m_idfObjects.push_back(scheduleTypeLimits);
-      scheduleTypeLimits.setString(1,"0");
-      scheduleTypeLimits.setString(2,"4");
-      scheduleTypeLimits.setString(3,"DISCRETE");
-
-      zoneControlThermostat.setString(ZoneControl_ThermostatFields::ControlTypeScheduleName,scheduleCompact.name().get());
-
-      if( boost::optional<IdfObject> idfThermostat = translateAndMapModelObject(thermostat.get()) )
+      if( thermostat->iddObjectType() == ZoneControlThermostatStagedDualSetpoint::iddObjectType() )
       {
-        StringVector values(zoneControlThermostat.iddObject().properties().numExtensible);
-        values[ZoneControl_ThermostatExtensibleFields::ControlObjectType] = idfThermostat->iddObject().name();
-        values[ZoneControl_ThermostatExtensibleFields::ControlName] = idfThermostat->name().get();
-        IdfExtensibleGroup eg = zoneControlThermostat.pushExtensibleGroup(values);
+        translateAndMapModelObject(thermostat.get());
+      } else {
+        auto createZoneControlThermostat = [&]() {
+          IdfObject zoneControlThermostat(openstudio::IddObjectType::ZoneControl_Thermostat);
+          zoneControlThermostat.setString(ZoneControl_ThermostatFields::Name,modelObject.name().get() + " Thermostat");
+          zoneControlThermostat.setString(ZoneControl_ThermostatFields::ZoneorZoneListName,modelObject.name().get());
+          m_idfObjects.push_back(zoneControlThermostat);
+
+          IdfObject scheduleCompact(openstudio::IddObjectType::Schedule_Compact);
+          scheduleCompact.setName(modelObject.name().get() + " Thermostat Schedule");
+          m_idfObjects.push_back(scheduleCompact);
+          scheduleCompact.setString(1,modelObject.name().get() + " Thermostat Schedule Type Limits");
+          scheduleCompact.setString(2,"Through: 12/31");
+          scheduleCompact.setString(3,"For: AllDays");
+          scheduleCompact.setString(4,"Until: 24:00");
+          scheduleCompact.setString(5,"4");
+
+          IdfObject scheduleTypeLimits(openstudio::IddObjectType::ScheduleTypeLimits);
+          scheduleTypeLimits.setName(modelObject.name().get() + " Thermostat Schedule Type Limits");
+          m_idfObjects.push_back(scheduleTypeLimits);
+          scheduleTypeLimits.setString(1,"0");
+          scheduleTypeLimits.setString(2,"4");
+          scheduleTypeLimits.setString(3,"DISCRETE");
+
+          zoneControlThermostat.setString(ZoneControl_ThermostatFields::ControlTypeScheduleName,scheduleCompact.name().get());
+
+          if( boost::optional<IdfObject> idfThermostat = translateAndMapModelObject(thermostat.get()) )
+          {
+            StringVector values(zoneControlThermostat.iddObject().properties().numExtensible);
+            values[ZoneControl_ThermostatExtensibleFields::ControlObjectType] = idfThermostat->iddObject().name();
+            values[ZoneControl_ThermostatExtensibleFields::ControlName] = idfThermostat->name().get();
+            IdfExtensibleGroup eg = zoneControlThermostat.pushExtensibleGroup(values);
+          }
+        };
+
+        // Only translate ThermostatSetpointDualSetpoint if there are schedules attached
+        if( auto dualSetpoint = thermostat->optionalCast<ThermostatSetpointDualSetpoint>() ) {
+          if( dualSetpoint->heatingSetpointTemperatureSchedule() && dualSetpoint->coolingSetpointTemperatureSchedule() ) {
+            createZoneControlThermostat();
+          }  
+        } else {
+          createZoneControlThermostat();
+        }
       }
     }
 
@@ -539,6 +657,11 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
       if( boost::optional<IdfObject> idfHumidistat = translateAndMapModelObject(humidistat.get()) ) {
         idfHumidistat->setString(ZoneControl_HumidistatFields::ZoneName,modelObject.name().get());
       }
+    }
+
+    // ZoneControlContaminantController
+    if( auto controller = modelObject.zoneControlContaminantController() ) {
+      translateAndMapModelObject(controller.get());
     }
   }
 
@@ -552,12 +675,13 @@ boost::optional<IdfObject> ForwardTranslator::translateThermalZone( ThermalZone 
     m_idfObjects.push_back(idealLoadsAirSystem); 
   }
 
-  ModelObjectVector zoneEquipment = modelObject.equipment();
+  // ZoneVentilationDesignFlowRate does not go on equipment connections or associated list
+  for( auto & zone_vent : zoneVentilationObjects ) {
+    translateAndMapModelObject(zone_vent);
+  }
 
-  if( zoneEquipment.size() > 0 )
-  {
+  if( zoneEquipment.size() > 0 ) {
     // ZoneHVAC_EquipmentConnections
-
     IdfObject connectionsObject(openstudio::IddObjectType::ZoneHVAC_EquipmentConnections);
     m_idfObjects.push_back(connectionsObject);
 

@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ScriptsTabView.hpp"
 
@@ -27,8 +36,11 @@
 #include "../shared_gui_components/MeasureManager.hpp"
 #include "../shared_gui_components/OSListView.hpp"
 #include "../shared_gui_components/SyncMeasuresDialog.hpp"
+#include "../shared_gui_components/EditController.hpp"
 
-#include "../analysisdriver/SimpleProject.hpp"
+#include "../utilities/plot/ProgressBar.hpp"
+
+#include "../energyplus/ForwardTranslator.hpp"
 
 #include <QLabel>
 #include <QVBoxLayout>
@@ -36,7 +48,7 @@
 namespace openstudio {
 
 ScriptsTabView::ScriptsTabView(QWidget * parent)
-  : MainTabView("Measures",false,parent)
+  : MainTabView("Measures", MainTabView::MAIN_TAB, parent)
 {
   //setTitle("Organize and Edit Measures for Project");
 
@@ -44,7 +56,7 @@ ScriptsTabView::ScriptsTabView(QWidget * parent)
 
   mainContent = new QWidget();
 
-  QVBoxLayout * mainContentVLayout = new QVBoxLayout();
+  auto mainContentVLayout = new QVBoxLayout();
   mainContentVLayout->setContentsMargins(0,0,0,0);
   mainContentVLayout->setSpacing(0);
   mainContentVLayout->setAlignment(Qt::AlignTop);
@@ -52,10 +64,10 @@ ScriptsTabView::ScriptsTabView(QWidget * parent)
 
   addTabWidget(mainContent);
 
-  variableGroupListView = new OSListView(true);
-  variableGroupListView->setContentsMargins(0,0,0,0);
-  variableGroupListView->setSpacing(0);
-  mainContentVLayout->addWidget(variableGroupListView);
+  workflowView = new OSListView(true);
+  workflowView->setContentsMargins(0,0,0,0);
+  workflowView->setSpacing(0);
+  mainContentVLayout->addWidget(workflowView);
 
   QString style;
   style.append("QWidget#Footer {");
@@ -63,12 +75,12 @@ ScriptsTabView::ScriptsTabView(QWidget * parent)
   style.append("background-color: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop: 0 #B6B5B6, stop: 1 #737172); ");
   style.append("}");
 
-  QWidget * footer = new QWidget();
+  auto footer = new QWidget();
   footer->setObjectName("Footer");
   footer->setStyleSheet(style);
   mainContentVLayout->addWidget(footer);
 
-  QHBoxLayout * layout = new QHBoxLayout();
+  auto layout = new QHBoxLayout();
   layout->setSpacing(0);
   footer->setLayout(layout);
 
@@ -85,27 +97,31 @@ void ScriptsTabView::showEvent(QShowEvent *e)
 {
   MainTabView::showEvent(e);
 
-  boost::optional<openstudio::analysisdriver::SimpleProject> project = OSAppBase::instance()->project();
-  if (project)
-  {
-    // DLM: why is this necessary?
-    OSAppBase::instance()->measureManager().updateMeasures(*project, project->measures(), false);
-  }
-  variableGroupListView->refreshAllViews();
+  workflowView->refreshAllViews();
 }
 
 //*****SLOTS*****
 
 void ScriptsTabView::openUpdateMeasuresDlg()
 {
+  m_updateMeasuresButton->setEnabled(false);
+
   openstudio::OSAppBase * app = OSAppBase::instance();
 
-  boost::optional<analysisdriver::SimpleProject> project = app->project();
-  OS_ASSERT(project);
+  app->currentDocument()->disable();
+ 
+  WorkflowJSON workflow = app->currentDocument()->model().workflowJSON();
 
-  m_syncMeasuresDialog = boost::shared_ptr<SyncMeasuresDialog>(new SyncMeasuresDialog(&(project.get()),&(app->measureManager())));
+  m_syncMeasuresDialog = boost::shared_ptr<SyncMeasuresDialog>(new SyncMeasuresDialog(workflow,&(app->measureManager())));
   m_syncMeasuresDialog->setGeometry(app->currentDocument()->mainWindow()->geometry());
   m_syncMeasuresDialog->exec();
+
+  app->currentDocument()->enable();
+
+  app->editController()->reset();
+  workflowView->refreshAllViews();
+
+  m_updateMeasuresButton->setEnabled(true);
 }
 
 } // openstudio

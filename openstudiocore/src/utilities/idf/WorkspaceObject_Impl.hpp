@@ -1,31 +1,39 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef UTILITIES_IDF_WORKSPACEOBJECT_IMPL_HPP
 #define UTILITIES_IDF_WORKSPACEOBJECT_IMPL_HPP
 
 #include <utilities/UtilitiesAPI.hpp>
+#include <nano/nano_signal_slot.hpp> // Signal-Slot replacement
 
 #include <utilities/idf/IdfObject_Impl.hpp>
 #include <utilities/idf/ObjectPointer.hpp>
-
-#include <QObject>
 
 namespace openstudio {
 
@@ -104,7 +112,6 @@ namespace detail {
   }
 
   class UTILITIES_API WorkspaceObject_Impl : public IdfObject_Impl {
-    Q_OBJECT;
    public:
 
     /** @name Constructors */
@@ -145,7 +152,7 @@ namespace detail {
     /** Get the value of field index, if index < numFields(). Optionally, if returnDefault is
      *  passed in as true, getString will return the default value for non-existent
      *  (non-extensible) fields and fields with empty data, if a default exists. */
-    virtual boost::optional<std::string> getString(unsigned index, bool returnDefault=false,bool returnUninitializedEmpty=false) const;
+    virtual boost::optional<std::string> getString(unsigned index, bool returnDefault=false,bool returnUninitializedEmpty=false) const override;
 
     /** Returns the object pointed to by the field at index, if it exists. */
     boost::optional<WorkspaceObject> getTarget(unsigned index) const;
@@ -173,19 +180,19 @@ namespace detail {
      *  otherwise. The return value and newName may differ (by an appended integer) if a
      *  conflict with newName was detected. Name conflicts will not be automatically avoided
      *  in IDF (text-only) mode. */
-    virtual boost::optional<std::string> setName(const std::string& newName);
-    virtual boost::optional<std::string> setName(const std::string& newName, bool checkValidity);
+    virtual boost::optional<std::string> setName(const std::string& newName) override;
+    virtual boost::optional<std::string> setName(const std::string& newName, bool checkValidity) override;
 
     /** Sets the name field to a new, unique name, if the name field exists and (is empty or
      *  overwrite == true). Returns false otherwise. Created name is returned. */
-    virtual boost::optional<std::string> createName();
-    virtual boost::optional<std::string> createName(bool overwrite);
+    virtual boost::optional<std::string> createName() override;
+    virtual boost::optional<std::string> createName(bool overwrite) override;
 
     /** Sets the field at index to value, if possible. Returns false if the value cannot be set for any
      *  reason. (Perhaps index >= numFields(), or setting field index to value would invalidate the
      *   object.) */
-    virtual bool setString(unsigned index, const std::string& value);
-    virtual bool setString(unsigned index, const std::string& value, bool checkValidity);
+    virtual bool setString(unsigned index, const std::string& value) override;
+    virtual bool setString(unsigned index, const std::string& value, bool checkValidity) override;
 
     /** Sets the pointer at field index to targetHandle, if possible. The field must be of \object-list
      *  type, and targetHandle must be valid (null or in the containing Workspace, and if the strictness
@@ -195,10 +202,10 @@ namespace detail {
 
     /** Pushes a new field onto the object, if possible. Returns false if the operation cannot be completed
      *  for any reason. */
-    virtual bool pushString();
-    virtual bool pushString(bool checkValidity);
-    virtual bool pushString(const std::string& value);
-    virtual bool pushString(const std::string& value, bool checkValidity);
+    virtual bool pushString() override;
+    virtual bool pushString(bool checkValidity) override;
+    virtual bool pushString(const std::string& value) override;
+    virtual bool pushString(const std::string& value, bool checkValidity) override;
 
     /** Pushes a new pointer field onto the object, pointing to targetHandle, if possible. Returns
      *  false if operation cannot be completed for any reason. */
@@ -207,8 +214,8 @@ namespace detail {
 
     /** Pops the final extensible group from the object, if possible. Returns the popped data if
      *  successful. Otherwise, the returned vector will be empty. */
-    virtual std::vector<std::string> popExtensibleGroup();
-    virtual std::vector<std::string> popExtensibleGroup(bool checkValidity);
+    virtual std::vector<std::string> popExtensibleGroup() override;
+    virtual std::vector<std::string> popExtensibleGroup(bool checkValidity) override;
 
     //@}
     /** @name Queries */
@@ -274,18 +281,23 @@ namespace detail {
     //@{
 
     /** Emits signals after batch update and error checking is complete, clears the diffs */
-    virtual void emitChangeSignals();
+    virtual void emitChangeSignals() override;
 
     //@}
 
-   signals:
+   //@}
+    /** @name Nano Signal */
+    //@{
 
     /** Emitted when a pointer field is changed. */
-    void onRelationshipChange(int index, Handle newHandle, Handle oldHandle) const;
+    Nano::Signal<void(int, Handle, Handle)> onRelationshipChange;
 
     /** Emitted when this object is disconnected from the workspace.  Do not
      *  access any methods of this object as it is invalid. */
-    void onRemoveFromWorkspace(Handle handle) const;
+    Nano::Signal<void(const Handle &)> onRemoveFromWorkspace;
+    // Nano::Signal<void(Handle&)> onRemoveFromWorkspaceRef;
+
+    Nano::Signal<void(const openstudio::Handle &)> workspaceObjectRemovedSignal;
 
    protected:
 
@@ -313,7 +325,7 @@ namespace detail {
 
     // QUERY HELPERS
 
-    virtual void populateValidityReport(ValidityReport& report,bool checkNames) const;
+    virtual void populateValidityReport(ValidityReport& report,bool checkNames) const override;
 
     /** Returns true if the object is identifiable (within its collection) by IddObjectType and
      *  name. Also, if this object is in a reference list, its name must be unique within (single)
@@ -321,9 +333,9 @@ namespace detail {
     virtual bool uniquelyIdentifiableByName() const;
 
     /** Checks ObjectList fields, and calls IdfObject_Impl version. */
-    virtual bool fieldDataIsCorrectType(unsigned index) const;
+    virtual bool fieldDataIsCorrectType(unsigned index) const override;
 
-    virtual bool fieldIsNonnullIfRequired(unsigned index) const;
+    virtual bool fieldIsNonnullIfRequired(unsigned index) const override;
 
    private:
 

@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "UnitsFixture.hpp"
@@ -23,6 +32,7 @@
 #include "../IPUnit.hpp"
 #include "../IPUnit_Impl.hpp"
 #include "../Scale.hpp"
+#include "../QuantityConverter.hpp"
 
 #include "../../core/Exception.hpp"
 
@@ -39,10 +49,13 @@ using openstudio::createIPLength;
 using openstudio::createIPTime;
 using openstudio::createIPTemperature;
 using openstudio::createIPPeople;
+using openstudio::createIPCurrency;
 
 using openstudio::createIPForce;
 using openstudio::createIPEnergy;
 using openstudio::createIPPower;
+
+using openstudio::convert;
 
 TEST_F(UnitsFixture,IPUnit_Constructors)
 {
@@ -60,9 +73,108 @@ TEST_F(UnitsFixture,IPUnit_Constructors)
   ASSERT_TRUE(u2.baseUnitExponent("lb_f") == 1);
   ASSERT_TRUE(u2.baseUnitExponent("lb_m") == 0);
   ASSERT_TRUE(u2.baseUnitExponent("m") == 0);
-
   u2.lbfToLbm();
-  testStreamOutput("lb_m*ft/s^2",u2);
+  testStreamOutput("lb_m*ft/s^2", u2);
+
+  IPUnit u3(IPExpnt(0, -2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1));
+  testStreamOutput("$/ft^2", u3);
+  ASSERT_TRUE(u3.baseUnitExponent("$") == 1);
+  ASSERT_TRUE(u3.baseUnitExponent("ft") == -2);
+  ASSERT_TRUE(u3.baseUnitExponent("s") == 0);
+  u3.lbmToLbf();
+  testStreamOutput("$/ft^2", u3);
+  ASSERT_TRUE(u3.baseUnitExponent("$") == 1);
+  ASSERT_TRUE(u3.baseUnitExponent("ft") == -2);
+  ASSERT_TRUE(u3.baseUnitExponent("s") == 0);
+  u3.lbfToLbm();
+  testStreamOutput("$/ft^2", u3);
+}
+
+TEST_F(UnitsFixture, IPUnit_convert)
+{
+  boost::optional<double> value;
+
+  value = convert(1.0, "ft", "m");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.3048, value.get(), 0.0001);
+
+  value = convert(1.0, "m", "ft");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(3.28084, value.get(), 0.0001);
+
+  value = convert(1.0, "ft^2", "m^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.092903, value.get(), 0.0001);
+
+  value = convert(1.0, "m^2", "ft^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(10.7639, value.get(), 0.0001);
+
+  value = convert(1.0, "1/ft^2", "1/m^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(10.7639, value.get(), 0.0001);
+
+  value = convert(1.0, "$/ft^2", "$/m^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(10.7639, value.get(), 0.0001);
+}
+
+TEST_F(UnitsFixture, IPUnit_convert2)
+{
+  boost::optional<double> value;
+
+  value = convert(1.0, "in", "cm");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(2.54, value.get(), 0.0001);
+
+  value = convert(1.0, "cm", "in");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.393701, value.get(), 0.0001);
+
+  value = convert(1.0, "in^2", "cm^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(6.4516, value.get(), 0.0001);
+
+  value = convert(1.0, "cm^2", "in^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.1550, value.get(), 0.0001);
+
+  value = convert(1.0, "1/in^2", "1/cm^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.1550, value.get(), 0.0001);
+
+  value = convert(1.0, "$/in^2", "$/cm^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.1550, value.get(), 0.0001);
+}
+
+TEST_F(UnitsFixture, IPUnit_convert3)
+{
+  boost::optional<double> value;
+
+  value = convert(1.0, "in", "ft");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.083333, value.get(), 0.0001);
+
+  value = convert(1.0, "ft", "in");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(12.0, value.get(), 0.0001);
+
+  value = convert(1.0, "in^2", "ft^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(0.006944, value.get(), 0.0001);
+
+  value = convert(1.0, "ft^2", "in^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(144.0, value.get(), 0.0001);
+
+  value = convert(1.0, "1/in^2", "1/ft^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(144.0, value.get(), 0.0001);
+
+  value = convert(1.0, "$/in^2", "$/ft^2");
+  ASSERT_TRUE(value);
+  EXPECT_NEAR(144.0, value.get(), 0.0001);
 }
 
 TEST_F(UnitsFixture,IPUnit_LogicalOperators)
@@ -140,6 +252,14 @@ TEST_F(UnitsFixture,IPUnit_createFunctions)
   u.pow(-1);
   EXPECT_EQ("1/person",u.standardString());
 
+  u = createIPCurrency();
+  EXPECT_EQ(1, u.baseUnitExponent("$"));
+  EXPECT_EQ(0, u.scale().exponent);
+  EXPECT_EQ("$", u.standardString());
+  EXPECT_EQ("", u.prettyString());
+  u.pow(-1);
+  EXPECT_EQ("1/$", u.standardString());
+
   u = createIPForce();
   EXPECT_EQ(0,u.scale().exponent);
   EXPECT_EQ("lb_f",u.standardString());
@@ -154,5 +274,6 @@ TEST_F(UnitsFixture,IPUnit_createFunctions)
   EXPECT_EQ(0,u.scale().exponent);
   EXPECT_EQ("ft*lb_f/s",u.standardString());
   EXPECT_EQ("",u.prettyString());
+
 
 }

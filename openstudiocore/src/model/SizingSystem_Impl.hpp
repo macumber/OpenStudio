@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_SIZINGSYSTEM_IMPL_HPP
 #define MODEL_SIZINGSYSTEM_IMPL_HPP
@@ -34,40 +43,40 @@ namespace detail {
 /** SizingSystem_Impl is a ModelObject_Impl that is the implementation class for SizingSystem.*/
 class MODEL_API SizingSystem_Impl : public ModelObject_Impl 
 {
-  Q_OBJECT;
+  
 
-  Q_PROPERTY(std::string typeofLoadtoSizeOn READ typeofLoadtoSizeOn WRITE setTypeofLoadtoSizeOn RESET resetTypeofLoadtoSizeOn);
-  Q_PROPERTY(bool isTypeofLoadtoSizeOnDefaulted READ isTypeofLoadtoSizeOnDefaulted);
-  Q_PROPERTY(boost::optional<double> designOutdoorAirFlowRate READ designOutdoorAirFlowRate WRITE setDesignOutdoorAirFlowRate RESET resetDesignOutdoorAirFlowRate);
-  Q_PROPERTY(bool isDesignOutdoorAirFlowRateDefaulted READ isDesignOutdoorAirFlowRateDefaulted);
-  Q_PROPERTY(bool isDesignOutdoorAirFlowRateAutosized READ isDesignOutdoorAirFlowRateAutosized);
-  Q_PROPERTY(double minimumSystemAirFlowRatio READ minimumSystemAirFlowRatio WRITE setMinimumSystemAirFlowRatio);
-  Q_PROPERTY(double preheatDesignTemperature READ preheatDesignTemperature WRITE setPreheatDesignTemperature);
-  Q_PROPERTY(double preheatDesignHumidityRatio READ preheatDesignHumidityRatio WRITE setPreheatDesignHumidityRatio);
-  Q_PROPERTY(double precoolDesignTemperature READ precoolDesignTemperature WRITE setPrecoolDesignTemperature);
-  Q_PROPERTY(double precoolDesignHumidityRatio READ precoolDesignHumidityRatio WRITE setPrecoolDesignHumidityRatio);
-  Q_PROPERTY(double centralCoolingDesignSupplyAirTemperature READ centralCoolingDesignSupplyAirTemperature WRITE setCentralCoolingDesignSupplyAirTemperature);
-  Q_PROPERTY(double centralHeatingDesignSupplyAirTemperature READ centralHeatingDesignSupplyAirTemperature WRITE setCentralHeatingDesignSupplyAirTemperature);
-  Q_PROPERTY(std::string sizingOption READ sizingOption WRITE setSizingOption RESET resetSizingOption);
-  Q_PROPERTY(bool isSizingOptionDefaulted READ isSizingOptionDefaulted);
-  Q_PROPERTY(bool allOutdoorAirinCooling READ allOutdoorAirinCooling WRITE setAllOutdoorAirinCooling RESET resetAllOutdoorAirinCooling);
-  Q_PROPERTY(bool isAllOutdoorAirinCoolingDefaulted READ isAllOutdoorAirinCoolingDefaulted);
-  Q_PROPERTY(bool allOutdoorAirinHeating READ allOutdoorAirinHeating WRITE setAllOutdoorAirinHeating RESET resetAllOutdoorAirinHeating);
-  Q_PROPERTY(bool isAllOutdoorAirinHeatingDefaulted READ isAllOutdoorAirinHeatingDefaulted);
-  Q_PROPERTY(double centralCoolingDesignSupplyAirHumidityRatio READ centralCoolingDesignSupplyAirHumidityRatio WRITE setCentralCoolingDesignSupplyAirHumidityRatio RESET resetCentralCoolingDesignSupplyAirHumidityRatio);
-  Q_PROPERTY(bool isCentralCoolingDesignSupplyAirHumidityRatioDefaulted READ isCentralCoolingDesignSupplyAirHumidityRatioDefaulted);
-  Q_PROPERTY(double centralHeatingDesignSupplyAirHumidityRatio READ centralHeatingDesignSupplyAirHumidityRatio WRITE setCentralHeatingDesignSupplyAirHumidityRatio RESET resetCentralHeatingDesignSupplyAirHumidityRatio);
-  Q_PROPERTY(bool isCentralHeatingDesignSupplyAirHumidityRatioDefaulted READ isCentralHeatingDesignSupplyAirHumidityRatioDefaulted);
-  Q_PROPERTY(std::string coolingDesignAirFlowMethod READ coolingDesignAirFlowMethod WRITE setCoolingDesignAirFlowMethod RESET resetCoolingDesignAirFlowMethod);
-  Q_PROPERTY(bool isCoolingDesignAirFlowMethodDefaulted READ isCoolingDesignAirFlowMethodDefaulted);
-  Q_PROPERTY(double coolingDesignAirFlowRate READ coolingDesignAirFlowRate WRITE setCoolingDesignAirFlowRate RESET resetCoolingDesignAirFlowRate);
-  Q_PROPERTY(bool isCoolingDesignAirFlowRateDefaulted READ isCoolingDesignAirFlowRateDefaulted);
-  Q_PROPERTY(std::string heatingDesignAirFlowMethod READ heatingDesignAirFlowMethod WRITE setHeatingDesignAirFlowMethod RESET resetHeatingDesignAirFlowMethod);
-  Q_PROPERTY(bool isHeatingDesignAirFlowMethodDefaulted READ isHeatingDesignAirFlowMethodDefaulted);
-  Q_PROPERTY(double heatingDesignAirFlowRate READ heatingDesignAirFlowRate WRITE setHeatingDesignAirFlowRate RESET resetHeatingDesignAirFlowRate);
-  Q_PROPERTY(bool isHeatingDesignAirFlowRateDefaulted READ isHeatingDesignAirFlowRateDefaulted);
-  Q_PROPERTY(std::string systemOutdoorAirMethod READ systemOutdoorAirMethod WRITE setSystemOutdoorAirMethod RESET resetSystemOutdoorAirMethod);
-  Q_PROPERTY(bool isSystemOutdoorAirMethodDefaulted READ isSystemOutdoorAirMethodDefaulted);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   public:
 
@@ -83,11 +92,9 @@ class MODEL_API SizingSystem_Impl : public ModelObject_Impl
 
   virtual ~SizingSystem_Impl() {}
 
-  virtual const std::vector<std::string>& outputVariableNames() const;
+  virtual const std::vector<std::string>& outputVariableNames() const override;
 
-  virtual IddObjectType iddObjectType() const;
-
-  // TODO: Handle Non-Extensible IddField AirLoop Name.
+  virtual IddObjectType iddObjectType() const override;
 
   std::string typeofLoadtoSizeOn() const;
 
@@ -153,7 +160,43 @@ class MODEL_API SizingSystem_Impl : public ModelObject_Impl
 
   bool isSystemOutdoorAirMethodDefaulted() const;
 
-  // TODO: Handle Non-Extensible IddField AirLoop Name.
+  double zoneMaximumOutdoorAirFraction() const;
+
+  double coolingSupplyAirFlowRatePerFloorArea() const;
+
+  double coolingFractionofAutosizedCoolingSupplyAirFlowRate() const;
+
+  double coolingSupplyAirFlowRatePerUnitCoolingCapacity() const;
+
+  double heatingSupplyAirFlowRatePerFloorArea() const;
+
+  double heatingFractionofAutosizedHeatingSupplyAirFlowRate() const;
+
+  double heatingFractionofAutosizedCoolingSupplyAirFlowRate() const;
+
+  double heatingSupplyAirFlowRatePerUnitHeatingCapacity() const;
+
+  std::string coolingDesignCapacityMethod() const;
+
+  boost::optional<double> coolingDesignCapacity() const;
+
+  bool isCoolingDesignCapacityAutosized() const;
+
+  double coolingDesignCapacityPerFloorArea() const;
+
+  double fractionofAutosizedCoolingDesignCapacity() const;
+
+  std::string heatingDesignCapacityMethod() const;
+
+  boost::optional<double> heatingDesignCapacity() const;
+
+  bool isHeatingDesignCapacityAutosized() const;
+
+  double heatingDesignCapacityPerFloorArea() const;
+
+  double fractionofAutosizedHeatingDesignCapacity() const;
+
+  std::string centralCoolingCapacityControlMethod() const;
 
   bool setTypeofLoadtoSizeOn(std::string typeofLoadtoSizeOn);
 
@@ -218,6 +261,44 @@ class MODEL_API SizingSystem_Impl : public ModelObject_Impl
   bool setSystemOutdoorAirMethod(std::string systemOutdoorAirMethod);
 
   void resetSystemOutdoorAirMethod();
+
+  bool setZoneMaximumOutdoorAirFraction(double zoneMaximumOutdoorAirFraction);
+
+  bool setCoolingSupplyAirFlowRatePerFloorArea(double coolingSupplyAirFlowRatePerFloorArea);
+
+  bool setCoolingFractionofAutosizedCoolingSupplyAirFlowRate(double coolingFractionofAutosizedCoolingSupplyAirFlowRate);
+
+  bool setCoolingSupplyAirFlowRatePerUnitCoolingCapacity(double coolingSupplyAirFlowRatePerUnitCoolingCapacity);
+
+  bool setHeatingSupplyAirFlowRatePerFloorArea(double heatingSupplyAirFlowRatePerFloorArea);
+
+  bool setHeatingFractionofAutosizedHeatingSupplyAirFlowRate(double heatingFractionofAutosizedHeatingSupplyAirFlowRate);
+
+  bool setHeatingFractionofAutosizedCoolingSupplyAirFlowRate(double heatingFractionofAutosizedCoolingSupplyAirFlowRate);
+
+  bool setHeatingSupplyAirFlowRatePerUnitHeatingCapacity(double heatingSupplyAirFlowRatePerUnitHeatingCapacity);
+
+  bool setCoolingDesignCapacityMethod(std::string coolingDesignCapacityMethod);
+
+  bool setCoolingDesignCapacity(boost::optional<double> coolingDesignCapacity);
+
+  void autosizeCoolingDesignCapacity();
+
+  bool setCoolingDesignCapacityPerFloorArea(double coolingDesignCapacityPerFloorArea);
+
+  bool setFractionofAutosizedCoolingDesignCapacity(double fractionofAutosizedCoolingDesignCapacity);
+
+  bool setHeatingDesignCapacityMethod(std::string heatingDesignCapacityMethod);
+
+  bool setHeatingDesignCapacity(boost::optional<double> heatingDesignCapacity);
+
+  void autosizeHeatingDesignCapacity();
+
+  bool setHeatingDesignCapacityPerFloorArea(double heatingDesignCapacityPerFloorArea);
+
+  bool setFractionofAutosizedHeatingDesignCapacity(double fractionofAutosizedHeatingDesignCapacity);
+
+  bool setCentralCoolingCapacityControlMethod(std::string centralCoolingCapacityControlMethod);
 
   AirLoopHVAC airLoopHVAC() const;
 

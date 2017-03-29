@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Time.hpp"
 
@@ -36,20 +45,27 @@ namespace openstudio{
       result = static_cast<int>(floor(value));
     };
     return result;
-  };
+  }
 
-  /// get current time of day
+  /// get current local time of day
   Time Time::currentTime()
   {
     posix_time::ptime now = posix_time::second_clock::local_time();
     return Time(now.time_of_day());
   }
 
-  /// Default constructor
-  Time::Time()
+  /// get current UTC time of day
+  Time Time::currentTimeUTC()
   {
-    m_impl = ImplPtr(new ImplType(0, 0, 0, 0));
-  };
+    posix_time::ptime now = posix_time::second_clock::universal_time();
+    return Time(now.time_of_day());
+  }
+
+
+  /// Default constructor
+  Time::Time() :
+    m_impl(0, 0, 0, 0)
+  {}
 
   /// Time from number of days, fractional values ok
   Time::Time(double fracDays)
@@ -63,8 +79,8 @@ namespace openstudio{
     double fracSeconds = SECONDS_PER_MINUTE * (fracMinutes-minutes);
     int seconds = floor0(fracSeconds);
 
-    m_impl = ImplPtr(new ImplType(hours, minutes, seconds, 0));
-  };
+    m_impl = ImplType(hours, minutes, seconds, 0);
+  }
 
   /// Time from days, hours, minutes, seconds
   Time::Time(int days, int hours, int minutes, int seconds)
@@ -72,46 +88,45 @@ namespace openstudio{
     hours += HOURS_PER_DAY*days;
     if ((hours*minutes >= 0) && (hours*seconds >= 0) && (minutes*seconds >= 0)) {
       // same sign, carry on
-      m_impl = ImplPtr(new ImplType(hours, minutes, seconds, 0));
+      m_impl = ImplType(hours, minutes, seconds, 0);
     }
     else {
       // mixed sign
       ImplType negativeDuration(std::min(hours,0),std::min(minutes,0),std::min(seconds,0),0);
-      m_impl = ImplPtr(new ImplType(std::max(hours,0),std::max(minutes,0),std::max(seconds,0),0));
-      *m_impl += negativeDuration;
+      m_impl = ImplType(std::max(hours,0),std::max(minutes,0),std::max(seconds,0),0);
+      m_impl += negativeDuration;
     }
-  };
+  }
 
   Time::Time(const std::string& string)
   {
     boost::posix_time::time_duration td = boost::posix_time::duration_from_string(string);
 
-    m_impl = std::shared_ptr<boost::posix_time::time_duration>(new boost::posix_time::time_duration(td));
+    m_impl = boost::posix_time::time_duration(td);
   }
 
   Time::Time(tm t_tm)
-    : m_impl(new ImplType(t_tm.tm_hour, t_tm.tm_min, t_tm.tm_sec))
+    : m_impl(t_tm.tm_hour, t_tm.tm_min, t_tm.tm_sec)
   {
   }
 
   /// copy constructor
-  Time::Time(const Time& other)
-  {
-    m_impl = ImplPtr(new ImplType(other.impl()));
-  };
+  Time::Time(const Time& other) :
+    m_impl(other.impl())
+  {}
 
   /// Time from impl 
   Time::Time(const ImplType& implType)
   {
-    m_impl = ImplPtr(new ImplType(implType));
-  };
+    m_impl = implType;
+  }
 
   /// assignment operator
   Time& Time::operator= (const Time& other)
   {
-    m_impl = ImplPtr(new ImplType(other.impl()));
+    m_impl = other.impl();
     return *this;
-  };
+  }
 
   /// addition operator
   Time Time::operator+ (const Time& time) const
@@ -119,19 +134,19 @@ namespace openstudio{
     Time result(*this);
     result += time;
     return result;
-  };
+  }
 
   /// assignment by addition operator
   Time& Time::operator+= (const Time& time)
   {
-    (*m_impl)+= time.impl();
+    m_impl+= time.impl();
     return *this;
-  };
+  }
 
 
   std::string Time::toString() const
   {
-    return boost::posix_time::to_simple_string(*m_impl);
+    return boost::posix_time::to_simple_string(m_impl);
   }
 
   /// difference operator
@@ -140,116 +155,116 @@ namespace openstudio{
     Time result(*this);
     result -= time;
     return result;
-  };
+  }
 
   /// assignment by difference operator
   Time& Time::operator-= (const Time& time)
   {
-    (*m_impl)-= time.impl();
+    m_impl-= time.impl();
     return *this;
-  };
+  }
 
   /// multiplication operator
   Time Time::operator* (double mult) const
   {
     return Time(this->totalDays()*mult);
-  };
+  }
 
   /// division operator
   Time Time::operator/ (double div) const
   {
     return Time(this->totalDays()/div);
-  };
+  }
 
   /// equality operator
   bool Time::operator== (const Time& other) const
   {
     return totalSeconds() == other.totalSeconds();
-  };
+  }
 
   /// non-equality operator
   bool Time::operator!= (const Time& other) const
   {
     return totalSeconds() != other.totalSeconds();
-  };
+  }
 
   /// less than operator
   bool Time::operator< (const Time& rhs) const
   {
     return totalSeconds() < rhs.totalSeconds();
-  };
+  }
 
   /// less than equals operator
   bool Time::operator<= (const Time& rhs) const
   {
     return totalSeconds() <= rhs.totalSeconds();
-  };
+  }
 
   /// greater than operator
   bool Time::operator> (const Time& rhs) const
   { 
     return totalSeconds() > rhs.totalSeconds();
-  };
+  }
 
   /// greater than equals operator
   bool Time::operator>= (const Time& rhs) const
   {
     return totalSeconds() >= rhs.totalSeconds();
-  };
+  }
 
   /// whole number of days
   int Time::days() const
   {
     return floor0(totalDays());
-  };
+  }
 
   /// whole number of hours remaining after days
   int Time::hours() const
   {
-    return (m_impl->hours() % 24);
-  };
+    return (m_impl.hours() % 24);
+  }
 
   /// whole number of minutes remaining after hours
   int Time::minutes() const
   {
-    return m_impl->minutes();
-  };
+    return m_impl.minutes();
+  }
 
   /// whole number of seconds remaining after minutes
   int Time::seconds() const
   {
-    return m_impl->seconds();
-  };
+    return m_impl.seconds();
+  }
 
   /// entire time in days
   double Time::totalDays() const
   {
     return DAYS_PER_SECOND*totalSeconds();
-  };
+  }
 
   /// entire time in hours
   double Time::totalHours() const
   {
     return HOURS_PER_SECOND*totalSeconds();
-  };
+  }
 
   /// entire time in minutes
   double Time::totalMinutes() const
   {
     return MINUTES_PER_SECOND*totalSeconds();
-  };
+  }
 
   /// entire time in seconds
   int Time::totalSeconds() const
   {
-    return m_impl->total_seconds();
-  };
+    return m_impl.total_seconds();
+  }
 
   // reference to impl
-  const Time::ImplType& Time::impl() const
+  const Time::ImplType Time::impl() const
   {
-    return (*m_impl);
-  };
+    return m_impl;
+  }
 
   // std::ostream operator<<
   std::ostream& operator<<(std::ostream& os, const Time& time)
@@ -265,6 +280,6 @@ namespace openstudio{
   bool TimeCompare::operator()(const Time& lhs, const Time& rhs) const
   {
     return lhs < rhs;
-  };
+  }
 
 } // openstudio

@@ -1,26 +1,45 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "ModelFixture.hpp"
 #include "../AirLoopHVAC.hpp"
 #include "../AirLoopHVAC_Impl.hpp"
+#include "../AvailabilityManager.hpp"
+#include "../AvailabilityManager_Impl.hpp"
+#include "../AvailabilityManagerNightCycle.hpp"
+#include "../AvailabilityManagerNightCycle_Impl.hpp"
+#include "../AvailabilityManagerHybridVentilation.hpp"
+#include "../AvailabilityManagerHybridVentilation_Impl.hpp"
+#include "../AvailabilityManagerNightVentilation.hpp"
+#include "../AvailabilityManagerNightVentilation_Impl.hpp"
+#include "../AvailabilityManagerOptimumStart.hpp"
+#include "../AvailabilityManagerOptimumStart_Impl.hpp"
 #include "../AirLoopHVACSupplyPlenum.hpp"
 #include "../AirLoopHVACReturnPlenum.hpp"
 #include "../CoilHeatingWater.hpp"
@@ -39,7 +58,13 @@
 #include "../ThermalZone.hpp"
 #include "../ScheduleCompact.hpp"
 #include "../ScheduleTypeLimits.hpp"
+#include "../ScheduleRuleset.hpp"
+#include "../ScheduleDay.hpp"
+#include "../../utilities/time/Time.hpp"
 #include "../FanConstantVolume.hpp"
+#include "../FanConstantVolume_Impl.hpp"
+#include "../FanVariableVolume.hpp"
+#include "../FanVariableVolume_Impl.hpp"
 #include "../SizingSystem.hpp"
 #include "../SizingSystem_Impl.hpp"
 #include "../CoilHeatingElectric.hpp"
@@ -48,6 +73,8 @@
 #include "../HVACComponent_Impl.hpp"
 #include "../HVACTemplates.hpp"
 #include "../LifeCycleCost.hpp"
+#include "../ConnectorSplitter.hpp"
+#include "../ConnectorSplitter_Impl.hpp"
 
 using namespace openstudio::model;
 
@@ -567,95 +594,383 @@ TEST_F(ModelFixture, AirLoopHVAC_edges)
   boost::optional<ModelObject> oaSystem = airLoopHVAC.supplyComponent(outdoorAirSystem.handle());
   ASSERT_TRUE(oaSystem);
   EXPECT_EQ(outdoorAirSystem, *oaSystem);
-  std::vector<HVACComponent> edges = outdoorAirSystem.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be Node
-  ASSERT_EQ(1, edges.size());
-  edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(false); // should be CoilHeatingElectric
-  ASSERT_EQ(1, edges.size());
-  EXPECT_EQ(coil4, edges[0]);
+  //std::vector<HVACComponent> edges = outdoorAirSystem.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be Node
+  //ASSERT_EQ(1, edges.size());
+  //edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(false); // should be CoilHeatingElectric
+  //ASSERT_EQ(1, edges.size());
+  //EXPECT_EQ(coil4, edges[0]);
 
   boost::optional<ModelObject> splitter_obj = airLoopHVAC.demandComponent(splitter.handle());
   ASSERT_TRUE(splitter_obj);
   EXPECT_EQ(splitter, *splitter_obj);
-  edges = splitter.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be all air terminals
-  EXPECT_EQ(4, edges.size());
-  bool found_terminal_1 = false;
-  bool found_terminal_2 = false;
-  bool found_terminal_3 = false;
-  bool found_terminal_4 = false;
-  for( std::vector<HVACComponent>::iterator it = edges.begin(); it != edges.end(); ++it )
+  //edges = splitter.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be all air terminals
+  //EXPECT_EQ(4, edges.size());
+  //bool found_terminal_1 = false;
+  //bool found_terminal_2 = false;
+  //bool found_terminal_3 = false;
+  //bool found_terminal_4 = false;
+  //for( std::vector<HVACComponent>::iterator it = edges.begin(); it != edges.end(); ++it )
+  //{
+  //  if( singleDuctTerminal == *it ) {
+  //    found_terminal_1 = true;
+  //  }
+  //  else if( singleDuctTerminal2 == *it ) {
+  //    found_terminal_2 = true;
+  //  }
+  //  else if( singleDuctTerminal3 == *it ) {
+  //    found_terminal_3 = true;
+  //  }
+  //  else if( singleDuctTerminal4 == *it ) {
+  //    found_terminal_4 = true;
+  //  }
+  //}
+  //EXPECT_TRUE(found_terminal_1);
+  //EXPECT_TRUE(found_terminal_2);
+  //EXPECT_TRUE(found_terminal_3);
+  //EXPECT_TRUE(found_terminal_4);
+
+  //boost::optional<ModelObject> thermal_zone = airLoopHVAC.demandComponent(thermalZone.handle());
+  //ASSERT_TRUE(thermal_zone);
+  //EXPECT_EQ(thermalZone, *thermal_zone);
+  //edges = thermalZone.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Node
+  //ASSERT_EQ(1, edges.size());
+  //edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Mixer
+  //ASSERT_EQ(1, edges.size());
+  //EXPECT_EQ(mixer, edges[0]);
+
+  //boost::optional<ModelObject> terminal = airLoopHVAC.demandComponent(singleDuctTerminal.handle());
+  //ASSERT_TRUE(terminal);
+  //EXPECT_EQ(singleDuctTerminal, *terminal);
+  //edges = singleDuctTerminal.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Node
+  //ASSERT_EQ(1, edges.size());
+  //edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(true); // should be ThermalZone
+  //ASSERT_EQ(1, edges.size());
+  //EXPECT_EQ(thermalZone, edges[0]);
+
+  //boost::optional<ModelObject> heatingElecCoil = airLoopHVAC.supplyComponent(coil.handle());
+  //ASSERT_TRUE(heatingElecCoil);
+  //EXPECT_EQ(coil, *heatingElecCoil);
+  //edges = coil.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be Node
+  //ASSERT_EQ(1, edges.size());
+  //edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(false); // should be ConstantVolumeFan
+  //ASSERT_EQ(1, edges.size());
+  //EXPECT_EQ(fan, edges[0]);
+
+  //Node supplyInletNode = airLoopHVAC.supplyInletNode();
+  //boost::optional<ModelObject> inletNode = airLoopHVAC.supplyComponent(supplyInletNode.handle());
+  //ASSERT_TRUE(inletNode);
+  //EXPECT_EQ(supplyInletNode, *inletNode);
+  //edges = supplyInletNode.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be OASystem
+
+  //boost::optional<ModelObject> heatingWaterCoil_air = airLoopHVAC.supplyComponent(coil3.handle());
+  //ASSERT_TRUE(heatingWaterCoil_air);
+  //EXPECT_EQ(coil3, *heatingWaterCoil_air);
+  //edges = coil3.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be Node
+  //ASSERT_EQ(1, edges.size());
+  //edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(false); // should be CoilHeatingElectric
+  //ASSERT_EQ(1, edges.size());
+  //EXPECT_EQ(coil, edges[0]);
+
+  //boost::optional<ModelObject> heatingWaterCoil_plant = plantLoop.demandComponent(coil3.handle());
+  //ASSERT_TRUE(heatingWaterCoil_plant);
+  //EXPECT_EQ(coil3, *heatingWaterCoil_plant);
+  //edges = coil3.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Node
+  //ASSERT_EQ(1, edges.size());
+  //edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(true); // should be ConnectorMixer
+  //ASSERT_EQ(1, edges.size());
+  //EXPECT_EQ(plantDemandMixer, edges[0]);
+
+  //// does not search OA system
+  //boost::optional<ModelObject> oaInletNode = airLoopHVAC.supplyComponent((*OANode).handle());
+  //ASSERT_FALSE(oaInletNode);
+  //boost::optional<ModelObject> heatingElecCoil2 = airLoopHVAC.supplyComponent(coil2.handle());
+  //ASSERT_FALSE(heatingElecCoil2);
+}
+
+TEST_F(ModelFixture,AirLoopHVAC_fans)
+{
   {
-    if( singleDuctTerminal == *it ) {
-      found_terminal_1 = true;
+    Model m;
+    AirLoopHVAC airSystem(m);
+
+    FanConstantVolume fan(m);
+    auto node = airSystem.supplyOutletNode();
+    fan.addToNode(node);
+
+    auto supplyFan = airSystem.supplyFan();
+    ASSERT_TRUE(supplyFan);
+    ASSERT_EQ(fan,supplyFan.get());
+
+    auto returnFan = airSystem.returnFan();
+    ASSERT_FALSE(returnFan);    
+
+    ControllerOutdoorAir oaController(m);
+    AirLoopHVACOutdoorAirSystem oaSystem(m,oaController);
+    oaSystem.addToNode(node);
+
+    supplyFan = airSystem.supplyFan();
+    ASSERT_FALSE(supplyFan);
+
+    returnFan = airSystem.returnFan();
+    ASSERT_TRUE(returnFan);
+    ASSERT_EQ(fan,returnFan.get());
+
+    FanVariableVolume fan2(m);
+    fan2.addToNode(node);
+
+    supplyFan = airSystem.supplyFan();
+    ASSERT_TRUE(supplyFan);
+    ASSERT_EQ(fan2,supplyFan.get());
+
+    fan2.remove();
+
+    FanConstantVolume fan3(m);
+    auto reliefNode = oaSystem.outboardReliefNode().get();
+    fan3.addToNode(reliefNode);
+
+    auto reliefFan = airSystem.reliefFan();
+    ASSERT_TRUE(reliefFan);
+    ASSERT_EQ(fan3,reliefFan.get());
+  }
+   
+}
+
+// Not possible in OS currently, uncomment in future
+// TEST_F(ModelFixture,AirLoopHVAC_returnAirBypassFlow)
+// {
+//   Model m;
+//   AirLoopHVAC airSystem(m);
+
+//   auto schedule = ScheduleRuleset(m);
+//   schedule.defaultDaySchedule().addValue( openstudio::Time(0, 24, 0), 50 );
+
+//   EXPECT_TRUE( airSystem.setReturnAirBypassFlowTemperatureSetpointSchedule( schedule ) );
+
+//   auto airSystem_schedule = airSystem.returnAirBypassFlowTemperatureSetpointSchedule();
+
+//   ASSERT_TRUE( airSystem_schedule );
+//   EXPECT_EQ( schedule, airSystem_schedule.get() );
+
+//   airSystem.resetReturnAirBypassFlowTemperatureSetpointSchedule();
+
+//   EXPECT_FALSE( airSystem.returnAirBypassFlowTemperatureSetpointSchedule() );
+   
+// }
+
+TEST_F(ModelFixture,AirLoopHVAC_Availability)
+{
+  Model m;
+  AirLoopHVAC airLoopHVAC(m);
+
+  {
+    auto schedule = m.alwaysOnDiscreteSchedule();
+    EXPECT_EQ(schedule,airLoopHVAC.availabilitySchedule()); 
+  } 
+
+  EXPECT_FALSE(airLoopHVAC.availabilityManager());
+
+  {
+    airLoopHVAC.setNightCycleControlType("CycleOnAny");  
+    auto availabilityManager = airLoopHVAC.availabilityManager();
+    EXPECT_TRUE(availabilityManager);
+    auto nightCycle = availabilityManager->optionalCast<AvailabilityManagerNightCycle>();
+    EXPECT_TRUE(nightCycle);
+    EXPECT_EQ("CycleOnAny",nightCycle->controlType());
+
+    nightCycle->remove();
+    EXPECT_FALSE(airLoopHVAC.availabilityManager());
+    EXPECT_EQ("StayOff",airLoopHVAC.nightCycleControlType());
+  }
+
+  {
+    AvailabilityManagerHybridVentilation availabilityManager(m);
+    EXPECT_TRUE(airLoopHVAC.setAvailabilityManager(availabilityManager));
+    auto availabilityManager2 = airLoopHVAC.availabilityManager();
+    EXPECT_TRUE(availabilityManager2);
+    EXPECT_EQ(availabilityManager2.get(),availabilityManager);
+
+    airLoopHVAC.setNightCycleControlType("CycleOnAny");  
+    auto availabilityManager3 = airLoopHVAC.availabilityManager();
+    EXPECT_TRUE(availabilityManager3);
+    auto nightCycle = availabilityManager3->optionalCast<AvailabilityManagerNightCycle>();
+    EXPECT_TRUE(nightCycle);
+    EXPECT_EQ("CycleOnAny",nightCycle->controlType());
+    EXPECT_TRUE(availabilityManager.handle().isNull());
+  }
+
+  {
+    AvailabilityManagerNightVentilation availabilityManager(m);
+    EXPECT_TRUE(airLoopHVAC.setAvailabilityManager(availabilityManager));
+    auto availabilityManager2 = airLoopHVAC.availabilityManager();
+    EXPECT_TRUE(availabilityManager2);
+    EXPECT_EQ(availabilityManager2.get(),availabilityManager);
+  }
+
+  {
+    AvailabilityManagerOptimumStart availabilityManager(m);
+    EXPECT_TRUE(airLoopHVAC.setAvailabilityManager(availabilityManager));
+    auto availabilityManager2 = airLoopHVAC.availabilityManager();
+    EXPECT_TRUE(availabilityManager2);
+    EXPECT_EQ(availabilityManager2.get(),availabilityManager);
+  }
+}
+
+TEST_F(ModelFixture,AirLoopHVAC_dualDuct)
+{
+  // Make dual duct
+  {
+    Model m;
+    AirLoopHVAC airLoopHVAC(m);
+
+    EXPECT_EQ(1u,airLoopHVAC.supplyOutletNodes().size()); 
+
+    ConnectorSplitter splitter(m);
+    auto supplyOutletNode = airLoopHVAC.supplyOutletNode();
+    EXPECT_TRUE(splitter.addToNode(supplyOutletNode));
+
+    EXPECT_TRUE(airLoopHVAC.isDualDuct());
+
+    EXPECT_EQ(2u,airLoopHVAC.supplyOutletNodes().size()); 
+    EXPECT_EQ(4u,airLoopHVAC.supplyComponents().size());
+    EXPECT_TRUE(airLoopHVAC.supplySplitter());
+    EXPECT_EQ(2u,airLoopHVAC.supplySplitterOutletNodes().size());
+    ASSERT_TRUE(airLoopHVAC.supplySplitterInletNode());
+    EXPECT_EQ(airLoopHVAC.supplySplitterInletNode().get(),airLoopHVAC.supplyInletNode());
+
+    EXPECT_TRUE(airLoopHVAC.supplyComponent(splitter.handle()));
+    EXPECT_TRUE(airLoopHVAC.supplyComponent(airLoopHVAC.supplyOutletNodes().front().handle()));
+    EXPECT_TRUE(airLoopHVAC.supplyComponent(airLoopHVAC.supplyOutletNodes().back().handle()));
+
+    EXPECT_EQ(4u,airLoopHVAC.supplyComponents().size());
+
+    auto supplyOutletNodes = airLoopHVAC.supplyOutletNodes();
+
+    CoilCoolingWater coolingCoil(m);
+    EXPECT_TRUE(coolingCoil.addToNode(supplyOutletNodes[0]));
+    {
+      auto mo = coolingCoil.airOutletModelObject();
+      ASSERT_TRUE(mo);
+      auto node = mo->optionalCast<Node>();
+      ASSERT_TRUE(node);
+      ASSERT_EQ(supplyOutletNodes[0],node.get());
     }
-    else if( singleDuctTerminal2 == *it ) {
-      found_terminal_2 = true;
+
+    CoilHeatingWater heatingCoil(m);
+    EXPECT_TRUE(heatingCoil.addToNode(supplyOutletNodes[1]));
+    {
+      auto mo = heatingCoil.airOutletModelObject();
+      ASSERT_TRUE(mo);
+      auto node = mo->optionalCast<Node>();
+      ASSERT_TRUE(node);
+      ASSERT_EQ(supplyOutletNodes[1],node.get());
     }
-    else if( singleDuctTerminal3 == *it ) {
-      found_terminal_3 = true;
+
+    EXPECT_EQ(8u,airLoopHVAC.supplyComponents().size());
+    EXPECT_EQ(5u,airLoopHVAC.demandComponents().size());
+
+    {
+      auto comps = airLoopHVAC.components(airLoopHVAC.supplySplitter()->outletModelObjects()[0].cast<Node>(),
+                                          airLoopHVAC.supplyOutletNodes()[0].cast<Node>());
+      EXPECT_EQ(3u,comps.size());
     }
-    else if( singleDuctTerminal4 == *it ) {
-      found_terminal_4 = true;
+    {
+      auto comps = airLoopHVAC.components(airLoopHVAC.supplySplitter()->outletModelObjects()[1].cast<Node>(),
+                                          airLoopHVAC.supplyOutletNodes()[1].cast<Node>());
+      EXPECT_EQ(3u,comps.size());
     }
   }
-  EXPECT_TRUE(found_terminal_1);
-  EXPECT_TRUE(found_terminal_2);
-  EXPECT_TRUE(found_terminal_3);
-  EXPECT_TRUE(found_terminal_4);
 
-  boost::optional<ModelObject> thermal_zone = airLoopHVAC.demandComponent(thermalZone.handle());
-  ASSERT_TRUE(thermal_zone);
-  EXPECT_EQ(thermalZone, *thermal_zone);
-  edges = thermalZone.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Node
-  ASSERT_EQ(1, edges.size());
-  edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Mixer
-  ASSERT_EQ(1, edges.size());
-  EXPECT_EQ(mixer, edges[0]);
+  // Unmake dual duct
+  auto createDualDuctSystem = [](Model & m) {
+    AirLoopHVAC airLoopHVAC(m);
 
-  boost::optional<ModelObject> terminal = airLoopHVAC.demandComponent(singleDuctTerminal.handle());
-  ASSERT_TRUE(terminal);
-  EXPECT_EQ(singleDuctTerminal, *terminal);
-  edges = singleDuctTerminal.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Node
-  ASSERT_EQ(1, edges.size());
-  edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(true); // should be ThermalZone
-  ASSERT_EQ(1, edges.size());
-  EXPECT_EQ(thermalZone, edges[0]);
+    ConnectorSplitter splitter(m);
+    auto supplyOutletNode = airLoopHVAC.supplyOutletNode();
 
-  boost::optional<ModelObject> heatingElecCoil = airLoopHVAC.supplyComponent(coil.handle());
-  ASSERT_TRUE(heatingElecCoil);
-  EXPECT_EQ(coil, *heatingElecCoil);
-  edges = coil.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be Node
-  ASSERT_EQ(1, edges.size());
-  edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(false); // should be ConstantVolumeFan
-  ASSERT_EQ(1, edges.size());
-  EXPECT_EQ(fan, edges[0]);
+    splitter.addToNode(supplyOutletNode);
 
-  Node supplyInletNode = airLoopHVAC.supplyInletNode();
-  boost::optional<ModelObject> inletNode = airLoopHVAC.supplyComponent(supplyInletNode.handle());
-  ASSERT_TRUE(inletNode);
-  EXPECT_EQ(supplyInletNode, *inletNode);
-  edges = supplyInletNode.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be OASystem
+    auto supplyOutletNodes = airLoopHVAC.supplyOutletNodes();
 
-  boost::optional<ModelObject> heatingWaterCoil_air = airLoopHVAC.supplyComponent(coil3.handle());
-  ASSERT_TRUE(heatingWaterCoil_air);
-  EXPECT_EQ(coil3, *heatingWaterCoil_air);
-  edges = coil3.getImpl<detail::HVACComponent_Impl>()->edges(false); // should be Node
-  ASSERT_EQ(1, edges.size());
-  edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(false); // should be CoilHeatingElectric
-  ASSERT_EQ(1, edges.size());
-  EXPECT_EQ(coil, edges[0]);
+    CoilCoolingWater coolingCoil(m);
+    coolingCoil.addToNode(supplyOutletNodes[0]);
 
-  boost::optional<ModelObject> heatingWaterCoil_plant = plantLoop.demandComponent(coil3.handle());
-  ASSERT_TRUE(heatingWaterCoil_plant);
-  EXPECT_EQ(coil3, *heatingWaterCoil_plant);
-  edges = coil3.getImpl<detail::HVACComponent_Impl>()->edges(true); // should be Node
-  ASSERT_EQ(1, edges.size());
-  edges = edges[0].getImpl<detail::HVACComponent_Impl>()->edges(true); // should be ConnectorMixer
-  ASSERT_EQ(1, edges.size());
-  EXPECT_EQ(plantDemandMixer, edges[0]);
+    CoilHeatingWater heatingCoil(m);
+    heatingCoil.addToNode(supplyOutletNodes[1]);
 
-  // does not search OA system
-  boost::optional<ModelObject> oaInletNode = airLoopHVAC.supplyComponent((*OANode).handle());
-  ASSERT_FALSE(oaInletNode);
-  boost::optional<ModelObject> heatingElecCoil2 = airLoopHVAC.supplyComponent(coil2.handle());
-  ASSERT_FALSE(heatingElecCoil2);
+    return airLoopHVAC;
+  };
+
+  {
+    Model m;
+    auto airLoop = createDualDuctSystem(m);
+    EXPECT_EQ(8u,airLoop.supplyComponents().size());
+    EXPECT_TRUE(airLoop.removeSupplySplitter());
+    EXPECT_EQ(2u,airLoop.supplyComponents().size());
+  }
+
+  {
+    Model m;
+    auto airLoop = createDualDuctSystem(m);
+    FanConstantVolume fan(m);
+    auto supplyInletNode = airLoop.supplyInletNode();
+    fan.addToNode(supplyInletNode);
+
+    EXPECT_EQ(10u,airLoop.supplyComponents().size());
+    EXPECT_TRUE(airLoop.removeSupplySplitter());
+    EXPECT_EQ(3u,airLoop.supplyComponents().size());
+  }
+
+  {
+    Model m;
+    AirLoopHVAC airLoop(m);
+    ConnectorSplitter splitter(m);
+    auto supplyOutletNode = airLoop.supplyOutletNode();
+    splitter.addToNode(supplyOutletNode);
+
+    EXPECT_EQ(4u,airLoop.supplyComponents().size());
+    EXPECT_TRUE(airLoop.removeSupplySplitter());
+    EXPECT_EQ(2u,airLoop.supplyComponents().size());
+  }
+
+  {
+    Model m;
+    auto airLoop = createDualDuctSystem(m);
+    FanConstantVolume fan(m);
+    auto supplyInletNode = airLoop.supplyInletNode();
+    fan.addToNode(supplyInletNode);
+    EXPECT_EQ(10u,airLoop.supplyComponents().size());
+
+    EXPECT_FALSE(airLoop.removeSupplySplitter(supplyInletNode));
+
+    auto supplyOutletNodes = airLoop.supplyOutletNodes();
+    EXPECT_TRUE(airLoop.removeSupplySplitter(supplyOutletNodes[0]));
+    EXPECT_EQ(5u,airLoop.supplyComponents().size());
+
+    EXPECT_EQ(supplyOutletNodes[1],airLoop.supplyOutletNode());
+    EXPECT_FALSE(airLoop.supplySplitter());
+  }
+
+  {
+    Model m;
+    auto airLoop = createDualDuctSystem(m);
+    FanConstantVolume fan(m);
+    auto supplyInletNode = airLoop.supplyInletNode();
+    fan.addToNode(supplyInletNode);
+    EXPECT_EQ(10u,airLoop.supplyComponents().size());
+
+    auto supplyOutletNodes = airLoop.supplyOutletNodes();
+    EXPECT_TRUE(airLoop.removeSupplySplitter(supplyOutletNodes[1]));
+    EXPECT_EQ(5u,airLoop.supplyComponents().size());
+
+    EXPECT_EQ(supplyOutletNodes[0],airLoop.supplyOutletNode());
+    EXPECT_FALSE(airLoop.supplySplitter());
+  }
+
+  {
+    Model m;
+    AirLoopHVAC airLoop(m,true);
+    EXPECT_EQ(4u,airLoop.supplyComponents().size());
+    EXPECT_TRUE(airLoop.supplySplitter());
+  }
 }
+

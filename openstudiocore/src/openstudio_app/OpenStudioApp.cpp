@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "OpenStudioApp.hpp"
 #include <openstudio_app/AboutBox.hpp>
@@ -23,14 +32,14 @@
 #include "StartupView.hpp"
 #include "../openstudio_lib/MainWindow.hpp"
 #include "../openstudio_lib/OSDocument.hpp"
-#include "../openstudio_lib/FileOperations.hpp"
 
 #include "../shared_gui_components/WaitDialog.hpp"
 #include "../shared_gui_components/MeasureManager.hpp"
 
 #include "../utilities/core/Assert.hpp"
-#include "../utilities/core/ApplicationPathHelpers.hpp"
 #include "../utilities/core/Compare.hpp"
+#include "../utilities/core/ApplicationPathHelpers.hpp"
+#include "../utilities/core/Filesystem.hpp"
 
 #include "../utilities/idf/IdfFile.hpp"
 #include "../utilities/idf/IdfObject.hpp"
@@ -47,7 +56,6 @@
 #include "../model/AirTerminalSingleDuctUncontrolled.hpp"
 #include "../model/AirTerminalSingleDuctVAVReheat.hpp"
 #include "../model/AirTerminalSingleDuctVAVNoReheat.hpp"
-#include "../model/AvailabilityManagerScheduled.hpp"
 #include "../model/BuildingStory.hpp"
 #include "../model/CoilCoolingCooledBeam.hpp"
 #include "../model/CoilCoolingDXSingleSpeed.hpp"
@@ -69,6 +77,8 @@
 #include "../model/FanOnOff.hpp"
 #include "../model/FanVariableVolume.hpp"
 #include "../model/FanZoneExhaust.hpp"
+// TODO: Not sure if I need to include GeneratorMicroTurbine.hpp, GeneratorMicroTurbineHeatRecovery.hpp or both
+#include "../model/GeneratorMicroTurbineHeatRecovery.hpp"
 #include "../model/Model.hpp"
 #include "../model/ScheduleCompact.hpp"
 #include "../model/SetpointManagerMixedAir.hpp"
@@ -91,6 +101,8 @@
 
 #include "../gbxml/ReverseTranslator.hpp"
 #include "../sdd/ReverseTranslator.hpp"
+#include "../bimserver/BIMserverConnection.hpp"
+#include "../bimserver/ProjectImporter.hpp"
 
 #include <QAbstractButton>
 #include <QDesktopServices>
@@ -104,26 +116,32 @@
 #include <QThread>
 #include <QTimer>
 #include <QWidget>
+#include <QProcess>
+#include <QTcpServer>
 
 #include <OpenStudio.hxx>
+#include <utilities/idd/IddEnums.hxx>
+#include <sstream>
+#include <cstdlib>
 
 using namespace openstudio::model;
 
 namespace openstudio {
 
-OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<ruleset::RubyUserScriptArgumentGetter> &t_argumentGetter)
-  : OSAppBase(argc, argv, QSharedPointer<MeasureManager>(new MeasureManager(t_argumentGetter, this))),
-    m_argumentGetter(t_argumentGetter)
+OpenStudioApp::OpenStudioApp( int & argc, char ** argv)
+  : OSAppBase(argc, argv, QSharedPointer<MeasureManager>(new MeasureManager(this))),
+    m_measureManagerProcess(nullptr)
 {
   setOrganizationName("NREL");
   QCoreApplication::setOrganizationDomain("nrel.gov");
-  setApplicationName("OpenStudio");
+  setApplicationName("OpenStudioApp");
 
   readSettings();
 
   QFile f(":/library/OpenStudioPolicy.xml");
-
-  openstudio::model::AccessPolicyStore::Instance().loadFile(f);
+  if(f.open(QFile::ReadOnly)) {
+    openstudio::model::AccessPolicyStore::Instance().loadFile(f.readAll());
+  }
 
   QFile data(":/openstudiolib.qss");
   QString style;
@@ -136,6 +154,13 @@ OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<rul
   }
 
   #ifdef Q_OS_MAC
+    std::stringstream webenginePath;
+    webenginePath << QCoreApplication::applicationDirPath().toStdString();
+    webenginePath << "/../Frameworks/QtWebEngineCore.framework/Versions/5/Helpers/QtWebEngineProcess.app/Contents/MacOS/QtWebEngineProcess";
+    if( filesystem::exists(filesystem::path(webenginePath.str())) ) { 
+      setenv("QTWEBENGINEPROCESS_PATH",webenginePath.str().c_str(),true);
+    }
+
     setQuitOnLastWindowClosed( false );
 
     m_startupMenu = std::shared_ptr<StartupMenu>(new StartupMenu());
@@ -144,6 +169,7 @@ OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<rul
     connect(m_startupMenu.get(), &StartupMenu::importClicked, this, &OpenStudioApp::importIdf);
     connect(m_startupMenu.get(), &StartupMenu::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
     connect(m_startupMenu.get(), &StartupMenu::importSDDClicked, this, &OpenStudioApp::importSDD);
+    connect(m_startupMenu.get(), &StartupMenu::importIFCClicked, this, &OpenStudioApp::importIFC);
     connect(m_startupMenu.get(), &StartupMenu::loadFileClicked, this, &OpenStudioApp::open);
     //connect(m_startupMenu.get(), &StartupMenu::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
     connect(m_startupMenu.get(), &StartupMenu::newClicked, this, &OpenStudioApp::newModel);
@@ -151,7 +177,12 @@ OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<rul
     connect(m_startupMenu.get(), &StartupMenu::aboutClicked, this, &OpenStudioApp::showAbout);
   #endif
 
-  this->buildCompLibraries();
+  // measure manager server needs to be started after event loop is started
+  QTimer::singleShot(0, this, &OpenStudioApp::startMeasureManagerProcess);
+
+  // DLM: does this have to happen here in a blocking way?  it takes a long time to complete
+  //this->buildCompLibraries();
+  QTimer::singleShot(0, this, &OpenStudioApp::buildCompLibraries);
 
   m_startupView = std::shared_ptr<openstudio::StartupView>(new openstudio::StartupView());
 
@@ -175,7 +206,7 @@ OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<rul
     osversion::VersionTranslator versionTranslator;
     versionTranslator.setAllowNewerVersions(false);
 
-    boost::optional<openstudio::model::Model> model = modelFromOSM(toPath(fileName), versionTranslator);
+    boost::optional<openstudio::model::Model> model = versionTranslator.loadModel(toPath(fileName));
     if( model ){
 
       m_osDocument = std::shared_ptr<OSDocument>( new OSDocument(componentLibrary(), 
@@ -184,26 +215,15 @@ OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<rul
                                                                    model,
                                                                    fileName) );
 
-      connect(m_osDocument.get(), &OSDocument::closeClicked, this, &OpenStudioApp::onCloseClicked);
-      connect(m_osDocument.get(), &OSDocument::exitClicked, this, &OpenStudioApp::quit);
-      connect(m_osDocument.get(), &OSDocument::importClicked, this, &OpenStudioApp::importIdf);
-      connect(m_osDocument.get(), &OSDocument::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
-      connect(m_osDocument.get(), &OSDocument::importSDDClicked, this, &OpenStudioApp::importSDD);
-      connect(m_osDocument.get(), &OSDocument::loadFileClicked, this, &OpenStudioApp::open);
-      connect(m_osDocument.get(), &OSDocument::osmDropped, this, &OpenStudioApp::openFromDrag);
-      connect(m_osDocument.get(), &OSDocument::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
-      connect(m_osDocument.get(), &OSDocument::newClicked, this, &OpenStudioApp::newModel);
-      connect(m_osDocument.get(), &OSDocument::helpClicked, this, &OpenStudioApp::showHelp);
-      connect(m_osDocument.get(), &OSDocument::aboutClicked, this, &OpenStudioApp::showAbout);
+      connectOSDocumentSignals();
+
       if(args.size() == 2){
         // check for 'noSavePath'
         if (args.at(1) == QString("noSavePath")){
-          // so new model can get access to weather file, file will be made relative again on save
-          m_osDocument->setFullWeatherFilePath(); 
           m_osDocument->setSavePath("");
           QTimer::singleShot(0, m_osDocument.get(), SLOT(markAsModified())); 
         }else{
-          LOG_FREE(Warn, "OpenStudio", "Incorrect second argument '" << args.at(1) << "'");
+          LOG_FREE(Warn, "OpenStudio", "Incorrect second argument '" << toString(args.at(1)) << "'");
         }
       }
 
@@ -230,7 +250,7 @@ OpenStudioApp::OpenStudioApp( int & argc, char ** argv, const QSharedPointer<rul
   //}
   //
   if (!openedCommandLine){
-    newFromTemplateSlot( NEWFROMTEMPLATE_EMPTY ); // remove when above code uncommented
+    QTimer::singleShot(0, this, &OpenStudioApp::newFromEmptyTemplateSlot); // remove when above code uncommented
   }
   //
   //*************************************************************************************
@@ -246,7 +266,7 @@ bool OpenStudioApp::openFile(const QString& fileName, bool restoreTabs)
     osversion::VersionTranslator versionTranslator;
     versionTranslator.setAllowNewerVersions(false);
 
-    boost::optional<openstudio::model::Model> temp = modelFromOSM(toPath(fileName), versionTranslator);
+    boost::optional<openstudio::model::Model> temp = versionTranslator.loadModel(toPath(fileName));
 
     if (temp) {
       model::Model model = temp.get();
@@ -282,17 +302,8 @@ bool OpenStudioApp::openFile(const QString& fileName, bool restoreTabs)
                                                                    startTabIndex, 
                                                                    startSubTabIndex) );
 
-      connect(m_osDocument.get(), &OSDocument::closeClicked, this, &OpenStudioApp::onCloseClicked);
-      connect(m_osDocument.get(), &OSDocument::exitClicked, this, &OpenStudioApp::quit);
-      connect(m_osDocument.get(), &OSDocument::importClicked, this, &OpenStudioApp::importIdf);
-      connect(m_osDocument.get(), &OSDocument::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
-      connect(m_osDocument.get(), &OSDocument::importSDDClicked, this, &OpenStudioApp::importSDD);
-      connect(m_osDocument.get(), &OSDocument::loadFileClicked, this, &OpenStudioApp::open);
-      connect(m_osDocument.get(), &OSDocument::osmDropped, this, &OpenStudioApp::openFromDrag);
-      connect(m_osDocument.get(), &OSDocument::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
-      connect(m_osDocument.get(), &OSDocument::newClicked, this, &OpenStudioApp::newModel);
-      connect(m_osDocument.get(), &OSDocument::helpClicked, this, &OpenStudioApp::showHelp);
-      connect(m_osDocument.get(), &OSDocument::aboutClicked, this, &OpenStudioApp::showAbout);
+      connectOSDocumentSignals();
+
       waitDialog()->setVisible(false);
 
       m_startupView->hide();
@@ -315,16 +326,39 @@ void OpenStudioApp::buildCompLibraries()
 {
   osversion::VersionTranslator versionTranslator;
   versionTranslator.setAllowNewerVersions(false);
+    
+  QWidget * parent = nullptr;
+  if( this->currentDocument() ){
+    parent = this->currentDocument()->mainWindow();
+  }
 
   path p = resourcesPath() / toPath("MinimalTemplate.osm");
   OS_ASSERT(exists(p));
   boost::optional<Model> temp = versionTranslator.loadModel(p);
+  if (!temp){
+    LOG_FREE(Error, "OpenStudioApp", "Failed to load MinimalTemplate");
+    for (const auto& error : versionTranslator.errors()){
+      LOG_FREE(Error, "OpenStudioApp", error.logMessage());
+    }
+  }
+  if (!temp){
+    QMessageBox::critical(parent, QString("Failed to load MinimalTemplate"), QString("Failed to load MinimalTemplate, likely due to problem with VersionTranslator."));
+  }
   OS_ASSERT(temp);
   m_compLibrary = temp.get();
 
   p = resourcesPath() / toPath("hvaclibrary/hvac_library.osm");
   OS_ASSERT(exists(p));
   temp = versionTranslator.loadModel(p);
+  if (!temp){
+    LOG_FREE(Error, "OpenStudioApp", "Failed to load hvaclibrary");
+    for (const auto& error : versionTranslator.errors()){
+      LOG_FREE(Error, "OpenStudioApp", error.logMessage());
+    }
+  }
+  if (!temp){
+    QMessageBox::critical(parent, QString("Failed to load hvaclibrary"), QString("Failed to load hvaclibrary, likely due to problem with VersionTranslator."));
+  }
   OS_ASSERT(temp);
   m_hvacCompLibrary = temp.get();
 }
@@ -359,21 +393,17 @@ void OpenStudioApp::quit()
   }
 }
 
+void OpenStudioApp::newFromEmptyTemplateSlot()
+{
+  newFromTemplateSlot(NEWFROMTEMPLATE_EMPTY);
+}
+
 void OpenStudioApp::newFromTemplateSlot( NewFromTemplateEnum newFromTemplateEnum )
 {
   m_osDocument = std::shared_ptr<OSDocument>( new OSDocument( componentLibrary(), hvacComponentLibrary(), resourcesPath() ) );
 
-  connect(m_osDocument.get(), &OSDocument::closeClicked, this, &OpenStudioApp::onCloseClicked);
-  connect(m_osDocument.get(), &OSDocument::exitClicked, this, &OpenStudioApp::quit);
-  connect(m_osDocument.get(), &OSDocument::importClicked, this, &OpenStudioApp::importIdf);
-  connect(m_osDocument.get(), &OSDocument::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
-  connect(m_osDocument.get(), &OSDocument::importSDDClicked, this, &OpenStudioApp::importSDD);
-  connect(m_osDocument.get(), &OSDocument::loadFileClicked, this, &OpenStudioApp::open);
-  connect(m_osDocument.get(), &OSDocument::osmDropped, this, &OpenStudioApp::openFromDrag);
-  connect(m_osDocument.get(), &OSDocument::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
-  connect(m_osDocument.get(), &OSDocument::newClicked, this, &OpenStudioApp::newModel);
-  connect(m_osDocument.get(), &OSDocument::helpClicked, this, &OpenStudioApp::showHelp);
-  connect(m_osDocument.get(), &OSDocument::aboutClicked, this, &OpenStudioApp::showAbout);
+  connectOSDocumentSignals();
+
   m_startupView->hide();
 }
 
@@ -445,38 +475,42 @@ void OpenStudioApp::importIdf()
         // ETH: parent should change now ...
         //parent = m_osDocument->mainWindow();
 
-        connect(m_osDocument.get(), &OSDocument::closeClicked, this, &OpenStudioApp::onCloseClicked);
-        connect(m_osDocument.get(), &OSDocument::exitClicked, this, &OpenStudioApp::quit);
-        connect(m_osDocument.get(), &OSDocument::importClicked, this, &OpenStudioApp::importIdf);
-        connect(m_osDocument.get(), &OSDocument::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
-        connect(m_osDocument.get(), &OSDocument::importSDDClicked, this, &OpenStudioApp::importSDD);
-        connect(m_osDocument.get(), &OSDocument::loadFileClicked, this, &OpenStudioApp::open);
-        connect(m_osDocument.get(), &OSDocument::osmDropped, this, &OpenStudioApp::openFromDrag);
-        connect(m_osDocument.get(), &OSDocument::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
-        connect(m_osDocument.get(), &OSDocument::newClicked, this, &OpenStudioApp::newModel);
-        connect(m_osDocument.get(), &OSDocument::helpClicked, this, &OpenStudioApp::showHelp);
-        connect(m_osDocument.get(), &OSDocument::aboutClicked, this, &OpenStudioApp::showAbout);
+        connectOSDocumentSignals();
+
         m_startupView->hide();
         
         QMessageBox messageBox; // (parent); ETH: ... but is hidden, so don't actually use
         messageBox.setText("Some portions of the idf file were not imported.");
+        messageBox.setInformativeText("Only geometry, constructions, loads, thermal zones, and schedules are supported by the OpenStudio IDF import feature.");
 
         QString log;
 
-        std::vector<LogMessage> messages = trans.errors();
-
-        for( const auto & message : messages )
-        {
+        for( const auto & message : trans.errors() ) {
+          log.append("\n");
+          log.append("\n");
           log.append(QString::fromStdString(message.logMessage()));
           log.append("\n");
           log.append("\n");
         }
 
-        messages = trans.warnings();
-
-        for( const auto & message : messages )
-        {
+        for( const auto & message : trans.warnings() ) {
           log.append(QString::fromStdString(message.logMessage()));
+          log.append("\n");
+          log.append("\n");
+        }
+
+        log.append("The following idf objects were not imported.");
+        log.append("\n");
+        log.append("\n");
+
+        for( const auto & idfObject : trans.untranslatedIdfObjects() ) {
+          std::string message;
+          if( auto name = idfObject.name() ) {
+            message = idfObject.iddObject().name() + " named " + name.get();
+          } else {
+            message = "Unammed " + idfObject.iddObject().name();
+          }
+          log.append(QString::fromStdString(message)); 
           log.append("\n");
           log.append("\n");
         }
@@ -499,6 +533,47 @@ void OpenStudioApp::importgbXML()
 void OpenStudioApp::importSDD()
 {
   import(SDD);
+}
+
+void OpenStudioApp::importIFC()
+{
+  QWidget * parent = nullptr;
+  if( this->currentDocument() )
+  {
+    parent = this->currentDocument()->mainWindow();
+  }
+  
+  auto projectImportation = new bimserver::ProjectImporter(parent);
+  boost::optional<model::Model> model = projectImportation->run();
+  projectImportation->close();
+
+  if (model) {
+    bool wasQuitOnLastWindowClosed = this->quitOnLastWindowClosed();
+    this->setQuitOnLastWindowClosed(false);
+
+    if (m_osDocument) {
+      if (!closeDocument()) {
+        this->setQuitOnLastWindowClosed(wasQuitOnLastWindowClosed);
+        return;
+      }
+      processEvents();
+    }
+
+    m_osDocument = std::shared_ptr<OSDocument>(new OSDocument(componentLibrary(),
+      hvacComponentLibrary(),
+      resourcesPath(),
+      *model));
+
+    m_osDocument->markAsModified();
+
+    connectOSDocumentSignals();
+
+    m_startupView->hide();
+
+    this->setQuitOnLastWindowClosed(wasQuitOnLastWindowClosed);
+
+  }
+
 }
 
 void OpenStudioApp::import(OpenStudioApp::fileType type)
@@ -569,17 +644,8 @@ void OpenStudioApp::import(OpenStudioApp::fileType type)
       // ETH: parent should change now ...
       //parent = m_osDocument->mainWindow();
 
-      connect(m_osDocument.get(), &OSDocument::closeClicked, this, &OpenStudioApp::onCloseClicked);
-      connect(m_osDocument.get(), &OSDocument::exitClicked, this, &OpenStudioApp::quit);
-      connect(m_osDocument.get(), &OSDocument::importClicked, this, &OpenStudioApp::importIdf);
-      connect(m_osDocument.get(), &OSDocument::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
-      connect(m_osDocument.get(), &OSDocument::importSDDClicked, this, &OpenStudioApp::importSDD);
-      connect(m_osDocument.get(), &OSDocument::loadFileClicked, this, &OpenStudioApp::open);
-      connect(m_osDocument.get(), &OSDocument::osmDropped, this, &OpenStudioApp::openFromDrag);
-      connect(m_osDocument.get(), &OSDocument::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
-      connect(m_osDocument.get(), &OSDocument::newClicked, this, &OpenStudioApp::newModel);
-      connect(m_osDocument.get(), &OSDocument::helpClicked, this, &OpenStudioApp::showHelp);
-      connect(m_osDocument.get(), &OSDocument::aboutClicked, this, &OpenStudioApp::showAbout);
+      connectOSDocumentSignals();
+
       m_startupView->hide();
 
       bool errorsOrWarnings = false;
@@ -745,7 +811,7 @@ void OpenStudioApp::loadLibrary()
       osversion::VersionTranslator versionTranslator;
       versionTranslator.setAllowNewerVersions(false);
 
-      boost::optional<openstudio::model::Model> model = modelFromOSM(toPath(fileName), versionTranslator);
+      boost::optional<openstudio::model::Model> model = versionTranslator.loadModel(toPath(fileName));
       if( model ) {
         this->currentDocument()->setComponentLibrary(*model);
         versionUpdateMessageBox(versionTranslator, true, fileName, openstudio::path());
@@ -788,13 +854,21 @@ void OpenStudioApp::newModel()
 
 void  OpenStudioApp::showHelp()
 {
-  QDesktopServices::openUrl(QUrl("https://openstudio.nrel.gov/openstudio-application-getting-started"));
+  QDesktopServices::openUrl(QUrl("http://nrel.github.io/OpenStudio-user-documentation/reference/openstudio_application_interface/"));
 }
 
 void  OpenStudioApp::showAbout()
 {
-  QMessageBox about(currentDocument()->mainWindow());
+  QWidget * parent = nullptr;
+
+  if (currentDocument()) {
+    parent = currentDocument()->mainWindow();
+  }
+  QString details = "Measure Manager Server: " + measureManager().url().toString() + "\n";
+  details += "Temp Directory: " + currentDocument()->modelTempDir();
+  QMessageBox about(parent);
   about.setText(OPENSTUDIO_ABOUTBOX);
+  about.setDetailedText(details);
   about.setStyleSheet("qproperty-alignment: AlignCenter;");
   about.setWindowTitle("About " + applicationName());
   about.exec();
@@ -807,7 +881,7 @@ void OpenStudioApp::reloadFile(const QString& fileToLoad, bool modified, bool sa
   QFileInfo info(fileToLoad); // handles windows links and "\"
   QString fileName = info.absoluteFilePath();
   osversion::VersionTranslator versionTranslator;
-  boost::optional<openstudio::model::Model> model = modelFromOSM(toPath(fileName), versionTranslator);
+  boost::optional<openstudio::model::Model> model = versionTranslator.loadModel(toPath(fileName));
   if( model ){ 
     
     bool wasQuitOnLastWindowClosed = this->quitOnLastWindowClosed();
@@ -834,8 +908,22 @@ openstudio::path OpenStudioApp::resourcesPath() const
   } 
   else 
   {
-    return getApplicationRunDirectory() / openstudio::toPath("../share/openstudio-" + openStudioVersion() + "/OSApp");
+    return getApplicationDirectory() / openstudio::toPath("../Resources");
   }
+}
+
+openstudio::path OpenStudioApp::openstudioCLIPath() const
+{
+  auto dir = applicationDirPath();
+  QString ext;
+  #ifdef _WIN32
+    ext = QFileInfo(applicationFilePath()).suffix();
+  #endif
+  if (ext.isEmpty())
+  {
+    return openstudio::toPath(dir + "/openstudio");
+  }
+  return openstudio::toPath(dir + "/openstudio." + ext);
 }
 
 bool OpenStudioApp::notify(QObject* receiver, QEvent* event)
@@ -843,7 +931,19 @@ bool OpenStudioApp::notify(QObject* receiver, QEvent* event)
   if (event->type() == QEvent::FileOpen) {
     return openFile(static_cast<QFileOpenEvent *>(event)->file());
   }
-  return QApplication::notify(receiver, event);
+  // Note: the original call below bypasses OSAppBase, OpenStudioApp's base class
+  //return QApplication::notify(receiver, event);
+  return OSAppBase::notify(receiver, event);
+}
+
+bool OpenStudioApp::event(QEvent * e)
+{
+  return OSAppBase::event(e);
+}
+
+void OpenStudioApp::childEvent(QChildEvent * e)
+{
+  OSAppBase::childEvent(e);
 }
 
 void OpenStudioApp::versionUpdateMessageBox(const osversion::VersionTranslator& translator, 
@@ -894,10 +994,10 @@ void OpenStudioApp::versionUpdateMessageBox(const osversion::VersionTranslator& 
           itr != scriptfolders.end();
           ++itr)
       {
-        if (boost::filesystem::exists(*itr))
+        if (openstudio::filesystem::exists(*itr))
         {
           removedScriptDirs = true;
-          boost::filesystem::remove_all(*itr);
+          openstudio::filesystem::remove_all(*itr);
         }
       }
     }
@@ -907,7 +1007,7 @@ void OpenStudioApp::versionUpdateMessageBox(const osversion::VersionTranslator& 
 
     if (versionChanged || removedScriptDirs)
     {
-      m_osDocument->markAsModified();
+      QTimer::singleShot(0, m_osDocument.get(), SLOT(markAsModified()));
 
       QString message;
       if (versionChanged)
@@ -984,6 +1084,91 @@ void OpenStudioApp::revertToSaved()
     openFile(fileName, true);
   }
 
+}
+
+void OpenStudioApp::connectOSDocumentSignals()
+{
+  OS_ASSERT(m_osDocument);
+  connect(m_osDocument.get(), &OSDocument::closeClicked, this, &OpenStudioApp::onCloseClicked);
+  connect(m_osDocument.get(), &OSDocument::exitClicked, this, &OpenStudioApp::quit);
+  connect(m_osDocument.get(), &OSDocument::importClicked, this, &OpenStudioApp::importIdf);
+  connect(m_osDocument.get(), &OSDocument::importgbXMLClicked, this, &OpenStudioApp::importgbXML);
+  connect(m_osDocument.get(), &OSDocument::importSDDClicked, this, &OpenStudioApp::importSDD);
+  connect(m_osDocument.get(), &OSDocument::importIFCClicked, this, &OpenStudioApp::importIFC);
+  connect(m_osDocument.get(), &OSDocument::loadFileClicked, this, &OpenStudioApp::open);
+  connect(m_osDocument.get(), &OSDocument::osmDropped, this, &OpenStudioApp::openFromDrag);
+  connect(m_osDocument.get(), &OSDocument::loadLibraryClicked, this, &OpenStudioApp::loadLibrary);
+  connect(m_osDocument.get(), &OSDocument::newClicked, this, &OpenStudioApp::newModel);
+  connect(m_osDocument.get(), &OSDocument::helpClicked, this, &OpenStudioApp::showHelp);
+  connect(m_osDocument.get(), &OSDocument::aboutClicked, this, &OpenStudioApp::showAbout);
+}
+
+void OpenStudioApp::measureManagerProcessStateChanged(QProcess::ProcessState newState)
+{
+}
+
+void OpenStudioApp::measureManagerProcessFinished()
+{
+  // any exit of the cli is an error
+  // DLM: I can't get this to fire when I terminate the process in taskmanager
+  OS_ASSERT(m_measureManagerProcess);
+
+  // the cli crashed
+  QByteArray stdErr = m_measureManagerProcess->readAllStandardError();
+  QByteArray stdOut = m_measureManagerProcess->readAllStandardOutput();
+
+  QString message = "Measure Manager has crashed, attempting to restart\n\n";
+  message += stdErr;
+  message += stdOut;
+
+  QMessageBox::warning(nullptr, QString("Measure Manager has crashed"), message);
+
+  startMeasureManagerProcess();
+}
+
+void OpenStudioApp::startMeasureManagerProcess(){
+  if (m_measureManagerProcess){
+    // will terminate the existing process, blocking call
+    delete m_measureManagerProcess;
+  }
+
+  // find available port
+  QTcpServer* tcpServer = new QTcpServer(this);
+
+  tcpServer->listen(QHostAddress::LocalHost);
+  quint16 port = tcpServer->serverPort();
+  tcpServer->close();
+  delete tcpServer;
+
+  QString portString = QString::number(port);
+  QString urlString = "http://127.0.0.1:" + portString;
+  QUrl url(urlString);
+
+  m_measureManagerProcess = new QProcess(this);
+
+  bool test;
+  // finished is an overloaded signal so have to be clear about which version to use
+  test = connect(m_measureManagerProcess, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this, &OpenStudioApp::measureManagerProcessFinished);
+  OS_ASSERT(test);
+  test = connect(m_measureManagerProcess, &QProcess::errorOccurred, this, &OpenStudioApp::measureManagerProcessFinished);
+  OS_ASSERT(test);
+  test = connect(m_measureManagerProcess, &QProcess::stateChanged, this, &OpenStudioApp::measureManagerProcessStateChanged);
+  OS_ASSERT(test);
+
+  QString program = toQString(openstudioCLIPath());
+  QStringList arguments;
+  arguments << "measure";
+  arguments << "-s";
+  arguments << portString;
+
+  LOG(Debug, "Starting measure manager server at " << url.toString().toStdString());
+  LOG(Debug, "Command: " << toString(openstudioCLIPath()) << " measure -s " << toString(portString));
+  
+  m_measureManagerProcess->start(program, arguments);
+  bool started = m_measureManagerProcess->waitForStarted();
+  OS_ASSERT(started);
+
+  measureManager().setUrl(url);
 }
 
 } // openstudio

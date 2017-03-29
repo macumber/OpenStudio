@@ -1,23 +1,33 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "GenerateIddFactory.hpp"
+#include "WriteEnums.hpp"
 
 #include <iostream>
 #include <iomanip>
@@ -85,6 +95,7 @@ void initializeOutFiles(GenerateIddFactoryOutFiles& outFiles,
     << std::endl
     << "#include <utilities/idd/IddObject.hpp>" << std::endl
     << "#include <utilities/idd/IddFile.hpp>" << std::endl
+    << "#include <utilities/idd/IddEnums.hpp>" << std::endl
     << "#include <utilities/idd/IddEnums.hxx>" << std::endl
     << std::endl
     << "#include <utilities/core/Singleton.hpp>" << std::endl
@@ -236,12 +247,13 @@ void initializeOutFiles(GenerateIddFactoryOutFiles& outFiles,
   // start IddFactory.cxx
   outFiles.iddFactoryCxx.tempFile
     << "#include <utilities/idd/IddFactory.hxx>" << std::endl
+    << "#include <utilities/idd/IddEnums.hxx>" << std::endl
     << "#include <utilities/idd/IddRegex.hpp>" << std::endl
     << std::endl
     << "#include <utilities/core/Assert.hpp>" << std::endl
     << "#include <utilities/core/Compare.hpp>" << std::endl
     << "#include <utilities/core/Containers.hpp>" << std::endl
-    << "#include <utilities/core/ApplicationPathHelpers.hpp>" << std::endl
+    << "#include <utilities/embedded_files.hxx>" << std::endl
     << std::endl
     << "#include <OpenStudio.hxx>" << std::endl
     << std::endl
@@ -266,6 +278,7 @@ void initializeOutFiles(GenerateIddFactoryOutFiles& outFiles,
   for (std::shared_ptr<IddFactoryOutFile>& cxxFile : outFiles.iddFactoryIddFileCxxs) {
     cxxFile->tempFile
       << "#include <utilities/idd/IddFactory.hxx>" << std::endl
+      << "#include <utilities/idd/IddEnums.hxx>" << std::endl
       << std::endl
       << "#include <utilities/core/Assert.hpp>" << std::endl
       << "#include <utilities/core/Compare.hpp>" << std::endl
@@ -278,107 +291,45 @@ void initializeOutFiles(GenerateIddFactoryOutFiles& outFiles,
   std::cout << "IddFactory files initialized." << std::endl << std::endl;
 }
 
+
 void completeOutFiles(const IddFileFactoryDataVector& iddFiles,
                       GenerateIddFactoryOutFiles& outFiles) {
 
-  // calculate total number of objects for purpose of splitting up IddObjectType OPENSTUDIO_ENUM
-  unsigned numObjects = 3; // Catchall, UserCustom, CommentOnly
+
+  std::vector<std::pair<std::string, std::string>> filetypes{ {"UserCustom", ""}, {"WholeFactory", ""} };
   for (const IddFileFactoryData& idd : iddFiles) {
-    numObjects += idd.objectNames().size();
+    filetypes.emplace_back(idd.fileName(), "");
   }
+
 
   std::stringstream tempSS;
+  writeDomain(tempSS, "IddFileType", filetypes, false);
 
-  // complete and close IddEnums.hxx
-  tempSS
-    << "OPENSTUDIO_ENUM( IddFileType," << std::endl
-    << "  ((UserCustom))" << std::endl
-    << "  ((WholeFactory))";
-  for (const IddFileFactoryData& idd : iddFiles) {
-    tempSS
-      << std::endl
-      << "  ((" << idd.fileName() << "))";
-  }
-  tempSS << " );" << std::endl;
   outFiles.iddEnumsHxx.tempFile
     << std::endl
-    << "/** \\class IddFileType" << std::endl
-    << " *  \\brief Enumeration of the types of \\link openstudio::IddFile IddFile\\endlink available" << std::endl
-    << " *  through OpenStudio." << std::endl
-    << " *  \\details See the OPENSTUDIO_ENUM documentation in utilities/core/Enum.hpp. The actual macro" << std::endl
-    << " *  call is:" << std::endl
-    << " *" << std::endl
-    << " *  \\code" << std::endl
-    << tempSS.str()
-    << " *  \\endcode" << std::endl
-    << " *" << std::endl
-    << " *  UserCustom \\link openstudio::IddFile IddFiles\\endlink are loaded directly from disk, and" << std::endl 
-    << " *  typically correspond to old or under-development versions of EnergyPlus or OpenStudio. The" << std::endl
-    << " *  rest of the enumeration values designate subsets of the \\link openstudio::IddFactorySingleton" << std::endl
-    << " *  IddFactory\\endlink (the current versions of the EnergyPlus and OpenStudio IDDs, and all" << std::endl
-    << " *  objects in the factory). */" << std::endl
+    << "/** \\class IddFileType */" << std::endl
     << tempSS.str();
   tempSS.str("");
 
-  // write IddObjectType enum. is very large, so split into 7 groups.
-  unsigned groupSize = static_cast<unsigned>(std::ceil(static_cast<double>(numObjects)/7.0));
-  unsigned n = 2; // number of objects written so far--will start with Catchall and UserCustom
-  tempSS
-    << "OPENSTUDIO_ENUM7( IddObjectType," << std::endl
-    << "  ((Catchall))" << std::endl
-    << "  ((UserCustom))" << std::endl;
+  std::vector<std::pair<std::string, std::string>> objtypes{ {"Catchall", ""}, {"UserCustom", ""} };
+
   // loop through each IDD file
   for (const IddFileFactoryData& idd : iddFiles) {
     // write out an IddObjectType enum value for each object in the IDD file
     for (const StringPair& objectName : idd.objectNames()) {
-      // splits the enum values into seven groups
-      if (n % groupSize == 0) {
-        tempSS << "  ," << std::endl;
-      }
-      // writes the enum value (name and description)
-      tempSS
-        << "  ((" << objectName.first << ")(" << objectName.second << "))" << std::endl;
-      ++n;
+      objtypes.emplace_back(objectName.first, objectName.second);
     }
   }
-  tempSS
-    << "  ((CommentOnly)) );" << std::endl;
+
+  objtypes.emplace_back("CommentOnly", "");
+  writeDomain(tempSS, "IddObjectType", objtypes, false);
+
   outFiles.iddEnumsHxx.tempFile
     << std::endl
-    << "/** \\class IddObjectType" << std::endl
-    << " *  \\brief Enumeration of the \\link openstudio::IddObject IddObject\\endlink types available" << std::endl
-    << " *  through the \\link openstudio::IddFactorySingleton IddFactory\\endlink. " << std::endl
-    << " *  \\details Catchall is the default constructed \\link openstudio::IddObject IddObject\\endlink" << std::endl
-    << " *  type. UserCustom is the default type for \\link openstudio::IddObject IddObjects\\endlink" << std::endl
-    << " *  constructed by \\link openstudio::IddObject::load IddObject::load\\endlink. UserCustom objects" << std::endl
-    << " *  must be referenced by name through an \\link openstudio::IddFile IddFile\\endlink or \\link" << std::endl
-    << " *  openstudio::IddFileAndFactoryWrapper IddFileAndFactoryWrapper\\endlink. They cannot be" << std::endl
-    << " *  accessed through the \\link openstudio::IddFactorySingleton IddFactory\\endlink (by name or" << std::endl
-    << " *  type). CommentOnly is a convenience object for capturing standalone comments in IDFs. All other" << std::endl
-    << " *  types are derived from the IDD files used to create \\link openstudio::IddFactorySingleton" << std::endl
-    << " *  IddFactory\\endlink. See the OPENSTUDIO_ENUM documentation in utilities/core/Enum.hpp. The" << std::endl
-    << " *  actual macro call is:" << std::endl
-    << " *" << std::endl
-    << " *  \\code" << std::endl
-    << tempSS.str()
-    << " *  \\endcode */" << std::endl
+    << "/** \\class IddObjectType */" << std::endl
     << tempSS.str()
     << std::endl
-    << "/** \\relates IddObjectType */" << std::endl
-    << "typedef std::vector<IddObjectType> IddObjectTypeVector;" << std::endl
-    << "/** \\relates IddObjectType */" << std::endl
-    << "typedef std::set<IddObjectType> IddObjectTypeSet;" << std::endl
-    << std::endl
-    << "/** \\relates IddObjectType */" << std::endl
-    << "typedef boost::optional<std::vector<IddObjectType> > OptionalIddObjectTypeVector;" << std::endl
-    << "/** \\relates IddObjectType */" << std::endl
-    << "typedef boost::optional<std::set<IddObjectType> > OptionalIddObjectTypeSet;" << std::endl
-    << std::endl
-    << "} // openstudio" << std::endl
-    << std::endl
-    << "Q_DECLARE_METATYPE(openstudio::IddFileType)" << std::endl
-    << "Q_DECLARE_METATYPE(openstudio::IddObjectType)" << std::endl
-    << std::endl
+    << "}\n"
     << "#endif // UTILITIES_IDD_IDDENUMS_HXX" << std::endl;
   tempSS.str("");
   
@@ -847,12 +798,14 @@ void completeOutFiles(const IddFileFactoryDataVector& iddFiles,
     << "    if (it != m_osIddFiles.end()) {" << std::endl
     << "      return it->second;" << std::endl
     << "    }" << std::endl
-    << "    openstudio::path iddPath = getSharedResourcesPath() / toPath(\"osversion\");" << std::endl
+    << "    std::string iddPath = \":/idd/versions\";" << std::endl
     << "    std::stringstream folderString;" << std::endl
     << "    folderString << version.major() << \"_\" << version.minor() << \"_\" << version.patch().get();" << std::endl
-    << "    iddPath = iddPath / toPath(folderString.str() + \"/OpenStudio.idd\");" << std::endl
-    << "    if (boost::filesystem::exists(iddPath) && (version < currentVersion)) {" << std::endl
-    << "      result = IddFile::load(iddPath);" << std::endl
+    << "    iddPath += \"/\" + folderString.str() + \"/OpenStudio.idd\";" << std::endl
+    << "    if (::openstudio::embedded_files::hasFile(iddPath) && (version < currentVersion)) {" << std::endl
+    << "      std::stringstream ss;" << std::endl
+    << "      ss << ::openstudio::embedded_files::getFileAsString(iddPath);" << std::endl
+    << "      result = IddFile::load(ss);" << std::endl
     << "    }" << std::endl
     << "    if (result) {" << std::endl
     << "      QMutexLocker l(&m_callbackmutex);" << std::endl
@@ -877,6 +830,10 @@ void completeOutFiles(const IddFileFactoryDataVector& iddFiles,
     << std::endl
     << "  return false;" << std::endl
     << "}" << std::endl;
+
+  // Implementation for IddObjectType and IddFileType
+  writeBuildStringVec(outFiles.iddFactoryCxx.tempFile, "IddObjectType", objtypes, false);
+  writeBuildStringVec(outFiles.iddFactoryCxx.tempFile, "IddFileType", filetypes, false);
 
   // close out file
   outFiles.iddFactoryCxx.tempFile

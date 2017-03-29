@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "OSItem.hpp"
 
@@ -24,6 +33,7 @@
 #include "ModelObjectItem.hpp"
 #include "OSAppBase.hpp"
 #include "OSDocument.hpp"
+#include "OSDropZone.hpp"
 #include "ScriptItem.hpp"
 
 #include "../shared_gui_components/MeasureBadge.hpp"
@@ -127,12 +137,12 @@ bool OSItemId::operator==(const OSItemId& other) const
 OSItem::OSItem(const OSItemId& itemId, OSItemType osItemType, QWidget * parent)
                : QWidget(parent),
                m_itemId(itemId),
-               m_selectionWidget(NULL),
-               m_borderWidget(NULL),
-               m_removeButton(NULL),
-               m_textLbl(NULL),
-               m_imageLeftLbl(NULL),
-               m_imageRightLbl(NULL),
+               m_selectionWidget(nullptr),
+               m_borderWidget(nullptr),
+               m_removeButton(nullptr),
+               m_textLbl(nullptr),
+               m_imageLeftLbl(nullptr),
+               m_imageRightLbl(nullptr),
                m_mouseDown(false),
                m_selected(false),
                m_draggable(true),
@@ -152,7 +162,7 @@ OSItem::OSItem(const OSItemId& itemId, OSItemType osItemType, QWidget * parent)
 
 OSItem* OSItem::makeItem(const OSItemId& itemId, OSItemType osItemType)
 {
-  OSItem* result = NULL;
+  OSItem* result = nullptr;
 
   OSAppBase* app = OSAppBase::instance();
 
@@ -171,7 +181,7 @@ OSItem* OSItem::makeItem(const OSItemId& itemId, OSItemType osItemType)
       result = new ModelObjectItem(*modelObject,itemId.isDefaulted(),osItemType);
     } else {
       openstudio::path p = openstudio::toPath(itemId.itemId());
-      if (boost::filesystem::exists(p))
+      if (openstudio::filesystem::exists(p))
       {
         result = new ScriptItem(p, osItemType);
       }
@@ -182,12 +192,12 @@ OSItem* OSItem::makeItem(const OSItemId& itemId, OSItemType osItemType)
 
 void OSItem::createLayout()
 {
-  QHBoxLayout * mainHLayout = new QHBoxLayout();
+  auto mainHLayout = new QHBoxLayout();
   mainHLayout->setContentsMargins(10,5,10,5);
   mainHLayout->setAlignment(Qt::AlignVCenter);
   setLayout(mainHLayout);
 
-  QVBoxLayout * leftVBoxLayout = new QVBoxLayout();
+  auto leftVBoxLayout = new QVBoxLayout();
 
   m_imageLeftLbl = new QLabel(this);
   leftVBoxLayout->addWidget(m_imageLeftLbl);
@@ -284,6 +294,13 @@ bool OSItem::isDefaulted() const
 void OSItem::setIsDefaulted(bool isDefaulted)
 {
   m_itemId.setIsDefaulted(isDefaulted);
+  if (isDefaulted) {
+    m_textLbl->setStyleSheet("QLabel { color: #006837 }");
+    this->setRemoveable(false);
+  } else {
+    m_textLbl->setStyleSheet("QLabel { color: black }");
+    this->setRemoveable(true);
+  }
 }
 
 QString OSItem::text() const
@@ -565,14 +582,14 @@ void OSItem::mouseMoveEvent(QMouseEvent *event)
 
   QString mimeDataText = m_itemId.mimeDataText();
 
-  QMimeData *mimeData = new QMimeData;
+  auto mimeData = new QMimeData;
   mimeData->setText(mimeDataText);
 
   QWidget* parent = this->parentWidget();
   OS_ASSERT(parent);
 
   // parent the QDrag on this parent instead of this, in case this item is deleted during drag
-  QDrag *drag = new QDrag(parent);
+  auto drag = new QDrag(parent);
   drag->setMimeData(mimeData);
   
   QPixmap _pixmap(size());
@@ -614,6 +631,16 @@ void OSItem::dropEvent(QDropEvent *event)
 
 void OSItem::onRemoveClicked()
 {
+  // Note: an OSDropZone2 owns this OSItem;
+  // there should be a parent...
+  //OS_ASSERT(this->parent());
+
+  // ... and it should be a OSDropZone2...
+  //auto dropZone = qobject_cast<OSDropZone2 *>(this->parent());
+  //OS_ASSERT(dropZone);
+
+  // ... and it needs to listen to, and act on,
+  // this signal to cause a model object reset
   emit itemRemoveClicked(this);
 }
 

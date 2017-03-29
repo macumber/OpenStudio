@@ -1,24 +1,34 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Application.hpp"
 #include "ApplicationPathHelpers.hpp"
+#include "PathHelpers.hpp"
 #include "String.hpp"
 #include <OpenStudio.hxx>
 
@@ -29,23 +39,25 @@
   #include <QWinWidget>
   #include <Windows.h>
   #include <boost/regex.hpp>
+#else
+  #include <dlfcn.h>
 #endif
 
 #include <iostream>
-#include <QPluginLoader>
 
 namespace openstudio{
 
 ApplicationSingleton::ApplicationSingleton()
   : m_qApplication(nullptr),
-    m_sketchUpWidget(nullptr)
+    m_sketchUpWidget(nullptr),
+    m_defaultInstance(false)
 {}
 
 ApplicationSingleton::~ApplicationSingleton()
 {
-  if (m_sketchUpWidget){
-    delete m_sketchUpWidget;
-  }
+  //if (m_sketchUpWidget){
+  //  delete m_sketchUpWidget;
+  //}
 
   if (m_qApplication)
   {
@@ -58,68 +70,75 @@ QCoreApplication* ApplicationSingleton::application(bool gui)
 {
   if (!m_qApplication){
 
-    if (QApplication::instance())
+    if (QCoreApplication::instance())
     {
 
-      m_qApplication = QApplication::instance();
+      m_qApplication = QCoreApplication::instance();
 
     } else {
 
       QCoreApplication::setAttribute(Qt::AA_DontUseNativeMenuBar, true);
       QCoreApplication::setAttribute(Qt::AA_MacPluginApplication, true);
 
+      // dir containing the current module, can be openstudio.so or openstudio.exe
+      openstudio::path openstudioDirPath = getOpenStudioModuleDirectory();
+
+      // Add the current module path to the backup plugin search location
+      QCoreApplication::addLibraryPath(toQString(openstudioDirPath));
+
+      // Make the ruby path the default plugin search location
+//#if defined(Q_OS_MAC)
+//      openstudio::path p = getApplicationRunDirectory().parent_path().parent_path().parent_path() / toPath("Ruby/openstudio");
+//      QCoreApplication::addLibraryPath(toQString(p));
+//#elif defined(Q_OS_WIN)
+//      openstudio::path p = getApplicationRunDirectory().parent_path() / toPath("Ruby/openstudio");
+//      QCoreApplication::addLibraryPath(toQString(p));
+//#endif
+
       static char *argv[] = {nullptr};
       static int argc = sizeof(argv) / sizeof(char*) - 1;
-      m_qApplication = new QApplication(argc, argv, gui);
- 
-#if defined(Q_OS_MAC)
-      openstudio::path p = getApplicationRunDirectory().parent_path().parent_path().parent_path() / toPath("Ruby/openstudio");
-      QCoreApplication::addLibraryPath(QString::fromStdString(toString(p)));
-#endif
 
-#if defined(Q_OS_WIN)
-      openstudio::path p = getApplicationRunDirectory().parent_path() / toPath("Ruby/openstudio");
-      QCoreApplication::addLibraryPath(QString::fromStdString(toString(p)));
-#endif
+      // Load the qpa plugin (If SketchUp is loading the OpenStudio plugin, the SketchUp run path will be added to the end of libraryPaths)
+      if (gui){
+        m_qApplication = new QApplication(argc, argv);
+        dynamic_cast<QApplication*>(m_qApplication)->setQuitOnLastWindowClosed(false);
+      }else{
+        m_qApplication = new QCoreApplication(argc, argv);
+      }
 
-      // Add this path for gem case
-      QCoreApplication::addLibraryPath(toQString(getApplicationRunDirectory() / toPath("plugins")));
-
-      // And for any other random cases
-      QCoreApplication::addLibraryPath(toQString(getApplicationRunDirectory().parent_path() / toPath("share/openstudio-" + openStudioVersion() + "/qtplugins")));
-      dynamic_cast<QApplication*>(m_qApplication)->setQuitOnLastWindowClosed(false);
-      defaultInstance = true;
+      
+      m_defaultInstance = true;
 
       // check if we are in a SketchUp process
       #if _WIN32 || _MSC_VER
+        if (gui){
+          DWORD pId = GetCurrentProcessId();
+          //HMODULE hModule = GetModuleHandle(NULL); // same as hInstance
+          LPTSTR className = new TCHAR[255];
+          LPTSTR typeName = new TCHAR[255];
+          HWND h = GetTopWindow(0);
+          while (h)
+          {
+            DWORD pId2;
+            GetWindowThreadProcessId(h, &pId2);
 
-        DWORD pId = GetCurrentProcessId();
-        //HMODULE hModule = GetModuleHandle(NULL); // same as hInstance
-        LPTSTR className = new TCHAR[255];
-        LPTSTR typeName = new TCHAR[255];
-        HWND h = GetTopWindow(0);
-        while ( h )
-        {
-          DWORD pId2;
-          GetWindowThreadProcessId(h, &pId2);
-          
-          if ( pId == pId2 ){
+            if (pId == pId2){
 
-            GetClassName(h, className, 255);
-            GetWindowText(h, typeName, 255);
+              GetClassName(h, className, 255);
+              GetWindowText(h, typeName, 255);
 
-            if (boost::regex_match(toString(typeName), boost::regex(".*- SketchUp.*"))){
-              m_sketchUpWidget = new QWinWidget(h);
-              break;
+              if (boost::regex_match(toString(typeName), boost::regex(".*- SketchUp.*"))){
+                m_sketchUpWidget = new QWinWidget(h);
+                break;
+              }
             }
+
+            h = GetNextWindow(h, GW_HWNDNEXT);
           }
-           
-          h = GetNextWindow(h , GW_HWNDNEXT);
+
+          delete[] className;
+          delete[] typeName;
         }
-
-        delete[] className; 
-        delete[] typeName; 
-
       #endif
 
     }
@@ -128,7 +147,20 @@ QCoreApplication* ApplicationSingleton::application(bool gui)
   return m_qApplication;
 }
 
-/// set the QApplication, this should be done before calling qApplication(), no op if it has already been set
+bool ApplicationSingleton::hasApplication() const
+{
+  return (m_qApplication != nullptr);
+}
+
+bool ApplicationSingleton::hasGUI() const
+{
+  if (hasApplication()){
+    return dynamic_cast<QApplication*>(m_qApplication);
+  }
+  return false;
+}
+
+/// set the QApplication, this should be done before calling application(), no op if it has already been set
 bool ApplicationSingleton::setApplication(QCoreApplication* qApplication)
 {
   if (!m_qApplication){
@@ -177,7 +209,7 @@ void ApplicationSingleton::removeSetting(const std::string& key)
 
 bool ApplicationSingleton::isDefaultInstance()
 {
-  return defaultInstance;
+  return m_defaultInstance;
 }
 
 boost::optional<bool> ApplicationSingleton::getSettingValueAsBool(const std::string& key)

@@ -1,21 +1,31 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
+
 #include "ReverseTranslator.hpp"
 #include "ForwardTranslator.hpp"
 
@@ -64,10 +74,16 @@
 #include "../model/SpaceInfiltrationDesignFlowRate.hpp"
 #include "../model/Schedule.hpp"
 #include "../model/Schedule_Impl.hpp"
+#include "../model/ScheduleDay.hpp"
+#include "../model/ScheduleDay_Impl.hpp"
 #include "../model/ScheduleConstant.hpp"
 #include "../model/ScheduleConstant_Impl.hpp"
+#include "../model/ScheduleRuleset.hpp"
+#include "../model/ScheduleRuleset_Impl.hpp"
 #include "../model/ScheduleTypeLimits.hpp"
 #include "../model/ScheduleTypeLimits_Impl.hpp"
+#include "../model/SurfacePropertyConvectionCoefficients.hpp"
+#include "../model/SurfacePropertyConvectionCoefficients_Impl.hpp"
 #include "../model/PlantLoop.hpp"
 #include "../model/PlantLoop_Impl.hpp"
 #include "../model/WaterUseConnections.hpp"
@@ -77,6 +93,9 @@
 #include "../model/WaterUseEquipmentDefinition.hpp"
 #include "../model/WaterUseEquipmentDefinition_Impl.hpp"
 #include "../model/ThermostatSetpointDualSetpoint.hpp"
+#include "../model/AirLoopHVAC.hpp"
+#include "../model/AirLoopHVAC_Impl.hpp"
+#include "../model/SurfacePropertyConvectionCoefficients.hpp"
 
 #include "../utilities/geometry/Transformation.hpp"
 #include "../utilities/geometry/Geometry.hpp"
@@ -92,7 +111,6 @@
 #include "../utilities/plot/ProgressBar.hpp"
 #include "../utilities/core/Assert.hpp"
 
-#include <QFile>
 #include <QDomDocument>
 #include <QDomElement>
 #include <QStringList>
@@ -148,8 +166,11 @@ namespace sdd {
     QDomNodeList thermalZoneElements = element.elementsByTagName("ThrmlZn");
     QDomNodeList buildingStoryElements = element.elementsByTagName("Story");
 
-    OS_ASSERT(!nameElement.isNull());
-    building.setName(escapeName(nameElement.text()));
+    if (nameElement.isNull()){
+      LOG(Error, "Bldg element 'Name' is empty.")
+    } else {
+      building.setName(escapeName(nameElement.text()));
+    }
 
     if(!buildingAzimuthElement.isNull()){
       double buildingAzimuth = fixAngle(buildingAzimuthElement.text().toDouble());
@@ -169,7 +190,9 @@ namespace sdd {
     for (int i = 0; i < exteriorShadingElements.count(); ++i){
       if (exteriorShadingElements.at(i).parentNode() == element){
         boost::optional<model::ModelObject> exteriorShading = translateShadingSurface(exteriorShadingElements.at(i).toElement(), doc, shadingSurfaceGroup);
-        OS_ASSERT(exteriorShading);
+        if (!exteriorShading){
+          LOG(Error, "Failed to translate 'ExtShdgObj' element " << i);
+        }
       }
     }
 
@@ -177,20 +200,25 @@ namespace sdd {
     for (int i = 0; i < spaceElements.count(); i++){
       QDomElement spaceElement = spaceElements.at(i).toElement();
       boost::optional<model::ModelObject> space = createSpace(spaceElement, doc, model);
-      OS_ASSERT(space); // what type of error handling do we want?
+      if (!space){
+        LOG(Error, "Failed to translate 'Spc' element " << i);
+      }
     }
 
     // create all thermal zones
     for (int i = 0; i < thermalZoneElements.count(); i++){
 
       if (thermalZoneElements.at(i).firstChildElement("Name").isNull()){
+        LOG(Error, "ThrmlZn element 'Name' is empty, object will not be translated.")
         continue;
       }
 
       QDomElement thermalZoneElement = thermalZoneElements.at(i).toElement();
 
       boost::optional<model::ModelObject> thermalZone = createThermalZone(thermalZoneElement, doc, model);
-      OS_ASSERT(thermalZone); // what type of error handling do we want?
+      if (!thermalZone){
+        LOG(Error, "Failed to translate 'ThrmlZn' element " << i);
+      }
     }
 
     // translate building stories
@@ -204,7 +232,9 @@ namespace sdd {
     for (int i = 0; i < buildingStoryElements.count(); i++){
       QDomElement buildingStoryElement = buildingStoryElements.at(i).toElement();
       boost::optional<model::ModelObject> buildingStory = translateBuildingStory(buildingStoryElement, doc, model);
-      OS_ASSERT(buildingStory); // what type of error handling do we want?
+      if (!buildingStory){
+        LOG(Error, "Failed to translate 'Story' element " << i);
+      }
 
       if (m_progressBar){
         m_progressBar->setValue(m_progressBar->value() + 1);
@@ -213,14 +243,14 @@ namespace sdd {
 
     // remove unused CFactor constructions
     for (model::CFactorUndergroundWallConstruction cFactorConstruction : model.getConcreteModelObjects<model::CFactorUndergroundWallConstruction>()){
-      if (cFactorConstruction.directUseCount() == 0){
+      if (cFactorConstruction.directUseCount(true) == 0){
         cFactorConstruction.remove();
       }
     }
 
     // remove unused FFactor constructions
     for (model::FFactorGroundFloorConstruction fFactorConstruction : model.getConcreteModelObjects<model::FFactorGroundFloorConstruction>()){
-      if (fFactorConstruction.directUseCount() == 0){
+      if (fFactorConstruction.directUseCount(true) == 0){
         fFactorConstruction.remove();
       }
     }
@@ -234,8 +264,11 @@ namespace sdd {
 
     model::ThermalZone thermalZone(model);
 
-    OS_ASSERT(!nameElement.isNull());
-    thermalZone.setName(escapeName(nameElement.text()));
+    if (nameElement.isNull()){
+      LOG(Error, "ThrmlZn element 'Name' is empty.");
+    } else{
+      thermalZone.setName(escapeName(nameElement.text()));
+    }
 
     return thermalZone;
   }
@@ -247,13 +280,20 @@ namespace sdd {
 
     model::BuildingStory buildingStory(model);
 
-    OS_ASSERT(!nameElement.isNull());
-    buildingStory.setName(escapeName(nameElement.text()));
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "Story element 'Name' is empty.");
+    } else{
+      name = escapeName(nameElement.text()); 
+    }
+    buildingStory.setName(name);
 
     for (int i = 0; i < spaceElements.count(); i++){
       QDomElement spaceElement = spaceElements.at(i).toElement();
       boost::optional<model::ModelObject> space = translateSpace(spaceElement, doc, buildingStory);
-      OS_ASSERT(space); // what type of error handling do we want?
+      if (!space){
+        LOG(Error, "Failed to translate 'Spc' element " << i << " under Story '" << name << "'");
+      }
     }
 
     return buildingStory;
@@ -264,10 +304,13 @@ namespace sdd {
     QDomElement nameElement = element.firstChildElement("Name");
 
     model::Space space(model);
-
-    OS_ASSERT(!nameElement.isNull());
-    space.setName(escapeName(nameElement.text()));
-
+    
+    if (nameElement.isNull()){
+      LOG(Error, "Spc element 'Name' is empty.")
+    } else{
+      space.setName(escapeName(nameElement.text()));
+    }
+    
     return space;
   }
 
@@ -277,6 +320,7 @@ namespace sdd {
     QDomElement hotWtrHtgRtElement = element.firstChildElement("HotWtrHtgRtSim");
     QDomElement hotWtrHtgSchRefElement = element.firstChildElement("HotWtrHtgSchRef");
     QDomElement shwFluidSegRefElement = element.firstChildElement("SHWFluidSegRef");
+    QDomElement hotWtrSupTempElement = element.firstChildElement("HotWtrSupTemp");
     QDomNodeList exteriorWallElements = element.elementsByTagName("ExtWall");
     QDomNodeList exteriorFloorElements = element.elementsByTagName("ExtFlr");
     QDomNodeList roofElements = element.elementsByTagName("Roof");
@@ -286,68 +330,101 @@ namespace sdd {
     QDomNodeList interiorWallElements = element.elementsByTagName("IntWall");
     QDomNodeList interiorFloorElements = element.elementsByTagName("IntFlr");
 
-    OS_ASSERT(!nameElement.isNull());
-    std::string spaceName = escapeName(nameElement.text());
+    std::string spaceName;
+    if (nameElement.isNull()){
+      LOG(Error, "Spc element 'Name' is empty.");
+    } else{
+      spaceName = escapeName(nameElement.text());
+    }
+
     boost::optional<model::Space> space = buildingStory.model().getModelObjectByName<model::Space>(spaceName);
-    OS_ASSERT(space); // what type of error handling do we want?
+    if (!space){
+      LOG(Error, "Could not retrieve Space named '" << spaceName << "'.");
+      return boost::none;
+    }
 
     space->setBuildingStory(buildingStory);
 
     QDomElement thermalZoneElement = element.firstChildElement("ThrmlZnRef");
-    OS_ASSERT(!thermalZoneElement.isNull());
-    std::string thermalZoneName = escapeName(thermalZoneElement.text());
+    std::string thermalZoneName;
+    if (thermalZoneElement.isNull()){
+      LOG(Error, "Spc element 'ThrmlZnRef' is empty for Space named '" << spaceName << "'.");
+    } else{
+      thermalZoneName = escapeName(thermalZoneElement.text());
+    }
+
     boost::optional<model::ThermalZone> thermalZone = space->model().getModelObjectByName<model::ThermalZone>(thermalZoneName);
-    OS_ASSERT(thermalZone);
-    space->setThermalZone(*thermalZone);
+    if (thermalZone){
+      space->setThermalZone(*thermalZone);
+    } else{
+      LOG(Error, "Could not retrieve ThermalZone named '" << thermalZoneName << "'.");
+      LOG(Error, "ThermalZone not set for Space named '" << spaceName << "'.");
+    }
 
     translateLoads(element, doc, *space);
 
     for (int i = 0; i < exteriorWallElements.count(); i++){
       QDomElement exteriorWallElement = exteriorWallElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(exteriorWallElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'ExtWall' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < exteriorFloorElements.count(); i++){
       QDomElement exteriorFloorElement = exteriorFloorElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(exteriorFloorElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'ExtFlr' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < roofElements.count(); i++){
       QDomElement roofElement = roofElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(roofElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'Roof' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < undergroundFloorElements.count(); i++){
       QDomElement undergroundFloorElement = undergroundFloorElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(undergroundFloorElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'UndgrFlr' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < undergroundWallElements.count(); i++){
       QDomElement undergroundWallElement = undergroundWallElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(undergroundWallElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'UndgrWall' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < ceilingElements.count(); i++){
       QDomElement ceilingElement = ceilingElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(ceilingElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'Ceiling' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < interiorWallElements.count(); i++){
       QDomElement interiorWallElement = interiorWallElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(interiorWallElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'IntWall' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     for (int i = 0; i < interiorFloorElements.count(); i++){
       QDomElement interiorFloorElement = interiorFloorElements.at(i).toElement();
       boost::optional<model::ModelObject> surface = translateSurface(interiorFloorElement, doc, *space);
-      OS_ASSERT(surface); // what type of error handling do we want?
+      if (!surface){
+        LOG(Error, "Failed to translate 'IntFlr' element " << i << " for Space named '" << spaceName << "'.");
+      }
     }
 
     // translate shadingSurfaces
@@ -358,7 +435,9 @@ namespace sdd {
     for (int i = 0; i < exteriorShadingElements.count(); ++i){
       if (exteriorShadingElements.at(i).parentNode() == element){
         boost::optional<model::ModelObject> exteriorShading = translateShadingSurface(exteriorShadingElements.at(i).toElement(), doc, shadingSurfaceGroup);
-       OS_ASSERT(exteriorShading);
+        if (!exteriorShading){
+          LOG(Error, "Failed to translate 'ExtShdgObj' element " << i << " for Space named '" << spaceName << "'.");
+        }
       }
     }
 
@@ -403,6 +482,16 @@ namespace sdd {
 
       definition.setPeakFlowRate(unitToUnit(value,"gal/h","m^3/s").get());
 
+      value = hotWtrSupTempElement.text().toDouble(&ok);
+      if( ok ) {
+        value = unitToUnit(value,"F","C").get();
+        model::ScheduleRuleset schedule(model);
+        schedule.setName(spaceName + " Target SHW Temp");
+        auto scheduleDay = schedule.defaultDaySchedule();
+        scheduleDay.addValue(Time(1.0),value);
+        definition.setTargetTemperatureSchedule(schedule);
+      }
+
       model::WaterUseEquipment equipment(definition);
 
       equipment.setName(spaceName + " Water Use Equipment");
@@ -439,7 +528,7 @@ namespace sdd {
       //<OccLatHtRt>200</OccLatHtRt> - Btu per h person
       //<OccSchRef>Office Occup Sched</OccSchRef>
 
-      QDomElement occDensElement = element.firstChildElement("OccDens");
+      QDomElement occDensElement = element.firstChildElement("OccDensSim");
       QDomElement occSensHtRtElement = element.firstChildElement("OccSensHtRt");
       QDomElement occLatHtRtElement = element.firstChildElement("OccLatHtRt");
       QDomElement occSchRefElement = element.firstChildElement("OccSchRef");
@@ -477,9 +566,8 @@ namespace sdd {
           people.setSpace(space);
 
           // activity schedule
-          openstudio::model::ScheduleConstant activitySchedule(model);
+          openstudio::model::ScheduleRuleset activitySchedule(model, totalHeatRateSI);
           activitySchedule.setName(name + " People Activity Level");
-          activitySchedule.setValue(totalHeatRateSI);
 
           //boost::optional<model::ScheduleTypeLimits> scheduleTypeLimits = model.getModelObjectByName<model::ScheduleTypeLimits>("Activity Level");
           //if (!scheduleTypeLimits){
@@ -520,7 +608,7 @@ namespace sdd {
       //<InfModelCoefC>0.10016</InfModelCoefC>
       //<InfModelCoefD>0</InfModelCoefD>
 
-      //InfMthd = {AirChangesPerHour, FlowArea, FlowExteriorArea, FlowExteriorWallArea, FlowZone}
+      //InfMthd = {AirChangesPerHour, FlowArea, FlowExteriorArea, FlowExteriorWallArea, FlowSpace}
       QDomNodeList infMthdNodes = element.elementsByTagName("InfMthd");
       for (int i = 0; i < infMthdNodes.count(); i++){
         
@@ -533,9 +621,12 @@ namespace sdd {
 
         if ((!infMthdElement.isNull()) && (!dsgnInfRtElement.isNull())){
           
-          // DLM: for now this is the only method supported
-          if ((infMthdElement.text() == "FlowExteriorWallArea") ||
-              (infMthdElement.text() == "FlowArea")){
+
+          if ((infMthdElement.text() == "AirChangesPerHour") || 
+              (infMthdElement.text() == "FlowArea") ||
+              (infMthdElement.text() == "FlowExteriorArea") ||
+              (infMthdElement.text() == "FlowExteriorWallArea") ||
+              (infMthdElement.text() == "FlowSpace")){
 
             QDomElement infSchRefElement = elementByTagNameAndIndex(element,"InfSchRef",hasIndex,infIndex);
             QDomElement infModelCoefAElement = elementByTagNameAndIndex(element,"InfModelCoefA",hasIndex,infIndex); // unitless
@@ -555,14 +646,28 @@ namespace sdd {
             spaceInfiltrationDesignFlowRate.setName(infName);
             spaceInfiltrationDesignFlowRate.setSpace(space);
 
-            openstudio::Quantity dsgnInfRtIP(dsgnInfRtElement.text().toDouble(), openstudio::createUnit("cfm/ft^2",UnitSystem::BTU).get());
+            double dsnInfRt = dsgnInfRtElement.text().toDouble();
+
+            openstudio::Quantity dsgnInfRtIP(dsnInfRt, openstudio::createUnit("cfm", UnitSystem::BTU).get());
             OptionalQuantity dsgnInfRtSI = QuantityConverter::instance().convert(dsgnInfRtIP, siSys);
             OS_ASSERT(dsgnInfRtSI);
-            OS_ASSERT(dsgnInfRtSI->units() == SIUnit(SIExpnt(0,1,-1)));
-            if( infMthdElement.text() == "FlowArea" ) {
-              spaceInfiltrationDesignFlowRate.setFlowperSpaceFloorArea(dsgnInfRtSI->value());
-            }else{ // Assume FlowExteriorWallArea
-              spaceInfiltrationDesignFlowRate.setFlowperExteriorWallArea(dsgnInfRtSI->value());
+            OS_ASSERT(dsgnInfRtSI->units() == SIUnit(SIExpnt(0, 3, -1)));
+
+            openstudio::Quantity dsgnInfRtAreaIP(dsnInfRt, openstudio::createUnit("cfm/ft^2", UnitSystem::BTU).get());
+            OptionalQuantity dsgnInfRtAreaSI = QuantityConverter::instance().convert(dsgnInfRtAreaIP, siSys);
+            OS_ASSERT(dsgnInfRtAreaSI);
+            OS_ASSERT(dsgnInfRtAreaSI->units() == SIUnit(SIExpnt(0, 1, -1)));
+
+            if (infMthdElement.text() == "AirChangesPerHour") {
+              spaceInfiltrationDesignFlowRate.setAirChangesperHour(dsnInfRt);
+            }else if (infMthdElement.text() == "FlowArea") {
+                spaceInfiltrationDesignFlowRate.setFlowperSpaceFloorArea(dsgnInfRtAreaSI->value());
+            }else if (infMthdElement.text() == "FlowExteriorArea") {
+              spaceInfiltrationDesignFlowRate.setFlowperExteriorSurfaceArea(dsgnInfRtAreaSI->value());
+            }else if(infMthdElement.text() == "FlowExteriorWallArea") {
+              spaceInfiltrationDesignFlowRate.setFlowperExteriorWallArea(dsgnInfRtAreaSI->value());
+            }else if (infMthdElement.text() == "FlowSpace") {
+              spaceInfiltrationDesignFlowRate.setDesignFlowRate(dsgnInfRtSI->value());
             }
 
             if (!infSchRefElement.isNull()){
@@ -620,13 +725,14 @@ namespace sdd {
       //<IntLtgNonRegHtGnRadFrac>0.55</IntLtgNonRegHtGnRadFrac> - radiant fraction
 
 
-      QDomElement intLPDRegElement = element.firstChildElement("IntLPDReg");
+      QDomElement intLPDRegSimElement = element.firstChildElement("IntLPDRegSim");
       QDomElement intLtgRegSchRefElement = element.firstChildElement("IntLtgRegSchRef");
-      QDomElement intLtgRegHtGnSpcFracElement = element.firstChildElement("IntLtgRegHtGnSpcFrac");
-      QDomElement intLtgRegHtGnRadFracElement = element.firstChildElement("IntLtgRegHtGnRadFrac");
-      if (!intLPDRegElement.isNull() && (intLPDRegElement.text().toDouble() > 0)){
+      QDomElement intLtgRegHtGnSpcFracSimElement = element.firstChildElement("IntLtgRegHtGnSpcFracSim");
+      QDomElement intLtgRegHtGnRadFracSimElement = element.firstChildElement("IntLtgRegHtGnRadFracSim");
+      QDomElement intLtgRegEndUseElement = element.firstChildElement("IntLtgRegEndUseCat");
+      if (!intLPDRegSimElement.isNull() && (intLPDRegSimElement.text().toDouble() > 0)){
 
-        openstudio::Quantity lightingDensityIP(intLPDRegElement.text().toDouble(), openstudio::createUnit("W/ft^2").get());
+        openstudio::Quantity lightingDensityIP(intLPDRegSimElement.text().toDouble(), openstudio::createUnit("W/ft^2").get());
         OptionalQuantity lightingDensitySI = QuantityConverter::instance().convert(lightingDensityIP, whSys);
         OS_ASSERT(lightingDensitySI);
         OS_ASSERT(lightingDensitySI->units() == WhUnit(WhExpnt(1,0,-2)));
@@ -638,7 +744,12 @@ namespace sdd {
         openstudio::model::Lights lights(lightsDefinition);
         lights.setName(name + " Regulated Lights");
         lights.setSpace(space);
-        lights.setEndUseSubcategory("Reg Ltg");
+
+        std::string subCategory = "ComplianceLtg";
+        if (!intLtgRegEndUseElement.isNull()){
+          subCategory = intLtgRegEndUseElement.text().toStdString();
+        }
+        lights.setEndUseSubcategory(subCategory);
 
         if (!intLtgRegSchRefElement.isNull()){
           std::string scheduleName = escapeName(intLtgRegSchRefElement.text());
@@ -650,27 +761,28 @@ namespace sdd {
           }
         }
 
-        if (!intLtgRegHtGnSpcFracElement.isNull()){
-          double spaceFraction = intLtgRegHtGnSpcFracElement.text().toDouble();
+        if (!intLtgRegHtGnSpcFracSimElement.isNull()){
+          double spaceFraction = intLtgRegHtGnSpcFracSimElement.text().toDouble();
           double returnAirFraction = 1.0 - spaceFraction;
           lightsDefinition.setReturnAirFraction(returnAirFraction);
         
-          if (!intLtgRegHtGnRadFracElement.isNull()){
-            double fractionRadiant = intLtgRegHtGnRadFracElement.text().toDouble() * spaceFraction;
+          if (!intLtgRegHtGnRadFracSimElement.isNull()){
+            double fractionRadiant = intLtgRegHtGnRadFracSimElement.text().toDouble() * spaceFraction;
             lightsDefinition.setFractionRadiant(fractionRadiant);
           }
-        }else if (!intLtgRegHtGnRadFracElement.isNull()){
-          LOG(Warn, "IntLtgRegHtGnRadFracElement is specified for space '" << name << "' but IntLtgRegHtGnSpcFracElement is not, IntLtgNonRegHtGnRadFracElement will be ignored.");
+        }else if (!intLtgRegHtGnRadFracSimElement.isNull()){
+          LOG(Warn, "IntLtgRegHtGnRadFracSimElement is specified for space '" << name << "' but IntLtgRegHtGnSpcFracSimElement is not, IntLtgNonRegHtGnRadFracSimElement will be ignored.");
         }
       }
 
-      QDomElement intLPDNonRegElement = element.firstChildElement("IntLPDNonReg");
+      QDomElement intLPDNonRegSimElement = element.firstChildElement("IntLPDNonRegSim");
       QDomElement intLtgNonRegSchRefElement = element.firstChildElement("IntLtgNonRegSchRef");
-      QDomElement intLtgNonRegHtGnSpcFracElement = element.firstChildElement("IntLtgNonRegHtGnSpcFrac");
-      QDomElement intLtgNonRegHtGnRadFracElement = element.firstChildElement("IntLtgNonRegHtGnRadFrac");
-      if (!intLPDNonRegElement.isNull() && (intLPDNonRegElement.text().toDouble() > 0)){
+      QDomElement intLtgNonRegHtGnSpcFracSimElement = element.firstChildElement("IntLtgNonRegHtGnSpcFracSim");
+      QDomElement intLtgNonRegHtGnRadFracSimElement = element.firstChildElement("IntLtgNonRegHtGnRadFracSim");
+      QDomElement intLtgNonRegEndUseElement = element.firstChildElement("IntLtgNonRegEndUseCat");
+      if (!intLPDNonRegSimElement.isNull() && (intLPDNonRegSimElement.text().toDouble() > 0)){
 
-        openstudio::Quantity lightingDensityIP(intLPDNonRegElement.text().toDouble(), openstudio::createUnit("W/ft^2").get());
+        openstudio::Quantity lightingDensityIP(intLPDNonRegSimElement.text().toDouble(), openstudio::createUnit("W/ft^2").get());
         OptionalQuantity lightingDensitySI = QuantityConverter::instance().convert(lightingDensityIP, whSys);
         OS_ASSERT(lightingDensitySI);
         OS_ASSERT(lightingDensitySI->units() == WhUnit(WhExpnt(1,0,-2)));
@@ -682,7 +794,12 @@ namespace sdd {
         openstudio::model::Lights lights(lightsDefinition);
         lights.setName(name + " Non-Regulated Lights");
         lights.setSpace(space);
-        lights.setEndUseSubcategory("NonReg Ltg");
+
+        std::string subCategory = "NonComplianceLtg";
+        if (!intLtgRegEndUseElement.isNull()){
+          subCategory = intLtgNonRegEndUseElement.text().toStdString();
+        }
+        lights.setEndUseSubcategory(subCategory);
 
         if (!intLtgNonRegSchRefElement.isNull()){
           std::string scheduleName = escapeName(intLtgNonRegSchRefElement.text());
@@ -694,17 +811,17 @@ namespace sdd {
           }
         }
 
-        if (!intLtgNonRegHtGnSpcFracElement.isNull()){
-          double spaceFraction = intLtgNonRegHtGnSpcFracElement.text().toDouble();
+        if (!intLtgNonRegHtGnSpcFracSimElement.isNull()){
+          double spaceFraction = intLtgNonRegHtGnSpcFracSimElement.text().toDouble();
           double returnAirFraction = 1.0 - spaceFraction;
           lightsDefinition.setReturnAirFraction(returnAirFraction);
 
-          if (!intLtgNonRegHtGnRadFracElement.isNull()){
-            double fractionRadiant = intLtgNonRegHtGnRadFracElement.text().toDouble() * spaceFraction;
+          if (!intLtgNonRegHtGnRadFracSimElement.isNull()){
+            double fractionRadiant = intLtgNonRegHtGnRadFracSimElement.text().toDouble() * spaceFraction;
             lightsDefinition.setFractionRadiant(fractionRadiant);
           }
-        }else if (!intLtgNonRegHtGnRadFracElement.isNull()){
-          LOG(Warn, "IntLtgNonRegHtGnRadFracElement is specified for space '" << name << "' but IntLtgNonRegHtGnSpcFracElement is not, IntLtgNonRegHtGnRadFracElement will be ignored.");
+        }else if (!intLtgNonRegHtGnRadFracSimElement.isNull()){
+          LOG(Warn, "IntLtgNonRegHtGnRadFracSimElement is specified for space '" << name << "' but IntLtgNonRegHtGnSpcFracSimElement is not, IntLtgNonRegHtGnRadFracSimElement will be ignored.");
         }
       }
     }
@@ -1061,6 +1178,68 @@ namespace sdd {
     return space;
   }
 
+  boost::optional<openstudio::model::ModelObject> ReverseTranslator::translateConvectionCoefficients(const QDomElement& element, const QDomDocument& doc, openstudio::model::PlanarSurface& surface)
+  {
+    boost::optional<std::string> convectionCoefficient1Location;
+    boost::optional<std::string> convectionCoefficient1Type;
+    boost::optional<double> convectionCoefficient1;
+    boost::optional<std::string> convectionCoefficient2Location;
+    boost::optional<std::string> convectionCoefficient2Type;
+    boost::optional<double> convectionCoefficient2;
+
+    QDomElement insideConvCoefElement = element.firstChildElement("InsideConvCoef");
+    if (!insideConvCoefElement.isNull()){
+
+      // sdd IP units (Btu/h-ft2-F), os SI units (W/m2-K) 
+      Quantity coefIP(insideConvCoefElement.text().toDouble(), BTUUnit(BTUExpnt(1, -2, -1, -1)));
+      OptionalQuantity coefSI = QuantityConverter::instance().convert(coefIP, UnitSystem(UnitSystem::Wh));
+      OS_ASSERT(coefSI);
+      OS_ASSERT(coefSI->units() == WhUnit(WhExpnt(1, 0, -2, -1)));
+
+      convectionCoefficient1Location = "Inside";
+      convectionCoefficient1 = coefSI->value();
+    }
+
+    QDomElement outsideConvCoefElement = element.firstChildElement("OutsideConvCoef");
+    if (!outsideConvCoefElement.isNull()){
+
+      // sdd IP units (Btu/h-ft2-F), os SI units (W/m2-K) 
+      Quantity coefIP(outsideConvCoefElement.text().toDouble(), BTUUnit(BTUExpnt(1, -2, -1, -1)));
+      OptionalQuantity coefSI = QuantityConverter::instance().convert(coefIP, UnitSystem(UnitSystem::Wh));
+      OS_ASSERT(coefSI);
+      OS_ASSERT(coefSI->units() == WhUnit(WhExpnt(1, 0, -2, -1)));
+
+      if (convectionCoefficient1Location){
+        convectionCoefficient2Location = "Outside";
+        convectionCoefficient2 = coefSI->value();
+      } else {
+        convectionCoefficient1Location = "Outside";
+        convectionCoefficient1 = coefSI->value();
+      }
+    }
+
+    if (convectionCoefficient1Location){
+
+      if( auto derivedSurface = surface.optionalCast<model::Surface>() ) {
+        model::SurfacePropertyConvectionCoefficients surfacePropertyConvectionCoefficients(derivedSurface.get());
+
+        surfacePropertyConvectionCoefficients.setConvectionCoefficient1Location(*convectionCoefficient1Location);
+        surfacePropertyConvectionCoefficients.setConvectionCoefficient1Type("Value");
+        surfacePropertyConvectionCoefficients.setConvectionCoefficient1(*convectionCoefficient1);
+
+        if (convectionCoefficient2Location){
+          surfacePropertyConvectionCoefficients.setConvectionCoefficient2Location(*convectionCoefficient2Location);
+          surfacePropertyConvectionCoefficients.setConvectionCoefficient2Type("Value");
+          surfacePropertyConvectionCoefficients.setConvectionCoefficient2(*convectionCoefficient2);
+        }
+
+        return surfacePropertyConvectionCoefficients;
+      }
+    }
+
+    return boost::none;
+  }
+
   boost::optional<model::ModelObject> ReverseTranslator::translateSurface(const QDomElement& element, const QDomDocument& doc, openstudio::model::Space& space)
   {
     boost::optional<model::ModelObject> result;
@@ -1070,12 +1249,18 @@ namespace sdd {
     std::vector<openstudio::Point3d> vertices;
 
     QDomElement polyLoopElement = element.firstChildElement("PolyLp");
-    OS_ASSERT(!polyLoopElement.isNull());
+    if (polyLoopElement.isNull()){
+      LOG(Error, "Surface element 'PolyLp' is empty, cannot create Surface.");
+      return boost::none;
+    }
 
     QDomNodeList cartesianPointElements = polyLoopElement.elementsByTagName("CartesianPt");
     for (int i = 0; i < cartesianPointElements.count(); i++){
       QDomNodeList coordinateElements = cartesianPointElements.at(i).toElement().elementsByTagName("Coord");
-      OS_ASSERT(coordinateElements.size() == 3);
+      if (coordinateElements.size() != 3){
+        LOG(Error, "PolyLp element 'CartesianPt' does not have exactly 3 'Coord' elements, cannot create Surface.");
+        return boost::none;
+      }
 
       /* DLM: these unit conversions are taking about 75% of the total time to translate a large model
 
@@ -1106,13 +1291,18 @@ namespace sdd {
 
     }
 
-    QDomElement nameElement = element.firstChildElement("Name");
-
     openstudio::model::Surface surface(vertices, space.model());
-    OS_ASSERT(!nameElement.isNull());
-    std::string name = escapeName(nameElement.text());
-    surface.setName(name);
     surface.setSpace(space);
+    
+    QDomElement nameElement = element.firstChildElement("Name");
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "Surface element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
+    surface.setName(name);
+    
     result = surface;
 
     QDomElement constructionReferenceElement = element.firstChildElement("ConsAssmRef");
@@ -1225,15 +1415,21 @@ namespace sdd {
 
     for (int i = 0; i < windowElements.count(); ++i){
       boost::optional<model::ModelObject> subSurface = translateSubSurface(windowElements.at(i).toElement(), doc, surface);
-      OS_ASSERT(subSurface);
+      if (!subSurface){
+        LOG(Error, "Failed to translate 'Win' element " << i << " for Surface named '" << name << "'");
+      }
     }
     for (int i = 0; i < doorElements.count(); ++i){
       boost::optional<model::ModelObject> subSurface = translateSubSurface(doorElements.at(i).toElement(), doc, surface);
-      OS_ASSERT(subSurface);
+      if (!subSurface){
+        LOG(Error, "Failed to translate 'Dr' element " << i << " for Surface named '" << name << "'");
+      }
     }
     for (int i = 0; i < skylightElements.count(); ++i){
       boost::optional<model::ModelObject> subSurface = translateSubSurface(skylightElements.at(i).toElement(), doc, surface);
-      OS_ASSERT(subSurface);
+      if (!subSurface){
+        LOG(Error, "Failed to translate 'Skylt' element " << i << " for Surface named '" << name << "'");
+      }
     }
 
     // check for adjacent surface
@@ -1241,11 +1437,35 @@ namespace sdd {
     if (!adjacentSpaceElement.isNull()){
       std::string adjacentSpaceName = escapeName(adjacentSpaceElement.text());
       boost::optional<model::Space> otherSpace = space.model().getModelObjectByName<model::Space>(adjacentSpaceName);
-      OS_ASSERT(otherSpace); // what type of error handling do we want?
 
-      // clone the surface and sub surfaces with reverse vertices
-      boost::optional<model::Surface> otherSurface = surface.createAdjacentSurface(*otherSpace);
-      OS_ASSERT(otherSurface); // what type of error handling do we want?
+      if (!otherSpace){
+        LOG(Error, "Cannot retrieve adjacent Space '" << adjacentSpaceName << "' for Surface named '" << name << "'");
+      
+        // DLM: make adiabatic per David Reddy, 6/5/2015
+        //surface.remove();
+        //return boost::none;
+        surface.setOutsideBoundaryCondition("Adiabatic");
+
+      } else if (otherSpace->handle() == space.handle()){
+        LOG(Error, "Adjacent Space '" << adjacentSpaceName << "' is same as parent Space for Surface named '" << name << "'.  Removing interior surface.");
+
+        // DLM: make adiabatic per David Reddy, 6/5/2015
+        //surface.remove();
+        //return boost::none;
+        surface.setOutsideBoundaryCondition("Adiabatic");
+
+      } else{
+        // clone the surface and sub surfaces with reverse vertices
+        boost::optional<model::Surface> otherSurface = surface.createAdjacentSurface(*otherSpace);
+        if (!otherSurface){
+          LOG(Error, "Failed to create surface in adjacent Space '" << adjacentSpaceName << "' for Surface named '" << name << "'.  Removing surface.");
+        
+          // DLM: make adiabatic per David Reddy, 6/5/2015
+          //surface.remove();
+          //return boost::none;
+          surface.setOutsideBoundaryCondition("Adiabatic");
+        }
+      }
     }
 
     return result;
@@ -1258,12 +1478,18 @@ namespace sdd {
     UnitSystem siSys(UnitSystem::SI);
 
     QDomElement polyLoopElement = element.firstChildElement("PolyLp");
-    OS_ASSERT(!polyLoopElement.isNull());
+    if (polyLoopElement.isNull()){
+      LOG(Error, "SubSurface element 'PolyLp' is empty, cannot create SubSurface.");
+      return boost::none;
+    }
 
     QDomNodeList cartesianPointElements = polyLoopElement.elementsByTagName("CartesianPt");
     for (int i = 0; i < cartesianPointElements.count(); i++){
       QDomNodeList coordinateElements = cartesianPointElements.at(i).toElement().elementsByTagName("Coord");
-      OS_ASSERT(coordinateElements.size() == 3);
+      if (coordinateElements.size() != 3){
+        LOG(Error, "PolyLp element 'CartesianPt' does not have exactly 3 'Coord' elements, cannot create SubSurface.");
+        return boost::none;
+      }
 
       /* DLM: there conversions were taking about 75% of the time it takes to convert a large model
 
@@ -1293,10 +1519,17 @@ namespace sdd {
       vertices.push_back(openstudio::Point3d(x,y,z));
     }
 
-    QDomElement nameElement = element.firstChildElement("Name");
     model::SubSurface subSurface(vertices, surface.model());
     subSurface.setSurface(surface);
-    subSurface.setName(escapeName(nameElement.text()));
+
+    QDomElement nameElement = element.firstChildElement("Name");
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "Surface element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
+    subSurface.setName(name);
 
     QString tagName = element.tagName();
     if (tagName == "Win"){
@@ -1314,6 +1547,9 @@ namespace sdd {
         }
       }
 
+      // Convert surface convection coefficients
+      translateConvectionCoefficients(element, doc, subSurface);
+        
     }else if (tagName == "Dr"){
 
       subSurface.setSubSurfaceType("Door");
@@ -1329,6 +1565,9 @@ namespace sdd {
         }
       }
 
+      // Convert surface convection coefficients
+      translateConvectionCoefficients(element, doc, subSurface);
+
     }else if (tagName == "Skylt"){
 
       subSurface.setSubSurfaceType("Skylight");
@@ -1343,6 +1582,9 @@ namespace sdd {
           LOG(Error, "Cannot find construction '" << constructionName << "'");
         }
       }
+
+      // Convert surface convection coefficients
+      translateConvectionCoefficients(element, doc, subSurface);
 
     }else{  
       LOG(Error, "Unknown subsurface type '" << toString(tagName) << "'");
@@ -1361,12 +1603,18 @@ namespace sdd {
     UnitSystem siSys(UnitSystem::SI);
 
     QDomElement polyLoopElement = element.firstChildElement("PolyLp");
-    OS_ASSERT(!polyLoopElement.isNull());
+    if (polyLoopElement.isNull()){
+      LOG(Error, "ShadingSurface element 'PolyLp' is empty, cannot create ShadingSurface.");
+      return boost::none;
+    }
 
     QDomNodeList cartesianPointElements = polyLoopElement.elementsByTagName("CartesianPt");
     for (int i = 0; i < cartesianPointElements.count(); i++){
       QDomNodeList coordinateElements = cartesianPointElements.at(i).toElement().elementsByTagName("Coord");
-      OS_ASSERT(coordinateElements.size() == 3);
+      if (coordinateElements.size() != 3){
+        LOG(Error, "PolyLp element 'CartesianPt' does not have exactly 3 'Coord' elements, cannot create ShadingSurface.");
+        return boost::none;
+      }
 
       /* DLM: there conversions were taking about 75% of the time it takes to convert a large model
 
@@ -1397,12 +1645,16 @@ namespace sdd {
     }
 
     model::Model model = shadingSurfaceGroup.model();
-
-    QDomElement nameElement = element.firstChildElement("Name");
-    std::string name = escapeName(nameElement.text());
-
     model::ShadingSurface shadingSurface(vertices, model);
     shadingSurface.setShadingSurfaceGroup(shadingSurfaceGroup);
+
+    QDomElement nameElement = element.firstChildElement("Name");
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "ShadingSurface element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
     shadingSurface.setName(name);
 
     QString tagName = element.tagName();
@@ -1425,18 +1677,52 @@ namespace sdd {
       model::ConstructionBase construction = shadingConstruction(model, solRefl, visRefl);
       shadingSurface.setConstruction(construction);
 
-      QDomElement scheduleReferenceElement = element.firstChildElement("TransSchRef");
-      if(!scheduleReferenceElement.isNull()){
-        std::string scheduleName = escapeName(scheduleReferenceElement.text());
-        boost::optional<model::Schedule> schedule = model.getModelObjectByName<model::Schedule>(scheduleName);
-        if(schedule){
+      QDomElement transOptionElement = element.firstChildElement("TransOption");
+      if (!transOptionElement.isNull()){
+
+        boost::optional<model::Schedule> schedule;
+        std::string scheduleName;
+
+        // constant transmittance
+        if (transOptionElement.text().compare("Constant", Qt::CaseInsensitive) == 0){
+
+          QDomElement transElement = element.firstChildElement("Trans");
+          if (!transElement.isNull()){
+            schedule = shadingSchedule(model, transElement.text().toDouble());
+            if (schedule){
+              scheduleName = schedule->name().get();
+            }
+          } else {
+            LOG(Error, "Cannot find shading transmittance for shading surface '" << name << "'");
+          }
+
+          // transmittance schedule
+        } else if (transOptionElement.text().compare("Scheduled", Qt::CaseInsensitive) == 0){
+
+          QDomElement scheduleReferenceElement = element.firstChildElement("TransSchRef");
+          if (!scheduleReferenceElement.isNull()){
+            scheduleName = escapeName(scheduleReferenceElement.text());
+            schedule = model.getModelObjectByName<model::Schedule>(scheduleName);
+            if (!schedule){
+              LOG(Error, "Cannot find shading schedule '" << scheduleName << "' for shading surface '" << name << "'");
+            }
+          } else{
+            LOG(Error, "Cannot find shading schedule for shading surface '" << name << "'");
+          }
+
+        } else{
+          LOG(Error, "Unknown TransOption value for shading surface '" << name << "'");
+        }
+
+        if (schedule){
           bool test = shadingSurface.setTransmittanceSchedule(*schedule);
           if (!test){
-            LOG(Error, "Failed to assign schedule '" << scheduleName << "' to shading surface '" << name << "'");
+            LOG(Error, "Failed to assign shading schedule '" << scheduleName << "' to shading surface '" << name << "'");
           }
-        }else{
-          LOG(Error, "Cannot find schedule '" << scheduleName << "'");
+        } else {
+          // DLM: could warn here
         }
+
       }
 
     }else{  
@@ -1478,10 +1764,30 @@ namespace sdd {
     std::vector<model::Material> materials;
     materials.push_back(material);
     test = construction.setLayers(materials);
-    OS_ASSERT(test); // what type of error handling do we want?
+    if (!test){
+      LOG(Error, "Failed to assign material layers to Construction named '" << constructionName << "'");
+    }
 
     m_shadingConstructionMap.insert(std::make_pair(key, construction));
     return construction;
+  }
+
+  model::Schedule ReverseTranslator::shadingSchedule(openstudio::model::Model& model, double trans)
+  {
+    auto it = m_shadingScheduleMap.find(trans);
+    if (it != m_shadingScheduleMap.end()){
+      return it->second;
+    }
+
+    std::string description = boost::lexical_cast<std::string>(trans);
+    std::string scheduleName = "Shading Schedule " + description;
+
+    // create a schedule with these properties
+    model::ScheduleRuleset schedule(model, trans);
+    schedule.setName(scheduleName);
+
+    m_shadingScheduleMap.insert(std::make_pair(trans, schedule));
+    return schedule;
   }
 
   boost::optional<QDomElement> ForwardTranslator::translateBuilding(const openstudio::model::Building& building, QDomDocument& doc)
@@ -1495,18 +1801,41 @@ namespace sdd {
     result.appendChild(nameElement);
     nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
-    double buildingAzimuth = fixAngle(building.northAxis());
-    double northAngle = 360.0 - buildingAzimuth;
-
-    // north angle
-    QDomElement northAngleElement = doc.createElement("NAng");
-    result.appendChild(northAngleElement);
-    northAngleElement.appendChild(doc.createTextNode(QString::number(northAngle)));
+    // SDD:
+    // FuncClassMthd - optional, ignore 
+    // RelocPubSchoolBldg - optional, in progress
+    // WholeBldgModeled - required, need to add
+    // BldgAz - required, done
+    // TotStoryCnt - required, in progress
+    // TotStoryCntNew - optional, need to add?
+    // TotStoryCntExisting - optional, need to add?
+    // TotStoryCntAltered - optional, need to add?
+    // AboveGrdStoryCnt - required, in progress
+    // AboveGrdStoryCntNew - optional, need to add?
+    // AboveGrdStoryCntExisting  - optional, need to add?
+    // AboveGrdStoryCntAltered - optional, need to add?
+    // LivingUnitCnt - defaulted, in progress
+    // LivingUnitCntNew - optional, need to add?
+    // LivingUnitCntExisting - optional, need to add?
+    // LivingUnitCntAltered - optional, need to add?
+    // TotFlrArea - defaulted, ignore 
+    // NonResFlrArea - defaulted, ignore 
+    // ResFlrArea - defaulted, ignore 
+    // TotCondVol - defaulted, ignore 
+    // PlantClgCap - defaulted, ignore
+    // PlantHtgCap - defaulted, ignore
+    // CoilClgCap - defaulted, ignore
+    // CoilHtgCap - defaulted, ignore
 
     // building azimuth
+    double buildingAzimuth = fixAngle(building.northAxis());
     QDomElement buildingAzimuthElement = doc.createElement("BldgAz");
     result.appendChild(buildingAzimuthElement);
     buildingAzimuthElement.appendChild(doc.createTextNode(QString::number(buildingAzimuth)));
+
+    // TotStoryCnt - required, Standards Number of Stories
+    // AboveGrdStoryCnt - required, Standards Number of Above Ground Stories
+    // LivingUnitCnt - defaulted, Standards Number of Living Units
 
     // translate storys
     std::vector<model::BuildingStory> buildingStories = building.model().getConcreteModelObjects<model::BuildingStory>();
@@ -1515,7 +1844,7 @@ namespace sdd {
     if (m_progressBar){
       m_progressBar->setWindowTitle(toString("Translating Building Stories"));
       m_progressBar->setMinimum(0);
-      m_progressBar->setMaximum(buildingStories.size());
+      m_progressBar->setMaximum((int)buildingStories.size());
       m_progressBar->setValue(0);
     }
 
@@ -1542,7 +1871,7 @@ namespace sdd {
     if (m_progressBar){
       m_progressBar->setWindowTitle(toString("Translating Building Shading"));
       m_progressBar->setMinimum(0);
-      m_progressBar->setMaximum(shadingSurfaceGroups.size()); 
+      m_progressBar->setMaximum((int)shadingSurfaceGroups.size());
       m_progressBar->setValue(0);
     }
 
@@ -1598,6 +1927,7 @@ namespace sdd {
 
     if (spacesWithoutZone.size() > 0){
       // DLM: desired workflow is to assign thermal zones in cbecc
+      // DLM: Kyle, we will have to think about if we want to warn about this or not
       //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
       //spacesWithoutZone.pop_back();
       //LOG(Warn, "Model contains spaces which are not assigned to a thermal zone, these have not been translated:" << spacesWithoutZone);
@@ -1640,7 +1970,7 @@ namespace sdd {
     if (m_progressBar){
       m_progressBar->setWindowTitle(toString("Translating Thermal Zones"));
       m_progressBar->setMinimum(0);
-      m_progressBar->setMaximum(thermalZones.size());
+      m_progressBar->setMaximum((int)thermalZones.size());
       m_progressBar->setValue(0);
     }
 
@@ -1649,6 +1979,28 @@ namespace sdd {
       boost::optional<QDomElement> thermalZoneElement = translateThermalZone(thermalZone, doc);
       if (thermalZoneElement){
         result.appendChild(*thermalZoneElement);
+      }
+
+      if (m_progressBar){
+        m_progressBar->setValue(m_progressBar->value() + 1);
+      }
+    }
+
+    // translate AirLoopHVAC systems
+    auto airLoops = building.model().getConcreteModelObjects<model::AirLoopHVAC>();
+    std::sort(airLoops.begin(),airLoops.end(),WorkspaceObjectNameLess());
+
+    if (m_progressBar) {
+      m_progressBar->setWindowTitle(toString("Translating AirLoopHVAC Systems"));
+      m_progressBar->setMinimum(0);
+      m_progressBar->setMaximum((int)airLoops.size());
+      m_progressBar->setValue(0);
+    }
+
+    for (const auto & airLoop : airLoops) {
+      auto airLoopElement = translateAirLoopHVAC(airLoop,doc);
+      if (airLoopElement) {
+        result.appendChild(*airLoopElement);
       }
 
       if (m_progressBar){
@@ -1669,6 +2021,12 @@ namespace sdd {
     QDomElement nameElement = doc.createElement("Name");
     result.appendChild(nameElement);
     nameElement.appendChild(doc.createTextNode(escapeName(name)));
+
+    // SDD:
+    // Mult - defaulted, ignore (OS doesn't have this)
+    // Z - only for simple geometry, ignore
+    // FlrToFlrHgt - only for simple geometry, ignore
+    // FlrToCeilingHgt - only for simple geometry, ignore
 
     // translate spaces
     std::vector<model::Space> spaces = buildingStory.spaces();
@@ -1698,6 +2056,129 @@ namespace sdd {
     result.appendChild(nameElement);
     nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
+    // SDD:
+    // Status - required, need to add
+    // CondgType - required, in progress
+    // SupPlenumSpcRef - optional, in progress
+    // RetPlenumSpcRef - optional, in progress
+    // ThrmlZnRef - required, done
+    // Area - only for simple geometry, done, can we remove?
+    // FlrArea - optional, do we need this?
+    // FlrZ - optional, do we need this?
+    // FlrToCeilingHgt - optional, do we need this?
+    // Vol - required, done, can we remove?
+    // SpcFuncDefaultsRef - optional, do with space types
+    // SpcFunc - compulsory, do with space types
+    // FuncSchGrp - optional, do with space types
+    // OccDensSim - optional, do with space types
+    // OccSensHtRt - optional, do with space types
+    // OccLatHtRt - optional, do with space types
+    // OccSchRef - optional, do with space types
+    // InfMthd - defaulted, do with space types
+    // DsgnInfRt - defaulted, do with space types
+    // InfSchRef - defaulted, do with space types
+    // InfModelCoefA - required, do with space types
+    // InfModelCoefB - required, do with space types
+    // InfModelCoefC - required, do with space types
+    // InfModelCoefD - required, do with space types
+    // EnvStatus - optional, do with space types
+    // LtgStatus - optional, do with space types
+    // IntLtgSpecMthd - required, do with space types
+    // IntLPDReg - optional, do with space types
+    // IntLtgRegSchRef - optional, do with space types
+    // IntLtgRegHtGnSpcFrac - optional, do with space types
+    // IntLtgRegHtGnRadFrac - optional, do with space types
+    // IntLPDNonReg - optional, do with space types
+    // IntLtgNonRegSchRef - optional, do with space types
+    // IntLtgNonRegHtGnSpcFrac - optional, do with space types
+    // IntLtgNonRegHtGnRadFrac - optional, do with space types
+    // SkylitDayltgInstalledLtgPwr - optional, do we need this?
+    // PriSideDayltgInstalledLtgPwr - optional, do we need this?
+    // SecSideDayltgInstalledLtgPwr - optional, do we need this?
+    // Skylit100PctControlled - optional, do we need this?
+    // PriSide100PctControlled - optional, do we need this?
+    // SecSide100PctControlled - optional, do we need this?
+    // SkylitDayltgRefPtCoord - optional, do we need this?
+    // SkylitDayltgCtrlLtgPwr - optional, do we need this?
+    // SkylitDayltgCtrlLtgFrac - optional, do we need this?
+    // SkylitDayltgIllumSetpt - optional, do we need this?
+    // PriSideDayltgRefPtCoord - optional, do we need this?
+    // PriSideDayltgCtrlLtgPwr - optional, do we need this?
+    // PriSideDayltgCtrlLtgFrac - optional, do we need this?
+    // PriSideDayltgIllumSetpt - optional, do we need this?
+    // SecSideDayltgRefPtCoord - optional, do we need this?
+    // SecSideDayltgCtrlLtgPwr - optional, do we need this?
+    // SecSideDayltgCtrlLtgFrac - optional, do we need this?
+    // SecSideDayltgIllumSetpt - optional, do we need this?
+    // DayltgCtrlType - optional, do we need this?
+    // MinDimLtgFrac - optional, do we need this?
+    // MinDimPwrFrac - optional, do we need this?
+    // NumOfCtrlSteps - optional, do we need this?
+    // GlrAz - optional, do we need this?
+    // MaxGlrIdx - optional, do we need this?
+    // SkyltReqExcpt - optional, do we need this?
+    // SkyltReqExcptArea - optional, do we need this?
+    // SkyltReqExcptFrac - optional, do we need this?
+    // RecptPwrDens - defaulted, do with space types
+    // RecptSchRef - defaulted, do with space types
+    // RecptRadFrac - defaulted, do with space types
+    // RecptLatFrac - defaulted, do with space types
+    // RecptLostFrac - defaulted, do with space types
+    // GasEqpPwrDens - defaulted, do with space types
+    // GasEqpSchRef - defaulted, do with space types
+    // GasEqpRadFrac - defaulted, do with space types
+    // GasEqpLatFrac - defaulted, do with space types
+    // GasEqpLostFrac - defaulted, do with space types
+    // ProcElecPwrDens - optional, do with space types
+    // ProcElecSchRef - optional, do with space types
+    // ProcElecRadFrac - optional, do with space types
+    // ProcElecLatFrac - optional, do with space types
+    // ProcElecLostFrac - optional, do with space types
+    // ProcGasPwrDens - optional, do with space types
+    // ProcGasSchRef - optional, do with space types
+    // ProcGasRadFrac - optional, do with space types
+    // ProcGasLatFrac - optional, do with space types
+    // ProcGasLostFrac - optional, do with space types
+    // CommRfrgEPD - defaulted, do with space types
+    // CommRfrgEqpSchRef - defaulted, do with space types
+    // CommRfrgRadFrac - defaulted, do with space types
+    // CommRfrgLatFrac - defaulted, do with space types
+    // CommRfrgLostFrac - defaulted, do with space types
+    // ElevCnt - optional, do with space types
+    // ElevPwr - optional, do with space types
+    // ElevSchRef - defaulted, do with space types
+    // ElevRadFrac - optional, do with space types
+    // ElevLatFrac - optional, do with space types
+    // ElevLostFrac - optional, do with space types
+    // EscalCnt - optional, do with space types
+    // EscalPwr - optional, do with space types
+    // EscalSchRef - defaulted, do with space types
+    // EscalRadFrac - optional, do with space types
+    // EscalLatFrac - optional, do with space types
+    // EscalLostFrac - optional, do with space types
+    // SHWFluidSegRef - optional, do with space types
+    // RecircDHWSysRef - optional, do with space types
+    // HotWtrHtgRt - defaulted, do with space types
+    // RecircHotWtrHtgRt - optional, do with space types
+    // HotWtrHtgSchRef - optional, do with space types
+    // VentPerPerson - defaulted, do with space types
+    // VentPerArea - defaulted, do with space types
+    // VentACH - optional, do with space types
+    // VentPerSpc - optional, do with space types
+    // ExhPerArea - optional, do we need this?
+    // ExhACH - optional, do we need this?
+    // ExhPerSpc - optional, do we need this?
+    // KitExhHoodLen - optional, do we need this?
+    // KitExhHoodStyle - optional, do we need this?
+    // KitExhHoodDuty - optional, do we need this?
+    // KitExhHoodFlow - optional, do we need this?
+    // LabExhRtType - optional, do we need this?
+    // IntLPDPrescrip - optional, do we need this?
+    // IsPlenumRet - optional, do we need this?
+    // HighRiseResInt - optional, do we need this?
+    // HighRiseResCondFlrArea - optional, do we need this?
+
+
     // volume
     double volume = space.volume();
     Quantity volumeSI(volume, SIUnit(SIExpnt(0,3,0)));
@@ -1713,7 +2194,7 @@ namespace sdd {
       LOG(Warn, "Space '" << name << "' has zero volume.");
     }
 
-    // floorArea
+    // area
     double floorArea = space.floorArea();
     Quantity floorAreaSI(floorArea, SIUnit(SIExpnt(0,2,0)));
     OptionalQuantity floorAreaIP = QuantityConverter::instance().convert(floorAreaSI, ipSys);
@@ -1773,6 +2254,11 @@ namespace sdd {
       QDomElement thermalZoneElement = doc.createElement("ThrmlZnRef");
       result.appendChild(thermalZoneElement);
       thermalZoneElement.appendChild(doc.createTextNode(escapeName(thermalZoneName)));
+
+      // CondgType - required
+      // SupPlenumSpcRef - optional
+      // RetPlenumSpcRef - optional
+      // ThrmlZnRef - required
     }
 
     // translate space shading
@@ -1882,6 +2368,31 @@ namespace sdd {
     QDomElement nameElement = doc.createElement("Name");
     result->appendChild(nameElement);
     nameElement.appendChild(doc.createTextNode(escapeName(name)));
+
+    // SDD:
+    // Status - required (ExtFlr, ExtWall, IntWall, Roof, UndgrFlr, UndgrWall), need to add
+    // ConsAssmRef - optional (Ceiling, ExtFlr, ExtWall, IntFlr, IntWall, Roof, UndgrFlr, UndgrWall), done
+    // AdjacentSpcRef - optional (Ceiling, IntFlr, IntWall), done
+    // Area - simplified geometry only (Ceiling, ExtFlr, ExtWall, IntFlr, IntWall, Roof, UndgrFlr, UndgrWall), ignore
+    // Hgt - optional (UndgrWall), done, requires unique CFactor construction per surface
+    // PerimExposed - optional (UndgrFlr), done requires unique FFactor construction per surface
+    // DisplayPerim - optional (ExtWall), need to add?
+    // Az - simplified geometry only (ExtWall, Roof), ignore
+    // Tilt - simplified geometry only (Roof), ignore
+    // ExtSolAbs - required (Ceiling, ExtFlr, ExtWall, IntWall), ignore, do at construction level
+    // ExtThrmlAbs - required (Ceiling, ExtFlr, ExtWall, IntWall), ignore, do at construction level
+    // ExtVisAbs - required (Ceiling, ExtFlr, ExtWall, IntWall), ignore, do at construction level
+    // IntSolAbs - optional (Ceiling, ExtFlr, ExtWall, IntFlr, IntWall, Roof, UndgrFlr, UndgrWall), ignore, do at construction level
+    // IntThrmlAbs - optional (Ceiling, ExtFlr, ExtWall, IntFlr, IntWall, Roof, UndgrFlr, UndgrWall), ignore, do at construction level
+    // IntVisAbs - optional (Ceiling, ExtFlr, ExtWall, IntFlr, IntWall, Roof, UndgrFlr, UndgrWall), ignore, do at construction level
+    // FieldAppliedCoating - optional (Roof), ignore, do at construction level
+    // CRRCInitialRefl - optional (Roof), ignore, do at construction level
+    // CRRCAgedRefl - optional (Roof), ignore, do at construction level
+    // CRRCInitialEmittance - optional (Roof)), ignore, do at construction level
+    // CRRCAgedEmittance - optional (Roof), ignore, do at construction level
+    // CRRCInitialSRI - optional (Roof), ignore, do at construction level
+    // CRRCAgedSRI - optional (Roof), ignore, do at construction level
+    // CRRCProdID - optional (Roof), ignore, do at construction level
 
     // adjacent surface
     boost::optional<model::Surface> adjacentSurface = surface.adjacentSurface();
@@ -2079,6 +2590,13 @@ namespace sdd {
     result->appendChild(nameElement);
     nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
+    // SDD:
+    // Status - required (Win, Skylt, Dr), need to add
+    // FenConsRef - optional (Win, Skylt), done
+    // DrConsRef - optional (Dr), done
+    // Oper - optional (Dr), in progress
+    // Area - simple geometry only (Win, Skylt, Dr), ignore
+
     // construction
     boost::optional<model::ConstructionBase> construction = subSurface.construction();
     if (construction){
@@ -2182,6 +2700,12 @@ namespace sdd {
     QDomElement nameElement = doc.createElement("Name");
     result->appendChild(nameElement);
     nameElement.appendChild(doc.createTextNode(escapeName(name)));
+
+    // SDD:
+    // Status - required, need to add
+    // TransSchRef - optional, in progress
+    // SolRefl - optional, done
+    // VisRefl - optional, done
 
     // schedule
     boost::optional<model::Schedule> transmittanceSchedule = shadingSurface.transmittanceSchedule();
@@ -2332,11 +2856,11 @@ namespace sdd {
     result.appendChild(typeElement);
     typeElement.appendChild(doc.createTextNode(toQString(type)));
 
-
+    // DLM: Not input
     // Mult
-    QDomElement multElement = doc.createElement("Mult");
-    result.appendChild(multElement);
-    multElement.appendChild(doc.createTextNode(QString::number(thermalZone.multiplier())));
+    //QDomElement multElement = doc.createElement("Mult");
+    //result.appendChild(multElement);
+    //multElement.appendChild(doc.createTextNode(QString::number(thermalZone.multiplier())));
 
     return result;
   }

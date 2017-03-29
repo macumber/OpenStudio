@@ -1,37 +1,56 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef SHAREDGUICOMPONENTS_OSGRIDVIEW_HPP
 #define SHAREDGUICOMPONENTS_OSGRIDVIEW_HPP
 
+#include <QTimer>
 #include <QWidget>
+
+#include "../openstudio_lib/OSItem.hpp"
 
 #include "../model/ModelObject.hpp"
 
 class QGridLayout;
+class QHideEvent;
+class QVBoxLayout;
 class QLabel;
+class QShowEvent;
 class QString;
+class QLayoutItem;
 
 namespace openstudio{
 
+class ModelSubTabView;
 class OSCollapsibleView;
+class OSDropZone;
 class OSGridController;
+class OSItem;
 
 class OSGridView : public QWidget
 {
@@ -39,59 +58,99 @@ class OSGridView : public QWidget
 
 public:
 
-  OSGridView(OSGridController * gridController,  const QString & headerText, const QString & dropZoneText, QWidget * parent = nullptr);
+  OSGridView(OSGridController * gridController,
+    const QString & headerText,
+    const QString & dropZoneText,
+    bool useHeader,
+    QWidget * parent = nullptr);
 
   virtual ~OSGridView() {};
 
-  QGridLayout * m_gridLayout;
+  // return the QLayoutItem at a particular partition, accounting for multiple grid layouts
+  QLayoutItem * itemAtPosition(int row, int column);
+
+  OSDropZone * m_dropZone;
+
+  virtual ModelSubTabView * modelSubTabView();
+
+  void requestRemoveRow(int row);
+
+  void requestAddRow(int row);
+
+  QVBoxLayout * m_contentLayout;
+
+protected:
+
+  virtual void hideEvent(QHideEvent * event) override;
+
+  virtual void showEvent(QShowEvent * event) override;
 
 signals:
 
-  void cellClicked(int row, int column);
+  void dropZoneItemClicked(OSItem* item);
 
-  void rowClicked(int row);
+  void gridRowSelectionChanged(int checkState);
 
-  void columnClicked(int column);
+public slots:
 
-private slots:
-
-  void refresh(int row, int column);
-
-  void deleteAll();
+  void onSelectionCleared();
 
   void refreshAll();
 
+  void requestRefreshAll();
+
+  void requestRefreshGrid();
+
+private slots:
+
+  void deleteAll();
+
   void addWidget(int row, int column);
-
-  void removeWidget(int row, int column);
-
-  void setHorizontalHeader(std::vector<QWidget *> widgets);
-
-  void setHorizontalHeader(std::vector<QString> names);
 
   void selectCategory(int index);
 
+  void doRefresh();
+
+  void doRowSelect();
+
+  void selectRowDeterminedByModelSubTabView();
+
 private:
+
+  enum QueueType
+  {
+    AddRow,
+    RemoveRow,
+    RefreshRow,
+    RefreshGrid,
+    RefreshAll
+  };
+
+  // construct a grid layout to our specs
+  QGridLayout * makeGridLayout();
+
+  // Add a widget, adding a new layout if necessary
+  void addWidget(QWidget *w, int row, int column);
 
   void setGridController(OSGridController * gridController);
 
-  void refreshRow(model::ModelObject modelObject);
+  static const int ROWS_PER_LAYOUT = 100;
 
-  void refreshColumn(int columnId);
-
-  void selectCell(int row, int column);
-
-  void selectRow(int row);
-
-  void selectColumn(int column);
+  std::vector<QGridLayout *> m_gridLayouts;
 
   OSCollapsibleView * m_CollapsibleView;
 
   OSGridController * m_gridController;
 
+  std::vector<QueueType> m_queueRequests;
+
+  QTimer m_timer;
+
+  int m_rowToAdd = -1;
+
+  int m_rowToRemove = -1;
 };
 
 } // openstudio
 
 #endif // SHAREDGUICOMPONENTS_OSGRIDVIEW_HPP
-

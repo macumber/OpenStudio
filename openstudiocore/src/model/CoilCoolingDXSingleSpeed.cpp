@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "CoilCoolingDXSingleSpeed.hpp"
 #include "CoilCoolingDXSingleSpeed_Impl.hpp"
@@ -37,12 +46,17 @@
 #include "ZoneHVACPackagedTerminalHeatPump_Impl.hpp"
 #include "AirLoopHVACUnitaryHeatPumpAirToAir.hpp"
 #include "AirLoopHVACUnitaryHeatPumpAirToAir_Impl.hpp"
+#include "AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass.hpp"
+#include "AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass_Impl.hpp"
+#include "CoilSystemCoolingDXHeatExchangerAssisted.hpp"
+#include "CoilSystemCoolingDXHeatExchangerAssisted_Impl.hpp"
 #include "Node.hpp"
 #include "Node_Impl.hpp"
 #include "AirLoopHVACUnitarySystem.hpp"
 #include "AirLoopHVACUnitarySystem_Impl.hpp"
 #include "Model.hpp"
 #include <utilities/idd/OS_Coil_Cooling_DX_SingleSpeed_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 #include "../utilities/core/Compare.hpp"
 #include "../utilities/core/Assert.hpp"
 #include "../utilities/units/Quantity.hpp"
@@ -78,21 +92,6 @@ namespace detail{
   ModelObject CoilCoolingDXSingleSpeed_Impl::clone(Model model) const
   {
     CoilCoolingDXSingleSpeed newCoil = StraightComponent_Impl::clone(model).cast<CoilCoolingDXSingleSpeed>();
-
-    Curve ccfot = totalCoolingCapacityFunctionOfTemperatureCurve();
-    newCoil.setTotalCoolingCapacityFunctionOfTemperatureCurve(ccfot.clone(model).cast<Curve>());
-
-    Curve ccfof = totalCoolingCapacityFunctionOfFlowFractionCurve();
-    newCoil.setTotalCoolingCapacityFunctionOfFlowFractionCurve(ccfof.clone(model).cast<Curve>());
-
-    Curve eifot = energyInputRatioFunctionOfTemperatureCurve();
-    newCoil.setEnergyInputRatioFunctionOfTemperatureCurve(eifot.clone(model).cast<Curve>());
-
-    Curve eifof = energyInputRatioFunctionOfFlowFractionCurve();
-    newCoil.setEnergyInputRatioFunctionOfFlowFractionCurve(eifof.clone(model).cast<Curve>());
-
-    Curve plfcc = partLoadFractionCorrelationCurve();
-    newCoil.setPartLoadFractionCorrelationCurve(plfcc.clone(model).cast<Curve>());
 
     return newCoil;
   }
@@ -527,6 +526,20 @@ namespace detail{
       }
     }
 
+    // AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass
+    std::vector<AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass> bypassSystems = this->model().getConcreteModelObjects<AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass>();
+
+    for( const auto & bypassSystem : bypassSystems )
+    {
+      if( boost::optional<HVACComponent> coolingCoil = bypassSystem.coolingCoil() )
+      {
+        if( coolingCoil->handle() == this->handle() )
+        {
+          return bypassSystem;
+        }
+      }
+    }
+
     // AirLoopHVACUnitaryHeatPumpAirToAir
 
     std::vector<AirLoopHVACUnitaryHeatPumpAirToAir> airLoopHVACUnitaryHeatPumpAirToAirs;
@@ -540,6 +553,17 @@ namespace detail{
         if( coil->handle() == this->handle() )
         {
           return airLoopHVACUnitaryHeatPumpAirToAir;
+        }
+      }
+    }
+
+
+    // CoilSystemCoolingDXHeatExchangerAssisted
+    {
+      auto coilSystems = this->model().getConcreteModelObjects<CoilSystemCoolingDXHeatExchangerAssisted>();
+      for( const auto & coilSystem : coilSystems ) {
+        if( coilSystem.coolingCoil().handle() == this->handle() ) {
+          return coilSystem;
         }
       }
     }
@@ -799,6 +823,81 @@ namespace detail{
   }
 
 }// detail
+
+CoilCoolingDXSingleSpeed::CoilCoolingDXSingleSpeed(const Model& model)
+  : StraightComponent(CoilCoolingDXSingleSpeed::iddObjectType(),model)
+{
+  model::CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
+  coolingCurveFofTemp.setCoefficient1Constant(0.942587793);
+  coolingCurveFofTemp.setCoefficient2x(0.009543347);
+  coolingCurveFofTemp.setCoefficient3xPOW2(0.000683770);
+  coolingCurveFofTemp.setCoefficient4y(-0.011042676);
+  coolingCurveFofTemp.setCoefficient5yPOW2(0.000005249);
+  coolingCurveFofTemp.setCoefficient6xTIMESY(-0.000009720);
+  coolingCurveFofTemp.setMinimumValueofx(17.0);
+  coolingCurveFofTemp.setMaximumValueofx(22.0);
+  coolingCurveFofTemp.setMinimumValueofy(13.0);
+  coolingCurveFofTemp.setMaximumValueofy(46.0);
+
+  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
+  coolingCurveFofFlow.setCoefficient1Constant(0.8);
+  coolingCurveFofFlow.setCoefficient2x(0.2);
+  coolingCurveFofFlow.setCoefficient3xPOW2(0.0);
+  coolingCurveFofFlow.setMinimumValueofx(0.5);
+  coolingCurveFofFlow.setMaximumValueofx(1.5);
+
+  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
+  energyInputRatioFofTemp.setCoefficient1Constant(0.342414409);
+  energyInputRatioFofTemp.setCoefficient2x(0.034885008);
+  energyInputRatioFofTemp.setCoefficient3xPOW2(-0.000623700);
+  energyInputRatioFofTemp.setCoefficient4y(0.004977216);
+  energyInputRatioFofTemp.setCoefficient5yPOW2(0.000437951);
+  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.000728028);
+  energyInputRatioFofTemp.setMinimumValueofx(17.0);
+  energyInputRatioFofTemp.setMaximumValueofx(22.0);
+  energyInputRatioFofTemp.setMinimumValueofy(13.0);
+  energyInputRatioFofTemp.setMaximumValueofy(46.0);
+
+  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
+  energyInputRatioFofFlow.setCoefficient1Constant(1.1552);
+  energyInputRatioFofFlow.setCoefficient2x(-0.1808);
+  energyInputRatioFofFlow.setCoefficient3xPOW2(0.0256);
+  energyInputRatioFofFlow.setMinimumValueofx(0.5);
+  energyInputRatioFofFlow.setMaximumValueofx(1.5);
+
+  CurveQuadratic partLoadFraction = CurveQuadratic(model);
+  partLoadFraction.setCoefficient1Constant(0.85);
+  partLoadFraction.setCoefficient2x(0.15);
+  partLoadFraction.setCoefficient3xPOW2(0.0);
+  partLoadFraction.setMinimumValueofx(0.0);
+  partLoadFraction.setMaximumValueofx(1.0);
+
+  autosizeRatedTotalCoolingCapacity();//autosize
+  autosizeRatedSensibleHeatRatio();//autosize
+  autosizeRatedAirFlowRate();//autosize
+  setRatedCOP(3.0);
+  setRatedEvaporatorFanPowerPerVolumeFlowRate(773.3);
+  setTotalCoolingCapacityFunctionOfTemperatureCurve(coolingCurveFofTemp);
+  setTotalCoolingCapacityFunctionOfFlowFractionCurve(coolingCurveFofFlow);
+  setEnergyInputRatioFunctionOfTemperatureCurve(energyInputRatioFofTemp);
+  setEnergyInputRatioFunctionOfFlowFractionCurve(energyInputRatioFofFlow);
+  setPartLoadFractionCorrelationCurve(partLoadFraction);
+  setEvaporativeCondenserEffectiveness(0.0);
+  setEvaporativeCondenserAirFlowRate( boost::none );
+  setEvaporativeCondenserPumpRatedPowerConsumption(boost::none);
+  setCrankcaseHeaterCapacity(0.0);
+  setMaximumOutdoorDryBulbTemperatureForCrankcaseHeaterOperation(0.0);
+  //setSupplyWaterStorageTankName("");
+  //setCondensateCollectionWaterStorageTankName("");
+  setBasinHeaterCapacity(0.0);
+  setBasinHeaterSetpointTemperature(10.0);
+  //setBasinHeaterOperatingSchedule(boost::none);
+  setString(OS_Coil_Cooling_DX_SingleSpeedFields::BasinHeaterOperatingScheduleName,"");
+  setCondenserType("AirCooled");
+
+  auto schedule = model.alwaysOnDiscreteSchedule();
+  setAvailabilitySchedule(schedule);
+}
 
 // create a new CoilCoolingDXSingleSpeed object in the model's workspace
 CoilCoolingDXSingleSpeed::CoilCoolingDXSingleSpeed(const Model& model,

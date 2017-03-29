@@ -29,6 +29,9 @@
   %ignore openstudio::model::Space::thermalZone;
   %ignore openstudio::model::Space::setThermalZone;
   
+  // ignore GeneratorPhotovoltaic
+  %ignore openstudio::model::PlanarSurface::generatorPhotovoltaics;
+  
   // DLM: this is a proof of concept section to see how attributes work in C#
   %include <attribute.i>
 
@@ -62,6 +65,7 @@ class DefaultScheduleType;
 class DefaultScheduleSet;
 class ThermalZone;
 class BuildingStory;
+class BuildingUnit;
 class ShadingSurfaceGroup;
 class InteriorPartitionSurfaceGroup;
 class PlanarSurface;
@@ -83,6 +87,7 @@ class SpaceInfiltrationEffectiveLeakageArea;
 class DesignSpecificationOutdoorAir;
 class SpaceLoadInstance;
 class SpaceLoadDefinition;
+class GeneratorPhotovoltaic;
 }
 }
 
@@ -90,6 +95,7 @@ UNIQUEMODELOBJECT_TEMPLATES(Site);
 UNIQUEMODELOBJECT_TEMPLATES(Facility);
 UNIQUEMODELOBJECT_TEMPLATES(Building);
 MODELOBJECT_TEMPLATES(BuildingStory);
+MODELOBJECT_TEMPLATES(BuildingUnit);
 MODELOBJECT_TEMPLATES(PlanarSurfaceGroup);
 MODELOBJECT_TEMPLATES(Space); 
 MODELOBJECT_TEMPLATES(SpaceItem); 
@@ -104,6 +110,9 @@ MODELOBJECT_TEMPLATES(ShadingSurfaceGroup);
 MODELOBJECT_TEMPLATES(ShadingSurface); 
 MODELOBJECT_TEMPLATES(InteriorPartitionSurfaceGroup); 
 MODELOBJECT_TEMPLATES(InteriorPartitionSurface);
+MODELOBJECT_TEMPLATES(SurfacePropertyOtherSideCoefficients);
+MODELOBJECT_TEMPLATES(SurfacePropertyOtherSideConditionsModel);
+MODELOBJECT_TEMPLATES(SurfacePropertyConvectionCoefficients);
 MODELOBJECT_TEMPLATES(People);
 MODELOBJECT_TEMPLATES(Luminaire);
 MODELOBJECT_TEMPLATES(ElectricEquipment);
@@ -126,6 +135,7 @@ SWIG_UNIQUEMODELOBJECT(Site);
 SWIG_UNIQUEMODELOBJECT(Facility);
 SWIG_UNIQUEMODELOBJECT(Building);
 SWIG_MODELOBJECT(BuildingStory, 1);
+SWIG_MODELOBJECT(BuildingUnit, 1);
 SWIG_MODELOBJECT(PlanarSurfaceGroup, 0);
 SWIG_MODELOBJECT(Space, 1); 
 SWIG_MODELOBJECT(SpaceItem, 0); 
@@ -140,6 +150,9 @@ SWIG_MODELOBJECT(ShadingSurfaceGroup, 1);
 SWIG_MODELOBJECT(ShadingSurface, 1); 
 SWIG_MODELOBJECT(InteriorPartitionSurfaceGroup, 1); 
 SWIG_MODELOBJECT(InteriorPartitionSurface, 1);
+SWIG_MODELOBJECT(SurfacePropertyOtherSideCoefficients, 1);
+SWIG_MODELOBJECT(SurfacePropertyOtherSideConditionsModel, 1);
+SWIG_MODELOBJECT(SurfacePropertyConvectionCoefficients, 1);
 SWIG_MODELOBJECT(People, 1);
 SWIG_MODELOBJECT(Luminaire, 1);
 SWIG_MODELOBJECT(ElectricEquipment, 1);

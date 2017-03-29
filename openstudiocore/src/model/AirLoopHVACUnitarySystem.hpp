@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_AIRLOOPHVACUNITARYSYSTEM_HPP
 #define MODEL_AIRLOOPHVACUNITARYSYSTEM_HPP
@@ -51,7 +60,7 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
 
   static IddObjectType iddObjectType();
 
-  // static std::vector<std::string> controlTypeValues();
+  static std::vector<std::string> controlTypeValues();
 
   static std::vector<std::string> dehumidificationControlTypeValues();
 
@@ -68,9 +77,9 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
   /** @name Getters */
   //@{
 
-  // std::string controlType() const;
+  //std::string controlType() const;
 
-  // bool isControlTypeDefaulted() const;
+  //bool isControlTypeDefaulted() const;
 
   boost::optional<ThermalZone> controllingZoneorThermostatLocation() const;
 
@@ -98,6 +107,7 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
 
   bool isUseDOASDXCoolingCoilDefaulted() const;
 
+  /** As of EnergyPlus version 8.7.0 this field maps to MinimumSupplyAirTemperature **/
   double dOASDXCoolingCoilLeavingMinimumAirTemperature() const;
 
   bool isDOASDXCoolingCoilLeavingMinimumAirTemperatureDefaulted() const;
@@ -108,44 +118,61 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
 
   boost::optional<HVACComponent> supplementalHeatingCoil() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Cooling Supply Air Flow Rate Method" **/
   boost::optional<std::string> supplyAirFlowRateMethodDuringCoolingOperation() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Cooling Supply Air Flow Rate" **/
   boost::optional<double> supplyAirFlowRateDuringCoolingOperation() const;
 
   bool isSupplyAirFlowRateDuringCoolingOperationAutosized() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Cooling Supply Air Flow Rate Per Floor Area" **/
   boost::optional<double> supplyAirFlowRatePerFloorAreaDuringCoolingOperation() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Cooling Fraction of Autosized Cooling Supply Air Flow Rate" **/
   boost::optional<double> fractionofAutosizedDesignCoolingSupplyAirFlowRate() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Cooling Supply Air Flow Rate Per Unit of Capacity" **/
   boost::optional<double> designSupplyAirFlowRatePerUnitofCapacityDuringCoolingOperation() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Heating Supply Air Flow Rate Method" **/
   boost::optional<std::string> supplyAirFlowRateMethodDuringHeatingOperation() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Heating Supply Air Flow Rate" **/
   boost::optional<double> supplyAirFlowRateDuringHeatingOperation() const;
 
   bool isSupplyAirFlowRateDuringHeatingOperationAutosized() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Heating Supply Air Flow Rate Per Floor Area" **/
   boost::optional<double> supplyAirFlowRatePerFloorAreaduringHeatingOperation() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Heating Fraction of Autosized Heating Supply Air Flow Rate" **/
   boost::optional<double> fractionofAutosizedDesignHeatingSupplyAirFlowRate() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Heating Supply Air Flow Rate Per Unit of Capacity" **/
   boost::optional<double> designSupplyAirFlowRatePerUnitofCapacityDuringHeatingOperation() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Supply Air Flow Rate Method" **/
   boost::optional<std::string> supplyAirFlowRateMethodWhenNoCoolingorHeatingisRequired() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Supply Air Flow Rate" **/
   boost::optional<double> supplyAirFlowRateWhenNoCoolingorHeatingisRequired() const;
 
   bool isSupplyAirFlowRateWhenNoCoolingorHeatingisRequiredAutosized() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Supply Air Flow Rate Per Floor Area" **/
   boost::optional<double> supplyAirFlowRatePerFloorAreaWhenNoCoolingorHeatingisRequired() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Fraction of Autosized Cooling Supply Air Flow Rate" **/
   boost::optional<double> fractionofAutosizedDesignCoolingSupplyAirFlowRateWhenNoCoolingorHeatingisRequired() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Fraction of Autosized Heating Supply Air Flow Rate" **/
   boost::optional<double> fractionofAutosizedDesignHeatingSupplyAirFlowRateWhenNoCoolingorHeatingisRequired() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Supply Air Flow Rate Per Unit of Capacity During Cooling Operation" **/
   boost::optional<double> designSupplyAirFlowRatePerUnitofCapacityDuringCoolingOperationWhenNoCoolingorHeatingisRequired() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "No Load Supply Air Flow Rate Per Unit of Capacity During Heating Operation" **/
   boost::optional<double> designSupplyAirFlowRatePerUnitofCapacityDuringHeatingOperationWhenNoCoolingorHeatingisRequired() const;
 
   boost::optional<double> maximumSupplyAirTemperature() const;
@@ -176,10 +203,12 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
 
   bool isHeatPumpFanDelayTimeDefaulted() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Ancillary On-Cycle Electric Power" **/
   double ancilliaryOnCycleElectricPower() const;
 
   bool isAncilliaryOnCycleElectricPowerDefaulted() const;
 
+  /** In EnergyPlus 8.3.0 and above this property maps to the EnergyPlus field "Ancillary Off-Cycle Electric Power" **/
   double ancilliaryOffCycleElectricPower() const;
 
   bool isAncilliaryOffCycleElectricPowerDefaulted() const;
@@ -198,9 +227,9 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
   /** @name Setters */
   //@{
 
-  // bool setControlType(std::string controlType);
+  //bool setControlType(std::string controlType);
 
-  // void resetControlType();
+  //void resetControlType();
 
   bool setControllingZoneorThermostatLocation(const ThermalZone& thermalZone);
 
@@ -242,6 +271,7 @@ class MODEL_API AirLoopHVACUnitarySystem : public WaterToAirComponent {
 
   void resetUseDOASDXCoolingCoil();
 
+  /** As of EnergyPlus version 8.7.0 this field maps to MinimumSupplyAirTemperature **/
   bool setDOASDXCoolingCoilLeavingMinimumAirTemperature(double dOASDXCoolingCoilLeavingMinimumAirTemperature);
 
   void resetDOASDXCoolingCoilLeavingMinimumAirTemperature();

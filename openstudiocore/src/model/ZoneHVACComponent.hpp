@@ -1,35 +1,44 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_ZONEHVACCOMPONENT_HPP
 #define MODEL_ZONEHVACCOMPONENT_HPP
 
 #include "ModelAPI.hpp"
-#include "ParentObject.hpp"
+#include "HVACComponent.hpp"
 
 namespace openstudio {
 
 namespace model {
 
 class ThermalZone;
-
 class Node;
+class AirLoopHVAC;
 
 namespace detail {
 
@@ -39,24 +48,24 @@ class ZoneHVACComponent_Impl;
 
 /** ZoneHVACComponent is the base class for HVAC related objects that exclusively condition a single zone.
  */
-class MODEL_API ZoneHVACComponent : public ParentObject
+class MODEL_API ZoneHVACComponent : public HVACComponent
 {
   public:
   virtual ~ZoneHVACComponent() {}
 
   /** Returns the inlet port.  For a ZoneHVACComponent this port is typically connected
    *  to a zone exhaust node. **/
-  unsigned inletPort();
+  unsigned inletPort() const;
 
   /** Returns the optional node connected to the inletPort(). **/
-  boost::optional<Node> inletNode();
+  boost::optional<Node> inletNode() const;
 
   /** Returns the outlet port. For a ZoneHVACComponent this port is typically connected
    *  to a zone air inlet node **/
-  unsigned outletPort();
+  unsigned outletPort() const;
 
   /** Returns the optional node connected to the outletPort(). **/
-  boost::optional<Node> outletNode();
+  boost::optional<Node> outletNode() const;
 
   /** Returns the optional ThermalZone that this ZoneHVACComponent is attached to
    **/
@@ -70,8 +79,21 @@ class MODEL_API ZoneHVACComponent : public ParentObject
 
   /** Detaches this ZoneHVACComponent from the associated ThermalZone.
    *  If there is no attached ThermalZone there is no effect.
+   *  If the ThermalZone is attached via an AirLoopHVAC object (as a result of addToNode()),
+   *  then this method will reverse the effects of addToNode.
    **/
   void removeFromThermalZone();
+
+  /** Adds this ZoneHVACComponent to a node on an AirLoopHVAC object.
+   *  The node must be located between a ThermalZone and a AirTerminalSingleDuctInletSideMixer object.
+   *  This is used to feed an AirLoopHVAC structure (such as a DOAS, or any built up system) into a ZoneHVACComponent.
+   *  If the ZoneHVACComponent object is already attached to a thermalZone() then it will first be detached using removeFromThermalZone().
+   **/
+  bool addToNode(Node & node);
+
+  /** Returns the AirLoopHVAC attached to this ZoneHVACComponent.
+   *  The AirLoopHVAC object would have been attached via addToNode */
+  boost::optional<AirLoopHVAC> airLoopHVAC() const;
 
   protected:
 
@@ -87,7 +109,7 @@ class MODEL_API ZoneHVACComponent : public ParentObject
 
   explicit ZoneHVACComponent(std::shared_ptr<ImplType> impl);
 
-  virtual std::vector<ModelObject> children() const;
+  virtual std::vector<ModelObject> children() const override;
 
   private:
 

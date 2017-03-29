@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -24,11 +33,15 @@
 #include "../SpaceType.hpp"
 #include "../SpaceType_Impl.hpp"
 #include "../People.hpp"
+#include "../People_Impl.hpp"
 #include "../PeopleDefinition.hpp"
+#include "../PeopleDefinition_Impl.hpp"
 #include "../Building.hpp"
 #include "../Building_Impl.hpp"
 #include "../Space.hpp"
 #include "../ThermalZone.hpp"
+#include "../ScheduleRuleset.hpp"
+#include "../ScheduleRuleset_Impl.hpp"
 
 #include "../../utilities/data/Attribute.hpp"
 #include "../../utilities/geometry/Point3d.hpp"
@@ -40,10 +53,11 @@ TEST_F(ModelFixture, SpaceType_InternalGainAttributes_PeoplePerFloorArea) {
   Model model;
   SpaceType spaceType(model);
 
-  OptionalAttribute peoplePerFloorArea = spaceType.getAttribute("peoplePerFloorArea");
-  ASSERT_TRUE(peoplePerFloorArea);
-  EXPECT_TRUE(peoplePerFloorArea->valueType() == AttributeValueType::Double);
-
+  // Removed due to removal of attributes
+  // OptionalAttribute peoplePerFloorArea = spaceType.getAttribute("peoplePerFloorArea");
+  // ASSERT_TRUE(peoplePerFloorArea);
+  // EXPECT_TRUE(peoplePerFloorArea->valueType() == AttributeValueType::Double);
+  
   PeopleDefinition defPerArea(model);
   People instPerArea(defPerArea);
   instPerArea.setSpaceType(spaceType);
@@ -196,3 +210,55 @@ TEST_F(ModelFixture, SpaceType_StandardsTypes) {
   EXPECT_EQ("Attic", suggestedStandardsSpaceTypes[0]);
   EXPECT_EQ("Plenum", suggestedStandardsSpaceTypes[1]);
 } 
+
+TEST_F(ModelFixture, SpaceType_Clone) {
+  Model library;
+  Model model;  
+
+  SpaceType librarySpaceType(library);
+
+  PeopleDefinition definition(library);
+  definition.setNumberofPeople(100.0);
+
+  People people(definition); // Not a ResourceObject
+  ScheduleRuleset activityLevelSchedule(library); // ResourceObject
+  people.setActivityLevelSchedule(activityLevelSchedule);
+  people.setSpaceType(librarySpaceType);
+
+  EXPECT_EQ(6u,library.modelObjects().size()); // SpaceType, PeopleDefinition, People, ScheduleRuleset, ScheduleDay, ScheduleTypeLimits
+
+  // Clone into same model
+  // Even though SpaceType is a resource object, because we call ::clone on it directly, we get a new one
+  librarySpaceType.clone(library);
+  EXPECT_EQ(8u,library.modelObjects().size()); // SpaceType * 2, PeopleDefinition, People * 2, ScheduleRuleset, ScheduleDay, ScheduleTypeLimits
+
+  EXPECT_EQ(2u,library.getModelObjects<SpaceType>().size());
+  EXPECT_EQ(2u,library.getModelObjects<People>().size());
+
+  // The referenced ResourceObject instances are not duplicated
+  EXPECT_EQ(1u,library.getModelObjects<PeopleDefinition>().size());
+  EXPECT_EQ(1u,library.getModelObjects<ScheduleRuleset>().size());
+
+  // Clone into a different model
+  librarySpaceType.clone(model);
+  EXPECT_EQ(6u,model.modelObjects().size());
+
+  auto modelSpaceTypes = model.getModelObjects<SpaceType>();
+  ASSERT_EQ(1u,modelSpaceTypes.size());
+
+  // SpaceType gets a new handle
+  EXPECT_NE(librarySpaceType.handle(),modelSpaceTypes.front().handle());
+
+  // Clone into model again
+  librarySpaceType.clone(model);
+  EXPECT_EQ(8u,model.modelObjects().size());
+
+  EXPECT_EQ(2u,model.getModelObjects<SpaceType>().size());
+  EXPECT_EQ(2u,model.getModelObjects<People>().size());
+
+  // The referenced ResourceObject instances are not duplicated
+  EXPECT_EQ(1u,model.getModelObjects<PeopleDefinition>().size());
+  EXPECT_EQ(1u,model.getModelObjects<ScheduleRuleset>().size());
+}
+
+

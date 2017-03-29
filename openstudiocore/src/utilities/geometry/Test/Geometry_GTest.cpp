@@ -1,32 +1,46 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "GeometryFixture.hpp"
 
 #include "../Geometry.hpp"
 #include "../Point3d.hpp"
+#include "../PointLatLon.hpp"
 #include "../Vector3d.hpp"
 
 using namespace std;
 using namespace boost;
 using namespace openstudio;
+
+// In Intersection_GTest.cpp
+std::vector<Point3d> makeRectangleUp(double xmin, double ymin, double width, double height);
+std::vector<Point3d> makeRectangleDown(double xmin, double ymin, double width, double height);
 
 TEST_F(GeometryFixture, Newall_Vector)
 {
@@ -132,18 +146,18 @@ TEST_F(GeometryFixture, Newall_Vector)
 
 TEST_F(GeometryFixture, DistanceLatLon)
 {
-  // expected test values from http://www.nhc.noaa.gov/gccalc.shtml
+  // expected test values from http://williams.best.vwh.net/gccalc.htm
 
-  // using 10 km threshold
+  // using 10 m threshold
 
   // San Francisco to New York
-  EXPECT_NEAR( 4138000, getDistanceLatLon(37.62, -122.38, 40.78, -73.88), 10000);
+  EXPECT_NEAR( 4150765, getDistanceLatLon(37.62, -122.38, 40.78, -73.88), 10);
 
   // Anchorage to New York
-  EXPECT_NEAR( 5414000, getDistanceLatLon(61.17, -150.02, 40.78, -73.88), 10000);
+  EXPECT_NEAR( 5432233, getDistanceLatLon(61.17, -150.02, 40.78, -73.88), 10);
 
   // Anchorage to San Francisco
-  EXPECT_NEAR( 3242000, getDistanceLatLon(61.17, -150.02, 37.62, -122.38), 10000);
+  EXPECT_NEAR( 3248030, getDistanceLatLon(61.17, -150.02, 37.62, -122.38), 10);
 }
 
 TEST_F(GeometryFixture, Centroid)
@@ -582,3 +596,223 @@ TEST_F(GeometryFixture, RemoveSpikes)
   EXPECT_TRUE(circularEqual(resultPoints, testPoints));
 }
 */
+
+TEST_F(GeometryFixture, Triangulate_Down)
+{
+  double tol = 0.01;
+  Vector3d normal(0, 0, -1);
+
+  std::vector<std::vector<Point3d> > test;
+  std::vector<std::vector<Point3d> > holes;
+  Point3dVector points1;
+  Point3dVector points2;
+
+  // sense is down
+  points1 = makeRectangleDown(0, 0, 4, 4);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_FALSE(test.empty());
+  EXPECT_DOUBLE_EQ(16.0, totalArea(test));
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is down with a hole in middle
+  points1 = makeRectangleDown(0, 0, 4, 4);
+  points2 = makeRectangleDown(1, 1, 1, 1);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_FALSE(test.empty());
+  EXPECT_DOUBLE_EQ(15.0, totalArea(test));
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is down with a hole on edge
+  points1 = makeRectangleDown(0, 0, 4, 4);
+  points2 = makeRectangleDown(1, 0, 1, 1);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_FALSE(test.empty());
+  EXPECT_DOUBLE_EQ(15.0, totalArea(test));
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is down with hole same size
+  points1 = makeRectangleDown(0, 0, 4, 4);
+  points2 = makeRectangleDown(0, 0, 4, 4);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is down with a bigger hole
+  points1 = makeRectangleDown(1, 1, 1, 1);
+  points2 = makeRectangleDown(0, 0, 4, 4);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+}
+
+TEST_F(GeometryFixture, Triangulate_Up)
+{
+  double tol = 0.01;
+  Vector3d normal(0, 0, 1);
+
+  std::vector<std::vector<Point3d> > test;
+  std::vector<std::vector<Point3d> > holes;
+  Point3dVector points1;
+  Point3dVector points2;
+
+  // sense is up
+  points1 = makeRectangleUp(0, 0, 4, 4);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is up with a hole in middle
+  points1 = makeRectangleUp(0, 0, 4, 4);
+  points2 = makeRectangleUp(1, 1, 1, 1);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is up with a hole on edge
+  points1 = makeRectangleUp(0, 0, 4, 4);
+  points2 = makeRectangleUp(1, 0, 1, 1);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is up with hole same size
+  points1 = makeRectangleUp(0, 0, 4, 4);
+  points2 = makeRectangleUp(0, 0, 4, 4);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+
+  // sense is up with a bigger hole
+  points1 = makeRectangleUp(1, 1, 1, 1);
+  points2 = makeRectangleUp(0, 0, 4, 4);
+
+  holes.clear();
+  holes.push_back(points2);
+  test = computeTriangulation(points1, holes, tol);
+  EXPECT_TRUE(test.empty());
+  EXPECT_TRUE(checkNormals(normal, test));
+}
+
+TEST_F(GeometryFixture, PointLatLon)
+{
+  // building in Portland
+  PointLatLon origin(45.521272355398, -122.686472758865);
+  EXPECT_TRUE(origin == origin);
+
+  PointLatLon originCopy(45.521272355398, -122.686472758865);
+  EXPECT_TRUE(origin == originCopy);
+
+  Point3d localOrigin = origin.toLocalCartesian(origin);
+  EXPECT_DOUBLE_EQ(0, localOrigin.x());
+  EXPECT_DOUBLE_EQ(0, localOrigin.y());
+  EXPECT_DOUBLE_EQ(0, localOrigin.z());
+
+  PointLatLon origin2 = origin.fromLocalCartesian(localOrigin);
+  EXPECT_DOUBLE_EQ(origin.lon(), origin2.lon());
+  EXPECT_DOUBLE_EQ(origin.lat(), origin2.lat());
+  EXPECT_NEAR(origin.height(), origin2.height(), 0.001);
+  //EXPECT_TRUE(origin == origin2);
+
+  EXPECT_DOUBLE_EQ(0, (origin - origin2));
+  
+  PointLatLonVector footprint;
+  footprint.push_back(PointLatLon(45.521272355398, -122.686472758865));
+  footprint.push_back(PointLatLon(45.5214185583437, -122.687017007901));
+  footprint.push_back(PointLatLon(45.5216756691633, -122.686878595312));
+  footprint.push_back(PointLatLon(45.5215377823024, -122.686365888764));
+  footprint.push_back(PointLatLon(45.5214801020189, -122.686152903546));
+  footprint.push_back(PointLatLon(45.5212238483817, -122.686291351916));
+  footprint.push_back(PointLatLon(45.521272355398, -122.686472758865));
+
+  Point3dVector localFootprint = origin.toLocalCartesian(footprint);
+  ASSERT_EQ(footprint.size(), localFootprint.size());
+  
+  double expectedArea = 1853.0906095305727; // from GIS
+  boost::optional<double> calcArea = getArea(localFootprint);
+  ASSERT_TRUE(calcArea);
+  EXPECT_NEAR(expectedArea, *calcArea, 0.5);
+
+  PointLatLonVector footprint2 = origin.fromLocalCartesian(localFootprint);
+  ASSERT_EQ(footprint2.size(), localFootprint.size());
+
+  unsigned n = footprint.size();
+  for (unsigned i = 0; i < n; ++i){
+    EXPECT_DOUBLE_EQ(footprint2[i].lat(), footprint[i].lat());
+    EXPECT_DOUBLE_EQ(footprint2[i].lon(), footprint[i].lon());
+    EXPECT_NEAR(footprint2[i].height(), footprint[i].height(), 0.001);
+
+    double localDistance = getDistance(localFootprint[i], localOrigin);
+    double geodesicDistance = (footprint[i] - origin);
+    EXPECT_NEAR(localDistance, geodesicDistance, 0.001);
+  }
+}
+
+TEST_F(GeometryFixture, PointLatLon_Elevation)
+{
+  // building in Portland
+  PointLatLon origin(45.521272355398, -122.686472758865);
+  EXPECT_TRUE(origin == origin);
+
+  Point3d localOrigin = origin.toLocalCartesian(origin);
+  EXPECT_DOUBLE_EQ(0.0, localOrigin.x());
+  EXPECT_DOUBLE_EQ(0.0, localOrigin.y());
+  EXPECT_DOUBLE_EQ(0.0, localOrigin.z());
+
+  PointLatLon testLatLon(45.521272355398, -122.686472758865, 30.0);
+  EXPECT_FALSE(origin == testLatLon);
+  EXPECT_DOUBLE_EQ(origin.lat(), testLatLon.lat());
+  EXPECT_DOUBLE_EQ(origin.lon(), testLatLon.lon());
+  EXPECT_DOUBLE_EQ(30.0, testLatLon.height());
+
+  Point3d test = origin.toLocalCartesian(testLatLon);
+  EXPECT_NEAR(0.0, test.x(), 0.001);
+  EXPECT_NEAR(0.0, test.y(), 0.001);
+  EXPECT_NEAR(30.0, test.z(), 0.001);
+
+  // calculated distance using:
+  // http://www.movable-type.co.uk/scripts/latlong.html
+  testLatLon = PointLatLon(45.521272355398, -122.687017007901, 0.0);
+  EXPECT_FALSE(origin == testLatLon);
+  EXPECT_DOUBLE_EQ(origin.lat(), testLatLon.lat());
+  EXPECT_DOUBLE_EQ(-122.687017007901, testLatLon.lon());
+  EXPECT_DOUBLE_EQ(0.0, testLatLon.height());
+
+  test = origin.toLocalCartesian(testLatLon);
+  EXPECT_NEAR(-42.521429845143913, test.x(), 0.001);
+  EXPECT_NEAR(0.0, test.y(), 0.001);
+  EXPECT_NEAR(0.0, test.z(), 0.001);
+
+  // calculated distance using:
+  // http://www.movable-type.co.uk/scripts/latlong.html
+  testLatLon = PointLatLon(45.521272355398, -122.687017007901, 30.0);
+  EXPECT_FALSE(origin == testLatLon);
+  EXPECT_DOUBLE_EQ(origin.lat(), testLatLon.lat());
+  EXPECT_DOUBLE_EQ(-122.687017007901, testLatLon.lon());
+  EXPECT_DOUBLE_EQ(30.0, testLatLon.height());
+
+  test = origin.toLocalCartesian(testLatLon);
+  EXPECT_NEAR(-42.521429845143913, test.x(), 0.001);
+  EXPECT_NEAR(0.0, test.y(), 0.001);
+  EXPECT_NEAR(30.0, test.z(), 0.001);
+}

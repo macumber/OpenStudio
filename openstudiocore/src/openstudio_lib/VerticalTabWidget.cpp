@@ -1,35 +1,44 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "VerticalTabWidget.hpp"
 
+#include "MainTabView.hpp"
+
+#include "../shared_gui_components/OSViewSwitcher.hpp"
+
 #include "../utilities/core/Assert.hpp"
 
-#include <QHBoxLayout>
-#include <QKeySequence>
-#include <QPixmap>
+#include <QBoxLayout>
 #include <QPushButton>
-#include <QShortcut>
-#include <QStackedWidget>
-#include <QVBoxLayout>
 
 #include <algorithm>
+
 #include <vector>
 
 namespace openstudio {
@@ -37,7 +46,7 @@ namespace openstudio {
 VerticalTabWidget::VerticalTabWidget(QWidget * parent)
   : QWidget(parent)
 {
-  QHBoxLayout * mainLayout = new QHBoxLayout();
+  auto mainLayout = new QHBoxLayout();
 
   mainLayout->setSpacing(0);
 
@@ -55,71 +64,51 @@ VerticalTabWidget::VerticalTabWidget(QWidget * parent)
 
   layout()->addWidget(m_tabBar);
 
-  m_pageStack = new QStackedWidget();
+  m_viewSwitcher = new OSViewSwitcher();
 
-  m_pageStack->setContentsMargins(0,0,0,0);
+  m_viewSwitcher->setContentsMargins(0,0,0,0);
 
-  layout()->addWidget(m_pageStack);
-
-  currentIndex = -1;
-
-  QShortcut* nextTabShortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::Key_Tab), this);
-  connect(nextTabShortcut, &QShortcut::activated, this, &VerticalTabWidget::nextTab);
-
-  QShortcut* previousTabShortcut = new QShortcut(QKeySequence(Qt::CTRL + Qt::SHIFT + Qt::Key_Tab), this);
-  connect(previousTabShortcut, &QShortcut::activated, this, &VerticalTabWidget::previousTab);
+  layout()->addWidget(m_viewSwitcher);
 }
 
-void VerticalTabWidget::addTab( QWidget * widget,
-                                int id,
-                                QString toolTip,
-                                const QString & selectedImagePath,
-                                const QString & unSelectedImagePath )
+void VerticalTabWidget::addTabButton(int id,
+  QString toolTip,
+  const QString & selectedImagePath,
+  const QString & unSelectedImagePath,
+  const QString & disabledImagePath)
 {
-  QPushButton * button = new QPushButton(m_tabBar);
+  auto button = new QPushButton(m_tabBar);
 
-  button->setFixedSize(QSize(39,42));
+  button->setFixedSize(QSize(39, 42));
 
   button->setToolTip(toolTip);
 
   m_tabButtons.push_back(button);
 
   connect(button, &QPushButton::clicked, this, &VerticalTabWidget::select);
-  m_pageStack->addWidget(widget);
 
-  m_selectedPixmaps.push_back(selectedImagePath); 
+  m_selectedPixmaps.push_back(selectedImagePath);
 
   m_unSelectedPixmaps.push_back(unSelectedImagePath);
 
-  m_ids.push_back(id);
+  m_disabledPixmaps.push_back(disabledImagePath);
 
-  setCurrentIndex(0);
+  m_ids.push_back(id);
 }
 
-void VerticalTabWidget::deleteAllTabs()
+void VerticalTabWidget::setView(MainTabView * view, int id)
 {
-  for (QPushButton * button : m_tabButtons){
-    delete button;
-    button = 0;
-  }
-  m_tabButtons.clear();
+  m_viewSwitcher->setView(view);
 
-  QWidget * widget = 0;
-  for(int i = m_pageStack->count() - 1; i >= 0; --i){
-    widget = m_pageStack->widget(i);
-    m_pageStack->removeWidget(widget);
-    delete widget;
-    widget = 0;
-  }
+  setCurrentIndex(getIndex(id));
+}
 
-  m_selectedPixmaps.clear();
+MainTabView * VerticalTabWidget::view() const
+{
+  MainTabView * view = qobject_cast<MainTabView *>(m_viewSwitcher->view());
+  OS_ASSERT(view);
 
-  m_unSelectedPixmaps.clear();
-
-  m_ids.clear();
-
-  currentIndex = -1;
-
+  return view;
 }
 
 void VerticalTabWidget::select()
@@ -128,16 +117,12 @@ void VerticalTabWidget::select()
 
   int index = 0;
 
-  for( std::vector<QPushButton*>::iterator  it = m_tabButtons.begin();
+  for( auto it = m_tabButtons.begin();
        it < m_tabButtons.end();
-       ++it )
-  {
-    if( *it == button )
-    {
+       ++it ) {
+    if( *it == button ){
       break;
-    }
-    else
-    {
+    } else {
       index++;
     }
   } 
@@ -145,16 +130,23 @@ void VerticalTabWidget::select()
   setCurrentIndex(index);
 }
 
-void VerticalTabWidget::setCurrentId(int id)
+int VerticalTabWidget::getIndex(int id)
 {
+  int index = -1;
   std::vector<int>::iterator it;
 
   it = std::find(m_ids.begin(),m_ids.end(),id);
 
-  if( it != m_ids.end() )
-  {
-    setCurrentIndex(*it);
+  if( it != m_ids.end() ){
+    index = it - m_ids.begin();
   }
+  OS_ASSERT(index >= 0);
+  return index;
+}
+
+void VerticalTabWidget::refreshTabButtons()
+{
+  setCurrentIndex(currentIndex);
 }
 
 void VerticalTabWidget::setCurrentIndex(int index)
@@ -169,7 +161,7 @@ void VerticalTabWidget::setCurrentIndex(int index)
 
     yPos = yPos + button->height();
 
-    QString imagePath = m_unSelectedPixmaps[i]; 
+    QString imagePath;
 
     QString style;
 
@@ -187,66 +179,39 @@ void VerticalTabWidget::setCurrentIndex(int index)
 
         button->setStyleSheet(style); 
 
-        m_pageStack->setCurrentIndex(index);
+        currentIndex = index;
 
         emit tabSelected(m_ids[index]);
       }
     }
     else
     {
-      style.append("QPushButton { background-image: url(\"");
-      style.append(imagePath);
-      style.append("\"); border: none; background-color: red; background-repeat: 0; }");
+      if (button->isEnabled()){
+        imagePath = m_unSelectedPixmaps[i];
+        style.append("QPushButton { background-image: url(\"");
+        style.append(imagePath);
+        style.append("\"); border: none; background-color: red; background-repeat: 0; }");
+      }
+      else {
+        imagePath = m_disabledPixmaps[i];
+        style.append("QPushButton { background-image: url(\"");
+        style.append(imagePath);
+        style.append("\"); border: none; background-color: red; background-repeat: 0; }");
+      }
 
       button->setStyleSheet(style); 
     }
   }
 }
 
+void VerticalTabWidget::enableTabButton(int id, bool enable)
+{
+  m_tabButtons.at(getIndex(id))->setEnabled(enable);
+}
+
 int VerticalTabWidget::verticalTabIndex()
 {
-  return m_pageStack->currentIndex();
-}
-
-QWidget* VerticalTabWidget::verticalTabWidgetByIndex(int index)
-{
-  return m_pageStack->widget(index);
-}
-
-void VerticalTabWidget::setCurrentWidget(QWidget * widget)
-{
-  int i = m_pageStack->indexOf(widget);
-
-  setCurrentIndex(i);
-}
-
-void VerticalTabWidget::nextTab()
-{
-  int size = m_pageStack->count(),
-      nextIndex = (currentIndex + 1) % size;
-  for(int i = 0; i < size; i++)
-  {
-    if (!m_pageStack->widget(nextIndex)->isEnabled()){
-      nextIndex = (nextIndex + 1) % size;
-    }else{
-      setCurrentIndex(nextIndex);
-    }
-  }
-}
-
-void VerticalTabWidget::previousTab()
-{
-  int size = m_pageStack->count(),
-      previousIndex = (((currentIndex < 0 ? -1 : currentIndex - 1) % size) + size) % size;
-  for(int i = 0; i < size; i++)
-  {
-    if (!m_pageStack->widget(previousIndex)->isEnabled()){
-      previousIndex = (((previousIndex - 1) % size) + size) % size;
-    }else{
-      setCurrentIndex(previousIndex);
-    }
-  }
+  return currentIndex;
 }
 
 } // namespace openstudio
-

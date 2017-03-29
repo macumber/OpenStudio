@@ -1,26 +1,37 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
 #include "../DateTime.hpp"
 #include "../../core/Exception.hpp"
+
+#include <QDateTime>
 
 #include <string>
 
@@ -105,7 +116,7 @@ TEST(DateTime, StringConstructor)
 
 TEST(DateTime, TMConstructor)
 {
-  time_t t = time(0);
+  time_t t = time(nullptr);
   tm* lt = localtime(&t);
   DateTime zd(*lt);
 
@@ -170,12 +181,203 @@ TEST(DateTime,EpochConversions) {
   EXPECT_EQ(dateTime,copy);
 }
 
+TEST(DateTime, QDateTime) {
+  {
+    DateTime dateTime = DateTime::now();
+    QDateTime qDateTime = toQDateTime(dateTime);
+    DateTime dateTime2 = toDateTime(qDateTime);
+    EXPECT_EQ(dateTime, dateTime2);
+  }
+  {
+    DateTime dateTime = DateTime::nowUTC();
+    QDateTime qDateTime = toQDateTime(dateTime);
+    DateTime dateTime2 = toDateTime(qDateTime);
+    EXPECT_EQ(dateTime, dateTime2);
+  }
+  {
+    QDateTime qDateTime = QDateTime::currentDateTime();
+    DateTime dateTime = toDateTime(qDateTime);
+    QDateTime qDateTime2 = toQDateTime(dateTime);
+    EXPECT_EQ(qDateTime.toTime_t(), qDateTime2.toTime_t());
+  }
+  {
+    QDateTime qDateTime = QDateTime::currentDateTimeUtc();
+    DateTime dateTime = toDateTime(qDateTime);
+    QDateTime qDateTime2 = toQDateTime(dateTime);
+    EXPECT_EQ(qDateTime.toTime_t(), qDateTime2.toTime_t());
+  }
+}
+
+
+
 TEST(DateTime,ISO8601Conversions) {
-  DateTime dateTime = DateTime::now();
-  std::string asIso = dateTime.toISO8601();
-  OptionalDateTime copy = DateTime::fromISO8601(asIso);
-  ASSERT_TRUE(copy);
-  EXPECT_EQ(dateTime,copy.get());
+  {
+    DateTime dateTime = DateTime::now();
+    double utcOffset = dateTime.utcOffset();
+    EXPECT_EQ(DateTime::localOffsetUTC(), utcOffset);
+
+    std::string asIso = dateTime.toISO8601();
+    OptionalDateTime copy = DateTime::fromISO8601(asIso);
+    ASSERT_TRUE(copy);
+    EXPECT_EQ(dateTime, copy.get());
+    EXPECT_EQ(dateTime.utcOffset(), copy->utcOffset());
+    EXPECT_EQ(dateTime.toEpoch(), copy->toEpoch());
+  }
+  {
+    DateTime dateTime = DateTime::nowUTC();
+    double utcOffset = dateTime.utcOffset();
+    EXPECT_EQ(0, utcOffset);
+
+    std::string asIso = dateTime.toISO8601();
+    OptionalDateTime copy = DateTime::fromISO8601(asIso);
+    ASSERT_TRUE(copy);
+    EXPECT_EQ(dateTime, copy.get());
+    EXPECT_EQ(dateTime.utcOffset(), copy->utcOffset());
+    EXPECT_EQ(dateTime.toEpoch(), copy->toEpoch());
+  }
+}
+
+TEST(DateTime, ISO8601Conversions_2) {
+  boost::optional<DateTime> test;
+
+
+  // Complete date plus hours and minutes :
+  test = DateTime::fromISO8601("1997-07-16T19:20+01:00");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(0, test->time().seconds());
+  EXPECT_EQ(1, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T1920+0100");  
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(0, test->time().seconds());
+  EXPECT_EQ(1, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T1920Z");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(0, test->time().seconds());
+  EXPECT_EQ(0, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T1920");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(0, test->time().seconds());
+  EXPECT_EQ(0, test->utcOffset());
+
+  // Complete date plus hours, minutes and seconds :
+  test = DateTime::fromISO8601("1997-07-16T19:20:30+01:00");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(1, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T192030+0100");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(1, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T192030Z"); 
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(0, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T192030");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(0, test->utcOffset());
+
+  // Complete date plus hours, minutes, seconds and a decimal fraction of a second :
+  test = DateTime::fromISO8601("1997-07-16T19:20:30.45+01:00");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(1, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T19203045+0100");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(1, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T19203045Z");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(0, test->utcOffset());
+
+  test = DateTime::fromISO8601("19970716T19203045");
+  ASSERT_TRUE(test);
+  EXPECT_EQ(1997, test->date().year());
+  EXPECT_EQ(7, test->date().monthOfYear().value());
+  EXPECT_EQ(16, test->date().dayOfMonth());
+  EXPECT_EQ(19, test->time().hours());
+  EXPECT_EQ(20, test->time().minutes());
+  EXPECT_EQ(30, test->time().seconds());
+  EXPECT_EQ(0, test->utcOffset());
+}
+
+TEST(DateTime, OutOfRangeYearTest) {
+
+  std::string timeString = "20151025T085412";
+  for (unsigned i = 0; i < 10000; ++i){
+    boost::optional<openstudio::DateTime> dateTime = openstudio::DateTime::fromISO8601(timeString);
+    ASSERT_TRUE(dateTime);
+    openstudio::Date date = dateTime->date();
+    for (unsigned j = 0; j < 10; ++j){
+      EXPECT_EQ(2015, date.year());
+      EXPECT_EQ(10, date.monthOfYear().value());
+      EXPECT_EQ(25, date.dayOfMonth());
+    }
+   }
 }
 
 

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ForwardTranslator.hpp"
 
@@ -27,6 +36,8 @@
 #include "../model/Material_Impl.hpp"
 #include "../model/ConstructionBase.hpp"
 #include "../model/ConstructionBase_Impl.hpp"
+#include "../model/ClimateZones.hpp"
+#include "../model/ClimateZones_Impl.hpp"
 #include "../model/Site.hpp"
 #include "../model/Site_Impl.hpp"
 #include "../model/Facility.hpp"
@@ -43,19 +54,118 @@
 #include "../model/ShadingSurface_Impl.hpp"
 #include "../model/ShadingSurfaceGroup.hpp"
 #include "../model/ShadingSurfaceGroup_Impl.hpp"
+#include "../model/CoilHeatingGasMultiStageStageData.hpp"
+#include "../model/Connection.hpp"
+#include "../model/CoolingTowerPerformanceCoolTools.hpp"
+#include "../model/StandardsInformationMaterial.hpp"
+#include "../model/StandardsInformationConstruction.hpp"
+#include "../model/PortList.hpp"
+#include "../model/ComponentData.hpp"
+#include "../model/ConvergenceLimits.hpp"
+#include "../model/CoolingTowerPerformanceYorkCalc.hpp"
+#include "../model/CurveBicubic.hpp"
+#include "../model/CurveBiquadratic.hpp"
+#include "../model/CurveCubic.hpp"
+#include "../model/CurveDoubleExponentialDecay.hpp"
+#include "../model/CurveExponent.hpp"
+#include "../model/CurveExponentialDecay.hpp"
+#include "../model/CurveExponentialSkewNormal.hpp"
+#include "../model/CurveFanPressureRise.hpp"
+#include "../model/CurveFunctionalPressureDrop.hpp"
+#include "../model/CurveLinear.hpp"
+#include "../model/CurveQuadratic.hpp"
+#include "../model/CurveQuadraticLinear.hpp"
+#include "../model/CurveQuartic.hpp"
+#include "../model/CurveRectangularHyperbola1.hpp"
+#include "../model/CurveRectangularHyperbola2.hpp"
+#include "../model/CurveSigmoid.hpp"
+#include "../model/CurveTriquadratic.hpp"
+#include "../model/TableMultiVariableLookup.hpp"
+#include "../model/DefaultConstructionSet.hpp"
+#include "../model/DefaultScheduleSet.hpp"
+#include "../model/DefaultSurfaceConstructions.hpp"
+#include "../model/DefaultSubSurfaceConstructions.hpp"
+#include "../model/DesignSpecificationZoneAirDistribution.hpp"
+#include "../model/HeatBalanceAlgorithm.hpp"
+#include "../model/InsideSurfaceConvectionAlgorithm.hpp"
+#include "../model/LifeCycleCost.hpp"
+#include "../model/LifeCycleCostParameters.hpp"
+#include "../model/LightingDesignDay.hpp"
+#include "../model/LightingSimulationControl.hpp"
+#include "../model/OutputMeter.hpp"
+#include "../model/ModelObjectList.hpp"
+#include "../model/OutputControlReportingTolerances.hpp"
+#include "../model/OutputVariable.hpp"
+#include "../model/OutsideSurfaceConvectionAlgorithm.hpp"
+#include "../model/CoilCoolingDXMultiSpeedStageData.hpp"
+#include "../model/ComponentCostAdjustments.hpp"
+#include "../model/CurrencyType.hpp"
+#include "../model/ControllerWaterCoil.hpp"
+#include "../model/SetpointManagerMixedAir.hpp"
+#include "../model/BoilerSteam.hpp"
+#include "../model/Node.hpp"
+#include "../model/RenderingColor.hpp"
+#include "../model/ScheduleCompact.hpp"
+#include "../model/ScheduleConstant.hpp"
+#include "../model/ScheduleFixedInterval.hpp"
+#include "../model/ScheduleVariableInterval.hpp"
+#include "../model/ScheduleRuleset.hpp"
+#include "../model/ScheduleYear.hpp"
+#include "../model/ScheduleDay.hpp"
+#include "../model/ScheduleTypeLimits.hpp"
+#include "../model/ScheduleWeek.hpp"
+#include "../model/RunPeriod.hpp"
+#include "../model/ScheduleRule.hpp"
+#include "../model/SimulationControl.hpp"
+#include "../model/DesignDay.hpp"
+#include "../model/WeatherFileConditionType.hpp"
+#include "../model/WeatherFileDays.hpp"
+#include "../model/UtilityCost_Charge_Block.hpp"
+#include "../model/UtilityCost_Charge_Simple.hpp"
+#include "../model/UtilityCost_Computation.hpp"
+#include "../model/UtilityCost_Qualify.hpp"
+#include "../model/UtilityCost_Ratchet.hpp"
+#include "../model/UtilityCost_Tariff.hpp"
+#include "../model/UtilityCost_Variable.hpp"
+#include "../model/ProgramControl.hpp"
+#include "../model/RadianceParameters.hpp"
+#include "../model/ShadowCalculation.hpp"
+#include "../model/SiteGroundReflectance.hpp"
+#include "../model/SiteGroundTemperatureBuildingSurface.hpp"
+#include "../model/SiteGroundTemperatureDeep.hpp"
+#include "../model/SiteGroundTemperatureFCfactorMethod.hpp"
+#include "../model/SiteGroundTemperatureShallow.hpp"
+#include "../model/SiteWaterMainsTemperature.hpp"
+#include "../model/SizingParameters.hpp"
+#include "../model/SkyTemperature.hpp"
+#include "../model/IlluminanceMap.hpp"
+#include "../model/InternalMass.hpp"
+#include "../model/Timestep.hpp"
+#include "../model/UtilityBill.hpp"
+#include "../model/Version.hpp"
+#include "../model/WeatherFile.hpp"
+#include "../model/YearDescription.hpp"
+#include "../model/ZoneAirContaminantBalance.hpp"
+#include "../model/ZoneAirHeatBalanceAlgorithm.hpp"
+#include "../model/ZoneCapacitanceMultiplierResearchSpecial.hpp"
+#include "../model/ZoneHVACEquipmentList.hpp"
 
 #include "../utilities/plot/ProgressBar.hpp"
 #include "../utilities/core/Assert.hpp"
+#include "../utilities/core/FilesystemHelpers.hpp"
 
-#include <QFile>
 #include <QDomDocument>
 #include <QDomElement>
 #include <QThread>
+
+#include <algorithm>
 
 namespace openstudio {
 namespace sdd {
 
   ForwardTranslator::ForwardTranslator()
+    : m_autoHardSize(false),
+      m_autoEfficiency(false)
   {
     m_logSink.setLogLevel(Warn);
     m_logSink.setChannelRegex(boost::regex("openstudio\\.sdd\\.ForwardTranslator"));
@@ -69,6 +179,9 @@ namespace sdd {
   bool ForwardTranslator::modelToSDD(const openstudio::model::Model& model, const openstudio::path& path, ProgressBar* progressBar)
   {
     m_progressBar = progressBar;
+    m_translatedObjects.clear();
+    m_ignoreTypes.clear();
+    m_ignoreObjects.clear();
 
     m_logSink.setThreadId(QThread::currentThread());
 
@@ -80,6 +193,7 @@ namespace sdd {
     modelCopy.purgeUnusedResourceObjects();
 
     boost::optional<QDomDocument> doc = this->translateModel(modelCopy);
+    logUntranslatedObjects(modelCopy);
     if (!doc){
       return false;
     }
@@ -92,10 +206,9 @@ namespace sdd {
       create_directory(path.parent_path());
     }
 
-    QFile file(toQString(path));
-    if (file.open(QFile::WriteOnly)){
-      QTextStream textStream(&file);
-      textStream << doc->toString(2);
+    openstudio::filesystem::ofstream file(path, std::ios_base::binary);
+    if (file.is_open()){
+      openstudio::filesystem::write(file, doc->toString(2));
       file.close();
       return true;
     }
@@ -147,20 +260,38 @@ namespace sdd {
     // set ruleset, where should this data come from?
     QDomElement rulesetFilenameElement = doc.createElement("RulesetFilename");
     sddElement.appendChild(rulesetFilenameElement);
-    rulesetFilenameElement.setAttribute("file", "unknown");
+    rulesetFilenameElement.setAttribute("file", "CEC 2013 NonRes.bin"); // DLM: only allow one value for now
 
     // set project, where should this data come from?
     QDomElement projectElement = doc.createElement("Proj");
     sddElement.appendChild(projectElement);
 
+    // DLM: what name to use here?
     QDomElement projectNameElement = doc.createElement("Name");
     projectElement.appendChild(projectNameElement);
-    projectNameElement.appendChild( doc.createTextNode( "unknown"));
+    projectNameElement.appendChild(doc.createTextNode("unknown"));
 
     // site data
-    QDomElement projectClimateZoneElement = doc.createElement("CliZn");
-    projectElement.appendChild(projectClimateZoneElement);
-    projectClimateZoneElement.appendChild( doc.createTextNode( "unknown"));
+    boost::optional<model::ClimateZones> climateZones = model.getOptionalUniqueModelObject<model::ClimateZones>();
+    if (climateZones){
+      // todo: check document year
+      std::vector<model::ClimateZone> zones = climateZones->getClimateZones("CEC");
+      if (zones.size() > 0 && !zones[0].value().empty()){
+
+        bool isNumber;
+        QString value = toQString(zones[0].value());
+        value.toInt(&isNumber);
+        if (isNumber){
+          value = QString("ClimateZone") + value;
+        }
+
+        QDomElement projectClimateZoneElement = doc.createElement("CliZn");
+        projectElement.appendChild(projectClimateZoneElement);
+        projectClimateZoneElement.appendChild(doc.createTextNode(value));
+
+        m_translatedObjects[climateZones->handle()] = projectClimateZoneElement;
+      }
+    }
 
     // set lat, lon, elev
     // DLM: do not translate forward,  Issue 242: Forward Translator - Remove Proj:Lat/Lon/Elevation translation
@@ -182,6 +313,8 @@ namespace sdd {
       QDomElement elevationElement = doc.createElement("Elevation");
       projectElement.appendChild(elevationElement);
       elevationElement.appendChild( doc.createTextNode(QString::number(elevationIP)));
+
+      m_translatedObjects[site.handle()] = latElement;
     }
     */
 
@@ -197,14 +330,14 @@ namespace sdd {
     //<RunPeriodEndDay>0</RunPeriodEndDay>
     //<RunPeriodYear>0</RunPeriodYear>
 
-    // do materials before constructions 
+    // do materials before constructions
     std::vector<model::Material> materials = model.getModelObjects<model::Material>();
     std::sort(materials.begin(), materials.end(), WorkspaceObjectNameLess());
 
     if (m_progressBar){
       m_progressBar->setWindowTitle(toString("Translating Materials"));
       m_progressBar->setMinimum(0);
-      m_progressBar->setMaximum(materials.size());
+      m_progressBar->setMaximum((int)materials.size());
       m_progressBar->setValue(0);
     }
 
@@ -219,7 +352,7 @@ namespace sdd {
         m_progressBar->setValue(m_progressBar->value() + 1);
       }
     }
-  
+
     // do constructions before geometry
 
     std::vector<model::ConstructionBase> constructions = model.getModelObjects<model::ConstructionBase>();
@@ -228,7 +361,7 @@ namespace sdd {
     if (m_progressBar){
       m_progressBar->setWindowTitle(toString("Translating Constructions"));
       m_progressBar->setMinimum(0);
-      m_progressBar->setMaximum(3*constructions.size()); // three loops below
+      m_progressBar->setMaximum(3 * ((int)constructions.size())); // three loops below
       m_progressBar->setValue(0);
     }
 
@@ -264,7 +397,7 @@ namespace sdd {
       if (constructionElement){
         projectElement.appendChild(*constructionElement);
       }
-            
+
       if (m_progressBar){
         m_progressBar->setValue(m_progressBar->value() + 1);
       }
@@ -280,7 +413,7 @@ namespace sdd {
       if (constructionElement){
         projectElement.appendChild(*constructionElement);
       }
-            
+
       if (m_progressBar){
         m_progressBar->setValue(m_progressBar->value() + 1);
       }
@@ -309,7 +442,7 @@ namespace sdd {
     if (m_progressBar){
       m_progressBar->setWindowTitle(toString("Translating Site Shading"));
       m_progressBar->setMinimum(0);
-      m_progressBar->setMaximum(shadingSurfaceGroups.size()); 
+      m_progressBar->setMaximum((int)shadingSurfaceGroups.size());
       m_progressBar->setValue(0);
     }
 
@@ -340,7 +473,120 @@ namespace sdd {
       }
     }
 
+    m_ignoreTypes.push_back(model::BoilerSteam::iddObjectType());
+    m_ignoreTypes.push_back(model::ClimateZones::iddObjectType()); // might not be translated but it is checked
+    m_ignoreTypes.push_back(model::CoilCoolingDXMultiSpeedStageData::iddObjectType());
+    m_ignoreTypes.push_back(model::CoilHeatingGasMultiStageStageData::iddObjectType());
+    m_ignoreTypes.push_back(model::ComponentCostAdjustments::iddObjectType());
+    m_ignoreTypes.push_back(model::ComponentData::iddObjectType());
+    m_ignoreTypes.push_back(model::Connection::iddObjectType());
+    m_ignoreTypes.push_back(model::ControllerWaterCoil::iddObjectType());
+    m_ignoreTypes.push_back(model::ConvergenceLimits::iddObjectType());
+    m_ignoreTypes.push_back(model::CoolingTowerPerformanceCoolTools::iddObjectType());
+    m_ignoreTypes.push_back(model::CoolingTowerPerformanceYorkCalc::iddObjectType());
+    m_ignoreTypes.push_back(model::CurrencyType::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveBicubic::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveBiquadratic::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveCubic::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveDoubleExponentialDecay::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveExponent::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveExponentialDecay::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveExponentialSkewNormal::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveFanPressureRise::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveFunctionalPressureDrop::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveLinear::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveQuadratic::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveQuadraticLinear::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveQuartic::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveRectangularHyperbola1::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveRectangularHyperbola2::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveSigmoid::iddObjectType());
+    m_ignoreTypes.push_back(model::CurveTriquadratic::iddObjectType());
+    m_ignoreTypes.push_back(model::DefaultConstructionSet::iddObjectType());
+    m_ignoreTypes.push_back(model::DesignDay::iddObjectType());
+    m_ignoreTypes.push_back(model::DefaultScheduleSet::iddObjectType());
+    m_ignoreTypes.push_back(model::DesignSpecificationZoneAirDistribution::iddObjectType());
+    m_ignoreTypes.push_back(model::DefaultSurfaceConstructions::iddObjectType());
+    m_ignoreTypes.push_back(model::DefaultSubSurfaceConstructions::iddObjectType());
+    m_ignoreTypes.push_back(model::Facility::iddObjectType());
+    m_ignoreTypes.push_back(model::HeatBalanceAlgorithm::iddObjectType());
+    m_ignoreTypes.push_back(model::IlluminanceMap::iddObjectType());
+    m_ignoreTypes.push_back(model::InsideSurfaceConvectionAlgorithm::iddObjectType());
+    m_ignoreTypes.push_back(model::InternalMass::iddObjectType());
+    m_ignoreTypes.push_back(model::LifeCycleCost::iddObjectType());
+    m_ignoreTypes.push_back(model::LifeCycleCostParameters::iddObjectType());
+    m_ignoreTypes.push_back(model::LightingDesignDay::iddObjectType());
+    m_ignoreTypes.push_back(model::LightingSimulationControl::iddObjectType());
+    m_ignoreTypes.push_back(model::ModelObjectList::iddObjectType());
+    m_ignoreTypes.push_back(model::Node::iddObjectType());
+    m_ignoreTypes.push_back(model::OutputControlReportingTolerances::iddObjectType());
+    m_ignoreTypes.push_back(model::OutputMeter::iddObjectType());
+    m_ignoreTypes.push_back(model::OutputVariable::iddObjectType());
+    m_ignoreTypes.push_back(model::OutsideSurfaceConvectionAlgorithm::iddObjectType());
+    m_ignoreTypes.push_back(model::PortList::iddObjectType());
+    m_ignoreTypes.push_back(model::ProgramControl::iddObjectType());
+    m_ignoreTypes.push_back(model::RadianceParameters::iddObjectType());
+    m_ignoreTypes.push_back(model::RenderingColor::iddObjectType());
+    m_ignoreTypes.push_back(model::RunPeriod::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleCompact::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleConstant::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleDay::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleFixedInterval::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleRule::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleRuleset::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleTypeLimits::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleVariableInterval::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleWeek::iddObjectType());
+    m_ignoreTypes.push_back(model::ScheduleYear::iddObjectType());
+    m_ignoreTypes.push_back(model::SetpointManagerMixedAir::iddObjectType());
+    m_ignoreTypes.push_back(model::ShadowCalculation::iddObjectType());
+    m_ignoreTypes.push_back(model::SimulationControl::iddObjectType());
+    m_ignoreTypes.push_back(model::Site::iddObjectType()); // might not be translated but it is checked
+    m_ignoreTypes.push_back(model::SiteGroundReflectance::iddObjectType());
+    m_ignoreTypes.push_back(model::SiteGroundTemperatureBuildingSurface::iddObjectType());
+    m_ignoreTypes.push_back(model::SiteWaterMainsTemperature::iddObjectType());
+    m_ignoreTypes.push_back(model::SizingParameters::iddObjectType());
+    m_ignoreTypes.push_back(model::SkyTemperature::iddObjectType());
+    m_ignoreTypes.push_back(model::StandardsInformationConstruction::iddObjectType());
+    m_ignoreTypes.push_back(model::StandardsInformationMaterial::iddObjectType());
+    m_ignoreTypes.push_back(model::TableMultiVariableLookup::iddObjectType());
+    m_ignoreTypes.push_back(model::Timestep::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityBill::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Charge_Block::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Charge_Simple::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Computation::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Qualify::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Ratchet::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Tariff::iddObjectType());
+    m_ignoreTypes.push_back(model::UtilityCost_Variable::iddObjectType());
+    m_ignoreTypes.push_back(model::Version::iddObjectType());
+    m_ignoreTypes.push_back(model::WeatherFile::iddObjectType());
+    m_ignoreTypes.push_back(model::WeatherFileConditionType::iddObjectType());
+    m_ignoreTypes.push_back(model::WeatherFileDays::iddObjectType());
+    m_ignoreTypes.push_back(model::YearDescription::iddObjectType());
+    m_ignoreTypes.push_back(model::ZoneAirContaminantBalance::iddObjectType());
+    m_ignoreTypes.push_back(model::ZoneAirHeatBalanceAlgorithm::iddObjectType());
+    m_ignoreTypes.push_back(model::ZoneCapacitanceMultiplierResearchSpecial::iddObjectType());
+    m_ignoreTypes.push_back(model::ZoneHVACEquipmentList::iddObjectType());
+
     return doc;
+  }
+
+  void ForwardTranslator::logUntranslatedObjects(const model::Model& model)
+  {
+    auto allModelObjects = model.modelObjects();
+    for(const auto & mo : allModelObjects) {
+      // If mo is not in m_translatedObjects
+      if(m_translatedObjects.find(mo.handle()) == m_translatedObjects.end()) {
+        // If mo.iddObjectType is not int the m_ignoreTypes list
+        if(std::find(m_ignoreTypes.begin(),m_ignoreTypes.end(),mo.iddObjectType()) == m_ignoreTypes.end()) {
+          // If mo is not in the m_ignoreObjects list
+          if(std::find(m_ignoreObjects.begin(),m_ignoreObjects.end(),mo.handle()) == m_ignoreObjects.end()) {
+            LOG(Error,mo.briefDescription() << " was not translated.");
+          }
+        }
+      }
+    }
   }
 
 } // sdd

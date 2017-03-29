@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_COILCOOLINGDXSINGLESPEED_IMPL_HPP
 #define MODEL_COILCOOLINGDXSINGLESPEED_IMPL_HPP
@@ -33,26 +42,26 @@ namespace detail {
 
   // derive CoilCoolingDXSingleSpeed_Impl from ModelObject_Impl to override virtual methods
   class MODEL_API CoilCoolingDXSingleSpeed_Impl : public StraightComponent_Impl {
-    Q_OBJECT;
+    
 
-    Q_PROPERTY(boost::optional<double> ratedCOP READ ratedCOP WRITE setRatedCOP);
-    Q_PROPERTY(boost::optional<double> ratedEvaporatorFanPowerPerVolumeFlowRate READ ratedEvaporatorFanPowerPerVolumeFlowRate WRITE setRatedEvaporatorFanPowerPerVolumeFlowRate);
-    Q_PROPERTY(boost::optional<double> nominalTimeForCondensateRemovalToBegin READ nominalTimeForCondensateRemovalToBegin WRITE setNominalTimeForCondensateRemovalToBegin);
-    Q_PROPERTY(boost::optional<double> ratioOfInitialMoistureEvaporationRateAndSteadyStateLatentCapacity READ ratioOfInitialMoistureEvaporationRateAndSteadyStateLatentCapacity WRITE setRatioOfInitialMoistureEvaporationRateAndSteadyStateLatentCapacity);
-    Q_PROPERTY(boost::optional<double> maximumCyclingRate READ maximumCyclingRate WRITE setMaximumCyclingRate);
-    Q_PROPERTY(boost::optional<double> latentCapacityTimeConstant READ latentCapacityTimeConstant WRITE setLatentCapacityTimeConstant);
-    Q_PROPERTY(boost::optional<std::string> condenserAirInletNodeName READ condenserAirInletNodeName WRITE setCondenserAirInletNodeName);
-    Q_PROPERTY(std::string condenserType READ condenserType WRITE setCondenserType);
-    Q_PROPERTY(boost::optional<double> evaporativeCondenserEffectiveness READ evaporativeCondenserEffectiveness WRITE setEvaporativeCondenserEffectiveness);
-    Q_PROPERTY(boost::optional<double> evaporativeCondenserAirFlowRate READ evaporativeCondenserAirFlowRate WRITE setEvaporativeCondenserAirFlowRate);
-    Q_PROPERTY(boost::optional<double> evaporativeCondenserPumpRatedPowerConsumption READ evaporativeCondenserPumpRatedPowerConsumption WRITE setEvaporativeCondenserPumpRatedPowerConsumption);
-    Q_PROPERTY(boost::optional<double> crankcaseHeaterCapacity READ crankcaseHeaterCapacity WRITE setCrankcaseHeaterCapacity);
-    Q_PROPERTY(boost::optional<double> maximumOutdoorDryBulbTemperatureForCrankcaseHeaterOperation READ maximumOutdoorDryBulbTemperatureForCrankcaseHeaterOperation WRITE setMaximumOutdoorDryBulbTemperatureForCrankcaseHeaterOperation);
-    Q_PROPERTY(boost::optional<double> basinHeaterCapacity READ basinHeaterCapacity WRITE setBasinHeaterCapacity);
-    Q_PROPERTY(boost::optional<double> basinHeaterSetpointTemperature READ basinHeaterSetpointTemperature WRITE setBasinHeaterSetpointTemperature);
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> availabilitySchedule READ availabilityScheduleAsModelObject WRITE setAvailabilityScheduleAsModelObject);
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> basinHeaterOperatingSchedule READ basinHeaterOperatingScheduleAsModelObject WRITE setBasinHeaterOperatingScheduleAsModelObject RESET resetBasinHeaterOperatingSchedule);
+    
+    
    public:
     /** @name Constructors and Destructors */
     //@{
@@ -76,25 +85,25 @@ namespace detail {
     /** @name Virtual Methods */
     //@{
 
-    virtual ModelObject clone(Model model) const;
+    virtual ModelObject clone(Model model) const override;
 
-    virtual const std::vector<std::string>& outputVariableNames() const;
+    virtual const std::vector<std::string>& outputVariableNames() const override;
 
-    virtual IddObjectType iddObjectType() const;
+    virtual IddObjectType iddObjectType() const override;
 
-    virtual std::vector<ScheduleTypeKey> getScheduleTypeKeys(const Schedule& schedule) const;
+    virtual std::vector<ScheduleTypeKey> getScheduleTypeKeys(const Schedule& schedule) const override;
 
-    virtual std::vector<ModelObject> children() const;
+    virtual std::vector<ModelObject> children() const override;
 
-    virtual std::vector<IddObjectType> allowableChildTypes() const;
+    virtual std::vector<IddObjectType> allowableChildTypes() const override;
 
-    virtual unsigned inletPort();
+    virtual unsigned inletPort() override;
 
-    virtual unsigned outletPort();
+    virtual unsigned outletPort() override;
 
-    virtual boost::optional<HVACComponent> containingHVACComponent() const;
+    virtual boost::optional<HVACComponent> containingHVACComponent() const override;
 
-    virtual boost::optional<ZoneHVACComponent> containingZoneHVACComponent() const;
+    virtual boost::optional<ZoneHVACComponent> containingZoneHVACComponent() const override;
 
     //@}
     /** @name Getters */
@@ -233,7 +242,7 @@ namespace detail {
 
     void autosizeRatedAirFlowRate();
 
-    bool addToNode(Node & node);
+    bool addToNode(Node & node) override;
 
     //@}
    private:

@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "DefaultConstructionSetInspectorView.hpp"
 #include "ModelObjectItem.hpp"
@@ -94,9 +103,9 @@ void WallConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -158,9 +167,9 @@ void FloorConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -222,9 +231,9 @@ void RoofConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -286,9 +295,9 @@ void GlassDoorConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -350,9 +359,9 @@ void OverheadDoorConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -414,9 +423,9 @@ void SkylightConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -478,9 +487,9 @@ void TubularDaylightDomeConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -542,9 +551,9 @@ void TubularDaylightDiffuserConstructionVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -606,9 +615,9 @@ void FixedWindowVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -670,9 +679,9 @@ void OperableWindowVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -734,9 +743,9 @@ void DoorVC::onDrop(const OSItemId& itemId)
     unsigned numSources = defaultSubSurfaceConstructions.getModelObjectSources<model::DefaultConstructionSet>().size();
     if (numSources > 1){
       QWidget* parent = OSAppBase::instance()->currentDocument()->mainWindow();
-      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources", 
+      QMessageBox::StandardButton button = QMessageBox::question(parent, "Shared Construction Set Resources",
         "This construction is shared by " + QString::number(numSources-1) + " other construction sets.\n\n" +
-        "Click \"Yes\" to change the construction in all construction sets.\n" + 
+        "Click \"Yes\" to change the construction in all construction sets.\n" +
         "Click \"No\" to change it in only this construction set.\n" +
         "Click \"Cancel\" to do nothing.",
         QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
@@ -942,57 +951,57 @@ void SiteShadingVC::onDrop(const OSItemId& itemId)
 DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const model::Model& model,
                                                                          QWidget * parent)
   : ModelObjectInspectorView(model, true, parent),
-  m_nameEdit(NULL),
+  m_nameEdit(nullptr),
 
-  m_exteriorWallConstructionDZ(NULL),
-  m_exteriorFloorConstructionDZ(NULL),
-  m_exteriorRoofConstructionDZ(NULL),
-  m_interiorWallConstructionDZ(NULL),
-  m_interiorFloorConstructionDZ(NULL),
-  m_interiorRoofConstructionDZ(NULL),
-  m_groundWallConstructionDZ(NULL),
-  m_groundFloorConstructionDZ(NULL),
-  m_groundRoofConstructionDZ(NULL),
-  m_exteriorFixedWindowDZ(NULL),
-  m_exteriorOperableWindowDZ(NULL),
-  m_exteriorDoorDZ(NULL),
-  m_glassDoorConstructionDZ(NULL),
-  m_overheadDoorConstructionDZ(NULL),
-  m_skylightConstructionDZ(NULL),
-  m_tubularDaylightDomeConstructionDZ(NULL),
-  m_tubularDaylightDiffuserConstructionDZ(NULL),
-  m_interiorFixedWindowDZ(NULL),
-  m_interiorOperableWindowDZ(NULL),
-  m_interiorDoorDZ(NULL),
-  m_interiorPartitionsDZ(NULL),
-  m_spaceShadingDZ(NULL),
-  m_buildingShadingDZ(NULL),
-  m_siteShadingDZ(NULL),
+  m_exteriorWallConstructionDZ(nullptr),
+  m_exteriorFloorConstructionDZ(nullptr),
+  m_exteriorRoofConstructionDZ(nullptr),
+  m_interiorWallConstructionDZ(nullptr),
+  m_interiorFloorConstructionDZ(nullptr),
+  m_interiorRoofConstructionDZ(nullptr),
+  m_groundWallConstructionDZ(nullptr),
+  m_groundFloorConstructionDZ(nullptr),
+  m_groundRoofConstructionDZ(nullptr),
+  m_exteriorFixedWindowDZ(nullptr),
+  m_exteriorOperableWindowDZ(nullptr),
+  m_exteriorDoorDZ(nullptr),
+  m_glassDoorConstructionDZ(nullptr),
+  m_overheadDoorConstructionDZ(nullptr),
+  m_skylightConstructionDZ(nullptr),
+  m_tubularDaylightDomeConstructionDZ(nullptr),
+  m_tubularDaylightDiffuserConstructionDZ(nullptr),
+  m_interiorFixedWindowDZ(nullptr),
+  m_interiorOperableWindowDZ(nullptr),
+  m_interiorDoorDZ(nullptr),
+  m_interiorPartitionsDZ(nullptr),
+  m_spaceShadingDZ(nullptr),
+  m_buildingShadingDZ(nullptr),
+  m_siteShadingDZ(nullptr),
 
-  m_exteriorWallConstructionVC(NULL),
-  m_exteriorFloorConstructionVC(NULL),
-  m_exteriorRoofConstructionVC(NULL),
-  m_interiorWallConstructionVC(NULL),
-  m_interiorFloorConstructionVC(NULL),
-  m_interiorRoofConstructionVC(NULL),
-  m_groundWallConstructionVC(NULL),
-  m_groundFloorConstructionVC(NULL),
-  m_groundRoofConstructionVC(NULL),
-  m_exteriorFixedWindowVC(NULL),
-  m_exteriorOperableWindowVC(NULL),
-  m_exteriorDoorVC(NULL),
-  m_glassDoorConstructionVC(NULL),
-  m_overheadDoorConstructionVC(NULL),
-  m_skylightConstructionVC(NULL),
-  m_tubularDaylightDomeConstructionVC(NULL),
-  m_tubularDaylightDiffuserConstructionVC(NULL),
-  m_interiorFixedWindowVC(NULL),
-  m_interiorOperableWindowVC(NULL),
-  m_interiorDoorVC(NULL),
-  m_interiorPartitionsVC(NULL),
-  m_spaceShadingVC(NULL),
-  m_buildingShadingVC(NULL),
-  m_siteShadingVC(NULL),
+  m_exteriorWallConstructionVC(nullptr),
+  m_exteriorFloorConstructionVC(nullptr),
+  m_exteriorRoofConstructionVC(nullptr),
+  m_interiorWallConstructionVC(nullptr),
+  m_interiorFloorConstructionVC(nullptr),
+  m_interiorRoofConstructionVC(nullptr),
+  m_groundWallConstructionVC(nullptr),
+  m_groundFloorConstructionVC(nullptr),
+  m_groundRoofConstructionVC(nullptr),
+  m_exteriorFixedWindowVC(nullptr),
+  m_exteriorOperableWindowVC(nullptr),
+  m_exteriorDoorVC(nullptr),
+  m_glassDoorConstructionVC(nullptr),
+  m_overheadDoorConstructionVC(nullptr),
+  m_skylightConstructionVC(nullptr),
+  m_tubularDaylightDomeConstructionVC(nullptr),
+  m_tubularDaylightDiffuserConstructionVC(nullptr),
+  m_interiorFixedWindowVC(nullptr),
+  m_interiorOperableWindowVC(nullptr),
+  m_interiorDoorVC(nullptr),
+  m_interiorPartitionsVC(nullptr),
+  m_spaceShadingVC(nullptr),
+  m_buildingShadingVC(nullptr),
+  m_siteShadingVC(nullptr),
 
   m_vectorControllers(std::vector<ModelObjectVectorController *>()),
   m_dropZones(std::vector<OSDropZone *>())
@@ -1004,8 +1013,8 @@ DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const m
   //hLayout->setSpacing(padding);
   //hLayout->addWidget(label);
   //hLayout->addWidget(m_nameEdit);
-  
-  QGridLayout * gridLayout = new QGridLayout();
+
+  auto gridLayout = new QGridLayout();
   gridLayout->setContentsMargins(10,10,10,10);
   gridLayout->setSpacing(10);
   gridLayout->setColumnStretch(3,10);
@@ -1019,8 +1028,8 @@ DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const m
   int rightCol = 2;
   int row = 0;
 
-  QLabel * label = NULL;
-  
+  QLabel * label = nullptr;
+
   label = new QLabel();
   label->setText("Name");
   label->setObjectName("H2");
@@ -1028,7 +1037,7 @@ DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const m
   gridLayout->addWidget(label,row,leftCol);
   row++;
 
-  m_nameEdit = new OSLineEdit();
+  m_nameEdit = new OSLineEdit2();
   gridLayout->addWidget(m_nameEdit,row,leftCol,1,3);
   row++;
 
@@ -1135,7 +1144,7 @@ DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const m
   m_dropZones.push_back(m_interiorRoofConstructionDZ);
   gridLayout->addWidget(label,row,rightCol);
   gridLayout->addWidget(m_interiorRoofConstructionDZ,row+1,rightCol);
-  
+
   row += 2;
 
   line = new QFrame();
@@ -1340,7 +1349,7 @@ DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const m
   label = new QLabel();
   label->setText("Doors");
   label->setObjectName("H2");
-  //label->setContentsMargins(padding,0,padding,0);  
+  //label->setContentsMargins(padding,0,padding,0);
   m_interiorDoorVC = new DoorVC();
   m_vectorControllers.push_back(m_interiorDoorVC);
   m_interiorDoorDZ = new OSDropZone(m_interiorDoorVC);
@@ -1420,12 +1429,12 @@ DefaultConstructionSetInspectorView::DefaultConstructionSetInspectorView(const m
   //mainVLayout->addLayout(hLayout);
   //mainVLayout->addLayout(gridLayout);
 
-  QWidget * widget = new QWidget();
+  auto widget = new QWidget();
   //widget->setLayout(mainVLayout);
   widget->setLayout(gridLayout);
 
   //int index;
-  QWidget * hiddenWidget = new QWidget();
+  auto hiddenWidget = new QWidget();
   /*index =*/ this->stackedWidget()->addWidget(hiddenWidget);
   /*index =*/ this->stackedWidget()->addWidget(widget);
 }
@@ -1605,7 +1614,14 @@ void DefaultConstructionSetInspectorView::attach(openstudio::model::DefaultConst
   m_siteShadingVC->attach(defaultConstructionSet);
   m_siteShadingVC->reportItems();
 
-  m_nameEdit->bind(defaultConstructionSet, "name");
+  m_defaultConstructionSet = defaultConstructionSet;
+
+  // m_nameEdit->bind(defaultConstructionSet, "name");
+  m_nameEdit->bind(
+    *m_defaultConstructionSet,
+    OptionalStringGetter(std::bind(&model::DefaultConstructionSet::name, m_defaultConstructionSet.get_ptr(),true)),
+    boost::optional<StringSetter>(std::bind(&model::DefaultConstructionSet::setName, m_defaultConstructionSet.get_ptr(),std::placeholders::_1))
+  );
 
   this->stackedWidget()->setCurrentIndex(1);
 }
@@ -1620,6 +1636,8 @@ void DefaultConstructionSetInspectorView::detach()
     vc->detach();
     vc->reportItems();
   }
+
+  m_defaultConstructionSet = boost::none;
 }
 
 } // openstudio

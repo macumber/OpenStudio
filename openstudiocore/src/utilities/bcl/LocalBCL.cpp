@@ -1,26 +1,35 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
+
 #include "BCLComponent.hpp"
 #include "BCLMeasure.hpp"
 #include "LocalBCL.hpp"
 #include "RemoteBCL.hpp"
-#include "OnDemandGenerator.hpp"
 #include "../core/Application.hpp"
 #include "../core/Assert.hpp"
 #include "../data/Attribute.hpp"
@@ -29,7 +38,6 @@
 #include "../core/System.hpp"
 
 #include <QDir>
-#include <QFile>
 #include <QIcon>
 #include <QInputDialog>
 #include <QSettings>
@@ -53,7 +61,7 @@ namespace openstudio{
     dbVersion("1.3")
   {
     //Make sure a QApplication exists
-    openstudio::Application::instance().application();
+    openstudio::Application::instance().application(false);
 
     QSqlDatabase database = QSqlDatabase::addDatabase("QSQLITE", m_libraryPath+m_dbName);
     database.setDatabaseName(m_libraryPath+m_dbName);
@@ -64,7 +72,7 @@ namespace openstudio{
       QDir().mkpath(m_libraryPath);
     }
     //Check for local database
-    if (!QFile(m_libraryPath+m_dbName).exists())
+    if (!openstudio::filesystem::exists(openstudio::toPath(m_libraryPath+m_dbName)))
     {
       initializeLocalDb();
     }
@@ -258,9 +266,9 @@ namespace openstudio{
         while (query.next()) {
           path src = toPath(m_libraryPath + "/" + query.value(0).toString() + "/" + query.value(1).toString() + query.value(2).toString().mid(query.value(2).toString().lastIndexOf("/")));
           path dest = src.parent_path();
-          QFile::remove(toQString(dest / toPath("DISCLAIMER.txt")));
-          QFile::remove(toQString(dest / toPath("README.txt")));
-          QFile::remove(toQString(dest / toPath("output.xml")));
+          openstudio::filesystem::remove(dest / toPath("DISCLAIMER.txt"));
+          openstudio::filesystem::remove(dest / toPath("README.txt"));
+          openstudio::filesystem::remove(dest / toPath("output.xml"));
           copyDirectory(src, dest);
           removeDirectory(src);
         }
@@ -332,41 +340,6 @@ namespace openstudio{
       }catch(const std::exception&){
       }
     }
-    return boost::none;
-  }
-
-  boost::optional<BCLComponent> LocalBCL::getOnDemandComponent(const OnDemandGenerator& generator) const
-  {
-    if (!generator.checkArgumentValues()){
-      return boost::none;
-    }
-
-    std::vector<std::pair<std::string, std::string> > searchTerms;
-
-    searchTerms.push_back(std::make_pair<std::string, std::string>("OnDemandGenerator UID", generator.uid()));
-    searchTerms.push_back(std::make_pair<std::string, std::string>("OnDemandGenerator VID", generator.versionId()));
-
-    for (const OnDemandGeneratorArgument& argument : generator.activeArguments()) {
-
-      // can't handle other types for now
-      if (argument.dataType() != OnDemandGeneratorArgumentType::String){
-        return boost::none;
-      }
-
-      std::string value = "";
-      boost::optional<std::string> valueAsString = argument.valueAsString();
-      if (valueAsString){
-        value = *valueAsString;
-      }
-      searchTerms.push_back(std::make_pair(argument.name(), value));
-    }
-
-    std::vector<BCLComponent> components = componentAttributeSearch(searchTerms);
-
-    if (!components.empty()){
-      return components[0];
-    }
-
     return boost::none;
   }
 
@@ -715,7 +688,7 @@ namespace openstudio{
 
   std::set<std::pair<std::string, std::string> > LocalBCL::attributeSearch(
       const std::vector<std::pair<std::string, std::string> >& searchTerms,
-      const std::string componentType) const
+      const std::string& componentType) const
   {
     typedef std::vector<std::pair<std::string, std::string> > UidsVecType;
     typedef std::set<std::pair<std::string, std::string> > UidsType;
@@ -779,7 +752,7 @@ namespace openstudio{
   bool LocalBCL::prodAuthKeyUserPrompt(QWidget* parent)
   {
     // make sure application is initialized
-    Application::instance().application(true);
+    Application::instance().application(false);
 
     QInputDialog inputDlg(parent);
     inputDlg.setInputMode(QInputDialog::TextInput);
@@ -810,7 +783,7 @@ namespace openstudio{
   bool LocalBCL::devAuthKeyUserPrompt(QWidget* parent)
   {
     // make sure application is initialized
-    openstudio::Application::instance().application(true);
+    openstudio::Application::instance().application(false);
 
     QInputDialog inputDlg(parent);
     inputDlg.setInputMode(QInputDialog::TextInput);
@@ -894,7 +867,7 @@ namespace openstudio{
     }
     m_libraryPath = path;
 
-    if (!QFile(path+m_dbName).exists())
+    if (!openstudio::filesystem::exists(openstudio::toPath(path+m_dbName)))
     {
       QSqlDatabase database = QSqlDatabase::addDatabase("QSQLITE", path+m_dbName);
       database.setDatabaseName(path+m_dbName);

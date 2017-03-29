@@ -1,24 +1,33 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ConstructionInternalSourceInspectorView.hpp"
-
+#include "StandardsInformationConstructionWidget.hpp"
 #include "ConstructionObjectVectorController.hpp"
 #include "ModelObjectItem.hpp"
 #include "OSAppBase.hpp"
@@ -48,92 +57,54 @@ namespace openstudio {
 
 ConstructionInternalSourceInspectorView::ConstructionInternalSourceInspectorView(bool isIP, const openstudio::model::Model& model, QWidget * parent)
   : ModelObjectInspectorView(model, true, parent),
-    m_constructionDZ(NULL),
-    m_nameEdit(NULL),
-    m_sourcePresentAfterLayerNumberEdit(NULL),
-    m_temperatureCalculationRequestedAfterLayerNumberEdit(NULL),
-    m_dimensionsForTheCTFCalculationEdit(NULL),
-    m_tubeSpacingEdit(NULL),
-    m_isIP(isIP)
+    m_isIP(isIP),
+    m_nameEdit(nullptr),
+    m_standardsInformationWidget(nullptr),
+    m_constructionDZ(nullptr),
+    m_sourcePresentAfterLayerNumberEdit(nullptr),
+    m_temperatureCalculationRequestedAfterLayerNumberEdit(nullptr),
+    m_dimensionsForTheCTFCalculationEdit(nullptr),
+    m_tubeSpacingEdit(nullptr),
+    m_constructionVC(nullptr)
 {
   createLayout();
 }
 
 void ConstructionInternalSourceInspectorView::createLayout()
 {
-  QWidget* visibleWidget = new QWidget();
+  auto hiddenWidget = new QWidget();
+  this->stackedWidget()->addWidget(hiddenWidget);
+
+  auto visibleWidget = new QWidget();
   this->stackedWidget()->addWidget(visibleWidget);
 
-  QGridLayout* mainGridLayout = new QGridLayout();
-  mainGridLayout->setContentsMargins(7,7,7,7);
+  auto mainGridLayout = new QGridLayout();
+  mainGridLayout->setContentsMargins(7, 7, 7, 7);
   mainGridLayout->setSpacing(14);
   visibleWidget->setLayout(mainGridLayout);
 
-  int row = 0;
+  int row = mainGridLayout->rowCount();
+
+  QLabel * label = nullptr;
 
   // Name
 
-  QLabel* label = new QLabel("Name: ");
+  label = new QLabel("Name: ");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
+  mainGridLayout->addWidget(label, row, 0);
 
   ++row;
 
-  m_nameEdit = new OSLineEdit();
-  mainGridLayout->addWidget(m_nameEdit,row,0,1,3);
+  m_nameEdit = new OSLineEdit2();
+  mainGridLayout->addWidget(m_nameEdit, row, 0, 1, 3);
 
   ++row;
 
-  // Standards
-  QFrame * line;
-  line = new QFrame();
-  line->setFrameShape(QFrame::HLine);
-  line->setFrameShadow(QFrame::Sunken);
-  mainGridLayout->addWidget(line,row,0,1,3);
+  // Standards Information
 
-  ++row;
-
-  label = new QLabel();
-  label->setText("Measure Tags (Optional):");
-  label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
-
-  ++row;
-
-  QVBoxLayout* vLayout = new QVBoxLayout();
-
-  label = new QLabel();
-  label->setText("Intended Surface Type: ");
-  label->setObjectName("StandardsInfo");
-  vLayout->addWidget(label);
-
-  m_intendedSurfaceType = new OSComboBox2();
-  m_intendedSurfaceType->setFixedWidth(OSItem::ITEM_WIDTH);
-  vLayout->addWidget(m_intendedSurfaceType);
-
-  mainGridLayout->addLayout(vLayout,row,0);
-
-  vLayout = new QVBoxLayout();
-
-  label = new QLabel();
-  label->setText("Standards Construction Type: ");
-  label->setObjectName("StandardsInfo");
-  vLayout->addWidget(label);
-
-  m_standardsConstructionType = new QComboBox();
-  m_standardsConstructionType->setEditable(true);
-  m_standardsConstructionType->setDuplicatesEnabled(false);
-  m_standardsConstructionType->setFixedWidth(OSItem::ITEM_WIDTH);
-  vLayout->addWidget(m_standardsConstructionType);
-
-  mainGridLayout->addLayout(vLayout,row,1);
-
-  ++row;
-
-  line = new QFrame();
-  line->setFrameShape(QFrame::HLine);
-  line->setFrameShadow(QFrame::Sunken);
-  mainGridLayout->addWidget(line,row,0,1,3);
+  m_standardsInformationWidget = new StandardsInformationConstructionWidget(m_isIP, mainGridLayout, row);
+  m_standardsInformationWidget->hideFenestration();
+  m_standardsInformationWidget->disableFenestration();
 
   ++row;
 
@@ -141,13 +112,13 @@ void ConstructionInternalSourceInspectorView::createLayout()
 
   label = new QLabel("Layer: ");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
+  mainGridLayout->addWidget(label, row, 0);
 
   ++row;
 
   label = new QLabel("Outside");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
+  mainGridLayout->addWidget(label, row, 0);
 
   ++row;
 
@@ -157,13 +128,13 @@ void ConstructionInternalSourceInspectorView::createLayout()
   m_constructionDZ->setMaxItems(16);
   m_constructionDZ->setItemsAcceptDrops(true);
   m_constructionDZ->setFixedSize(QSize(OSItem::ITEM_WIDTH + 20,600));
-  mainGridLayout->addWidget(m_constructionDZ,row,0);
+  mainGridLayout->addWidget(m_constructionDZ, row, 0);
 
   ++row;
 
   label = new QLabel("Inside");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
+  mainGridLayout->addWidget(label, row, 0);
 
   ++row;
 
@@ -171,12 +142,12 @@ void ConstructionInternalSourceInspectorView::createLayout()
 
   label = new QLabel("Source Present After Layer: ");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
+  mainGridLayout->addWidget(label, row, 0);
 
   ++row;
 
-  m_sourcePresentAfterLayerNumberEdit = new OSIntegerEdit();
-  mainGridLayout->addWidget(m_sourcePresentAfterLayerNumberEdit,row,0);
+  m_sourcePresentAfterLayerNumberEdit = new OSIntegerEdit2();
+  mainGridLayout->addWidget(m_sourcePresentAfterLayerNumberEdit, row, 0);
 
   ++row;
 
@@ -184,12 +155,12 @@ void ConstructionInternalSourceInspectorView::createLayout()
 
   label = new QLabel("Temperature Calculation Requested After Layer Number: ");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0,1,3);
+  mainGridLayout->addWidget(label, row, 0, 1, 3);
 
   ++row;
 
-  m_temperatureCalculationRequestedAfterLayerNumberEdit = new OSIntegerEdit();
-  mainGridLayout->addWidget(m_temperatureCalculationRequestedAfterLayerNumberEdit,row,0);
+  m_temperatureCalculationRequestedAfterLayerNumberEdit = new OSIntegerEdit2();
+  mainGridLayout->addWidget(m_temperatureCalculationRequestedAfterLayerNumberEdit, row, 0);
 
   ++row;
 
@@ -197,12 +168,12 @@ void ConstructionInternalSourceInspectorView::createLayout()
 
   label = new QLabel("Dimensions for the CTF Calculation: ");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0,1,3);
+  mainGridLayout->addWidget(label, row, 0, 1, 3);
 
   ++row;
 
-  m_dimensionsForTheCTFCalculationEdit = new OSIntegerEdit();
-  mainGridLayout->addWidget(m_dimensionsForTheCTFCalculationEdit,row,0);
+  m_dimensionsForTheCTFCalculationEdit = new OSIntegerEdit2();
+  mainGridLayout->addWidget(m_dimensionsForTheCTFCalculationEdit, row, 0);
 
   ++row;
 
@@ -210,27 +181,28 @@ void ConstructionInternalSourceInspectorView::createLayout()
 
   label = new QLabel("Tube Spacing: ");
   label->setObjectName("H2");
-  mainGridLayout->addWidget(label,row,0);
+  mainGridLayout->addWidget(label, row, 0);
 
   ++row;
 
-  m_tubeSpacingEdit = new OSQuantityEdit(m_isIP);
-  connect(this, &ConstructionInternalSourceInspectorView::toggleUnitsClicked, m_tubeSpacingEdit, &OSQuantityEdit::onUnitSystemChange);
-  mainGridLayout->addWidget(m_tubeSpacingEdit,row,0);
+  m_tubeSpacingEdit = new OSQuantityEdit2("m","m","ft", m_isIP);
+  connect(this, &ConstructionInternalSourceInspectorView::toggleUnitsClicked, m_tubeSpacingEdit, &OSQuantityEdit2::onUnitSystemChange);
+  mainGridLayout->addWidget(m_tubeSpacingEdit, row, 0);
 
   ++row;
 
   // Stretch
 
-  mainGridLayout->setRowStretch(row,100);
+  mainGridLayout->setRowStretch(row, 100);
 
-  mainGridLayout->setColumnStretch(100,100);
+  mainGridLayout->setColumnStretch(100, 100);
 }
 
 void ConstructionInternalSourceInspectorView::onClearSelection()
 {
-  ModelObjectInspectorView::onClearSelection(); // call parent implementation
   detach();
+
+  this->stackedWidget()->setCurrentIndex(0);
 }
 
 void ConstructionInternalSourceInspectorView::onSelectModelObject(const openstudio::model::ModelObject& modelObject)
@@ -238,125 +210,66 @@ void ConstructionInternalSourceInspectorView::onSelectModelObject(const openstud
   detach();
   model::ConstructionWithInternalSource constructionWithInternalSource = modelObject.cast<model::ConstructionWithInternalSource>();
   attach(constructionWithInternalSource);
-  refresh();
-}
-
-void ConstructionInternalSourceInspectorView::onUpdate()
-{
-  refresh();
-}
-
-void ConstructionInternalSourceInspectorView::standardsConstructionTypeChanged(const QString & text)
-{
-  if (m_standardsInformation){
-    std::string standardsConstructionType = toString(text);
-    if (standardsConstructionType.empty()){
-      m_standardsInformation->resetStandardsConstructionType();
-    }else{
-      m_standardsInformation->setStandardsConstructionType(standardsConstructionType);
-    }
-    populateStandardsConstructionType();
-  }
-}
-
-void ConstructionInternalSourceInspectorView::editStandardsConstructionType(const QString & text)
-{
-  if (m_standardsInformation){
-    std::string standardsConstructionType = toString(text);
-    if (standardsConstructionType.empty()){
-      m_standardsInformation->resetStandardsConstructionType();
-    }else{
-      m_standardsInformation->setStandardsConstructionType(standardsConstructionType);
-    }
-  }
-}
-
-void ConstructionInternalSourceInspectorView::populateStandardsConstructionType()
-{
-
-  disconnect(m_standardsConstructionType, 0, this, 0);
-
-  m_standardsConstructionType->clear();
-  if (m_standardsInformation){
-    m_standardsConstructionType->addItem("");
-    std::vector<std::string> suggestedStandardsConstructionTypes = m_standardsInformation->suggestedStandardsConstructionTypes();
-    for (const std::string& standardsConstructionType : suggestedStandardsConstructionTypes) {
-      m_standardsConstructionType->addItem(toQString(standardsConstructionType));
-    }
-    boost::optional<std::string> standardsConstructionType = m_standardsInformation->standardsConstructionType();
-    if (standardsConstructionType){
-      OS_ASSERT(!suggestedStandardsConstructionTypes.empty());
-      m_standardsConstructionType->setCurrentIndex(1);
-    }else{
-      m_standardsConstructionType->setCurrentIndex(0);
-    }
-  }
-
-  connect(m_standardsConstructionType, static_cast<void (QComboBox::*)(const QString &)>(&QComboBox::currentIndexChanged), this, &ConstructionInternalSourceInspectorView::standardsConstructionTypeChanged);
-  connect(m_standardsConstructionType, &QComboBox::editTextChanged, this, &ConstructionInternalSourceInspectorView::editStandardsConstructionType);
-}
-
-void ConstructionInternalSourceInspectorView::attach(openstudio::model::ConstructionWithInternalSource & constructionWithInternalSource)
-{
-  m_nameEdit->bind(constructionWithInternalSource,"name");
-
-  m_sourcePresentAfterLayerNumberEdit->bind(constructionWithInternalSource,"sourcePresentAfterLayerNumber");
-  m_temperatureCalculationRequestedAfterLayerNumberEdit->bind(constructionWithInternalSource,"temperatureCalculationRequestedAfterLayerNumber");
-  m_dimensionsForTheCTFCalculationEdit->bind(constructionWithInternalSource,"dimensionsForTheCTFCalculation");
-
-  m_tubeSpacingEdit->bind(constructionWithInternalSource,"tubeSpacing",m_isIP);
-
-  m_constructionVC->attach(constructionWithInternalSource);
-  m_constructionVC->reportItems();
-
-  m_standardsInformation = constructionWithInternalSource.standardsInformation();
-
-  m_intendedSurfaceType->bind<std::string>(
-      *m_standardsInformation,
-      static_cast<std::string (*)(const std::string&)>(&openstudio::toString),
-      std::bind(&openstudio::model::StandardsInformationConstruction::intendedSurfaceTypeValues),
-      std::function<boost::optional<std::string> ()>(std::bind(&openstudio::model::StandardsInformationConstruction::intendedSurfaceType,m_standardsInformation.get_ptr())),
-      std::bind(&openstudio::model::StandardsInformationConstruction::setIntendedSurfaceType,m_standardsInformation.get_ptr(),std::placeholders::_1),
-      NoFailAction(std::bind(&model::StandardsInformationConstruction::resetIntendedSurfaceType,m_standardsInformation.get_ptr())));
-
-  connect(m_standardsInformation->getImpl<openstudio::model::detail::ModelObject_Impl>().get(), &openstudio::model::detail::ModelObject_Impl::onChange, this, &ConstructionInternalSourceInspectorView::populateStandardsConstructionType);
-
-  m_standardsConstructionType->setEnabled(true);
-  populateStandardsConstructionType();
 
   this->stackedWidget()->setCurrentIndex(1);
 }
 
+void ConstructionInternalSourceInspectorView::onUpdate()
+{
+  m_constructionVC->reportItems();
+}
+
+void ConstructionInternalSourceInspectorView::attach(openstudio::model::ConstructionWithInternalSource & constructionWithInternalSource)
+{
+  m_constructionWithInternalSource = constructionWithInternalSource;
+
+  m_nameEdit->bind(
+    *m_constructionWithInternalSource,
+    OptionalStringGetter(std::bind(&model::ConstructionWithInternalSource::name, m_constructionWithInternalSource.get_ptr(),true)),
+    boost::optional<StringSetter>(std::bind(&model::ConstructionWithInternalSource::setName, m_constructionWithInternalSource.get_ptr(),std::placeholders::_1))
+  );
+
+  m_sourcePresentAfterLayerNumberEdit->bind(
+    *m_constructionWithInternalSource,
+    OptionalIntGetter(std::bind(&model::ConstructionWithInternalSource::sourcePresentAfterLayerNumber, m_constructionWithInternalSource.get_ptr())),
+    boost::optional<IntSetter>(std::bind(&model::ConstructionWithInternalSource::setSourcePresentAfterLayerNumber, m_constructionWithInternalSource.get_ptr(), std::placeholders::_1))
+  );
+
+  m_temperatureCalculationRequestedAfterLayerNumberEdit->bind(
+    *m_constructionWithInternalSource,
+    OptionalIntGetter(std::bind(&model::ConstructionWithInternalSource::temperatureCalculationRequestedAfterLayerNumber,m_constructionWithInternalSource.get_ptr())),
+    boost::optional<IntSetter>(std::bind(&model::ConstructionWithInternalSource::setTemperatureCalculationRequestedAfterLayerNumber,m_constructionWithInternalSource.get_ptr(),std::placeholders::_1))
+  );
+
+  m_dimensionsForTheCTFCalculationEdit->bind(
+    *m_constructionWithInternalSource,
+    OptionalIntGetter(std::bind(&model::ConstructionWithInternalSource::dimensionsForTheCTFCalculation,m_constructionWithInternalSource.get_ptr())),
+    boost::optional<IntSetter>(std::bind(&model::ConstructionWithInternalSource::setDimensionsForTheCTFCalculation,m_constructionWithInternalSource.get_ptr(),std::placeholders::_1))
+  );
+
+  m_tubeSpacingEdit->bind(
+    m_isIP,
+    *m_constructionWithInternalSource,
+    DoubleGetter(std::bind(&model::ConstructionWithInternalSource::tubeSpacing, m_constructionWithInternalSource.get_ptr())),
+    boost::optional<DoubleSetter>(std::bind(static_cast<bool(model::ConstructionWithInternalSource::*)(double)>(&model::ConstructionWithInternalSource::setTubeSpacing), m_constructionWithInternalSource.get_ptr(), std::placeholders::_1))
+  );
+
+  m_constructionVC->attach(m_constructionWithInternalSource.get());
+  m_constructionVC->reportItems();
+  
+  m_standardsInformationWidget->attach(m_constructionWithInternalSource.get());
+}
+
 void ConstructionInternalSourceInspectorView::detach()
 {
-  this->stackedWidget()->setCurrentIndex(0);
-
-  m_constructionVC->detach();
-
-  m_nameEdit->unbind();
   m_sourcePresentAfterLayerNumberEdit->unbind();
   m_temperatureCalculationRequestedAfterLayerNumberEdit->unbind();
   m_dimensionsForTheCTFCalculationEdit->unbind();
   m_tubeSpacingEdit->unbind();
 
-  if (m_standardsInformation){
-    disconnect(m_standardsInformation->getImpl<openstudio::model::detail::ModelObject_Impl>().get(), 0, this, 0);
-    m_standardsInformation.reset();
-  }
+  m_standardsInformationWidget->detach();
 
-  m_intendedSurfaceType->unbind();
-
-  disconnect(m_standardsConstructionType, 0, this, 0);
-  m_standardsConstructionType->setEnabled(false);
-}
-
-void ConstructionInternalSourceInspectorView::refresh()
-{
-}
-
-void ConstructionInternalSourceInspectorView::toggleUnits(bool displayIP)
-{
-  m_isIP = displayIP;
+  m_constructionWithInternalSource = boost::none;
 }
 
 } // openstudio

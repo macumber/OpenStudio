@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "LocalLibraryController.hpp"
 
@@ -27,6 +36,9 @@
 #include "OSListView.hpp"
 #include "OSViewSwitcher.hpp"
 
+#include "../openstudio_lib/MainWindow.hpp"
+#include "../openstudio_lib/OSAppBase.hpp"
+#include "../openstudio_lib/OSDocument.hpp"
 #include "../openstudio_lib/OSItem.hpp"
 
 #include "MeasureBadge.hpp"
@@ -34,6 +46,7 @@
 #include "../utilities/bcl/LocalBCL.hpp"
 #include "../utilities/core/Assert.hpp"
 #include "../utilities/core/Compare.hpp"
+#include "../utilities/core/PathHelpers.hpp"
 
 #include <OpenStudio.hxx>
 
@@ -44,6 +57,7 @@
 #include <QDrag>
 #include <QFile>
 #include <QLabel>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QSettings>
 #include <QVariant>
@@ -145,8 +159,13 @@ void LocalLibraryController::showMeasures()
 void LocalLibraryController::showMyMeasuresFolder()
 {
   openstudio::path userMeasuresDir = BCLMeasure::userMeasuresDir();
-  QString path = QDir::toNativeSeparators(toQString(userMeasuresDir));
-  QDesktopServices::openUrl(QUrl("file:///" + path));
+
+  if (isNetworkPath(userMeasuresDir) && !isNetworkPathAvailable(userMeasuresDir)) {
+    QMessageBox::information(QApplication::activeWindow(), "Cannot Open Directory", "Your My Measures Directory appears to be on a network drive that is not currently available.\nYou can change your specified My Measures Directory using 'Preferences->Change My Measures Directory'.", QMessageBox::Ok);
+  } else {
+    QString path = QDir::toNativeSeparators(toQString(userMeasuresDir));
+    QDesktopServices::openUrl(QUrl("file:///" + path));
+  }
 }
 
 QSharedPointer<LibraryTypeListController> LocalLibraryController::createLibraryListController(const QDomDocument & taxonomy, LocalLibrary::LibrarySource source)
@@ -214,7 +233,7 @@ QWidget * LibraryTypeItemDelegate::view(QSharedPointer<OSListItem> dataSource)
 { 
   if(QSharedPointer<LibraryTypeItem> item = dataSource.dynamicCast<LibraryTypeItem>())
   {
-    auto groupCollapsibleView = new OSCollapsibleView(nullptr);
+    auto groupCollapsibleView = new OSCollapsibleView();
 
     auto header = new DarkGradientHeader(); 
     header->label->setText(item->name());
@@ -287,7 +306,7 @@ QWidget * LibraryGroupItemDelegate::view(QSharedPointer<OSListItem> dataSource)
 { 
   if(QSharedPointer<LibraryGroupItem> item = dataSource.dynamicCast<LibraryGroupItem>())
   {
-    auto groupCollapsibleView = new OSCollapsibleView(nullptr);
+    auto groupCollapsibleView = new OSCollapsibleView();
 
     auto header = new LibraryGroupItemHeader(); 
     header->label->setText(item->name());
@@ -365,7 +384,7 @@ QWidget * LibrarySubGroupItemDelegate::view(QSharedPointer<OSListItem> dataSourc
 { 
   if(QSharedPointer<LibrarySubGroupItem> item = dataSource.dynamicCast<LibrarySubGroupItem>())
   {
-    auto subGroupCollapsibleView = new OSCollapsibleView(nullptr);
+    auto subGroupCollapsibleView = new OSCollapsibleView();
 
     auto header = new LibrarySubGroupItemHeader(); 
 
@@ -438,34 +457,103 @@ LibraryItem::LibraryItem(const BCLMeasure & bclMeasure, LocalLibrary::LibrarySou
   m_source(source),
   m_app(t_app)
 {
-  std::string componentVersion;
-  for (const BCLFileReference & file : bclMeasure.files()) {
-    if (file.usageType() == "script" && file.softwareProgram() == "OpenStudio"){
-      componentVersion = file.softwareProgramVersion();
+  boost::optional<VersionString> minCompatibleVersion;
+  boost::optional<VersionString> maxCompatibleVersion;
+  Q_FOREACH(const BCLFileReference & fileReference, bclMeasure.files()){
+    if (fileReference.usageType() == "script" && fileReference.softwareProgram() == "OpenStudio"){
+      minCompatibleVersion = fileReference.minCompatibleVersion();
+      maxCompatibleVersion = fileReference.maxCompatibleVersion();
+
+      if (!minCompatibleVersion){
+        try{
+          minCompatibleVersion = VersionString(fileReference.softwareProgramVersion());
+        } catch (const std::exception&){
+        }
+      }
       break;
     }
   }
-  if (componentVersion.empty() || VersionString(componentVersion) > VersionString(openStudioVersion())){
+
+  VersionString currentVersion(openStudioVersion());
+  if (minCompatibleVersion && (*minCompatibleVersion) > currentVersion){
     m_available = false;
-  }else{
+  } else if (maxCompatibleVersion && (*maxCompatibleVersion) < currentVersion){
+    m_available = false;
+  } else{
     m_available = true;
   }
 }
 
+LibraryItem::~LibraryItem()
+{}
+
+bool LibraryItem::hasError() const
+{
+  return m_bclMeasure.error();
+}
+
+QString LibraryItem::name() const 
+{ 
+  return QString::fromStdString(m_bclMeasure.name()); 
+}
+
+QString LibraryItem::displayName() const
+{
+  return QString::fromStdString(m_bclMeasure.displayName());
+}
+
+QString LibraryItem::className() const
+{
+  return QString::fromStdString(m_bclMeasure.className());
+}
+
+QString LibraryItem::description() const
+{
+  return QString::fromStdString(m_bclMeasure.description());
+}
+
+QString LibraryItem::modelerDescription() const
+{
+  return QString::fromStdString(m_bclMeasure.modelerDescription());
+}
+
+QString LibraryItem::error() const
+{
+  QString result;
+  if (m_bclMeasure.error()){
+    result = toQString(m_bclMeasure.error().get());
+  }
+  return result;
+}
+
+UUID LibraryItem::uuid() const 
+{ 
+  return m_bclMeasure.uuid(); 
+}
+
+bool LibraryItem::isAvailable() const 
+{ 
+  return m_available; 
+}
+
 void LibraryItem::dragItem(const OSDragPixmapData & dragPixmapData)
 {
-  MeasureDragData measureDragData(m_bclMeasure.uuid());
+  // DLM: I think we want to allow user to drag in measure with error because that is the best 
+  // way currently to allow them to inspect the error
+  //if (!m_bclMeasure.error()){
+    MeasureDragData measureDragData(m_bclMeasure.uuid());
 
-  auto drag = new QDrag(m_app->mainWidget());
+    auto drag = new QDrag(m_app->mainWidget());
 
-  auto mimeData = new QMimeData;
-  mimeData->setData(MeasureDragData::mimeType(m_bclMeasure.measureType()), measureDragData.data());
-  drag->setMimeData(mimeData);
+    auto mimeData = new QMimeData;
+    mimeData->setData(MeasureDragData::mimeType(m_bclMeasure.measureType()), measureDragData.data());
+    drag->setMimeData(mimeData);
 
-  drag->setPixmap(dragPixmapData.pixmap);
-  drag->setHotSpot(dragPixmapData.hotSpot);
+    drag->setPixmap(dragPixmapData.pixmap);
+    drag->setHotSpot(dragPixmapData.hotSpot);
 
-  drag->exec(Qt::CopyAction);
+    drag->exec(Qt::CopyAction);
+  //}
 }
 
 LibraryItemDelegate::LibraryItemDelegate(BaseApp *t_app)
@@ -481,7 +569,7 @@ QWidget * LibraryItemDelegate::view(QSharedPointer<OSListItem> dataSource)
     MeasureType measureType = libraryItem->m_bclMeasure.measureType();
 
     // NOTE: replaces needed to trim unwanted curly braces
-    QString measureUUID = libraryItem->m_bclMeasure.uuid().toString().replace("{", "").replace("}", "").toStdString().c_str();
+    QString measureUUID = toQString(libraryItem->m_bclMeasure.uuid()).replace("{", "").replace("}", "");
 
     std::vector<std::string> localUUIDs = (LocalBCL::instance().measureUids());
 
@@ -498,14 +586,27 @@ QWidget * LibraryItemDelegate::view(QSharedPointer<OSListItem> dataSource)
       widget->m_measureTypeBadge->setVisible(true);
     }
 
-    if(libraryItem->m_source == LocalLibrary::BCL){
+    if (libraryItem->m_source == LocalLibrary::BCL){
       widget->m_measureBadge->setMeasureBadgeType(MeasureBadgeType::BCLMeasure);
+    } else if (libraryItem->m_source == LocalLibrary::USER){
+      widget->m_measureBadge->setMeasureBadgeType(MeasureBadgeType::MyMeasure);
+    }else if(libraryItem->m_source == LocalLibrary::OS){
+      widget->m_measureBadge->setMeasureBadgeType(MeasureBadgeType::OSMeasure);
+    } else{
+      //DLM: this should not happen, LocalLibrary::COMBINED
+      // libraryItem->m_source;
     }
 
     // Name
 
-    widget->label->setText(libraryItem->name());
-    widget->setToolTip(libraryItem->name());
+    widget->label->setText(libraryItem->displayName());
+    if (libraryItem->hasError()){
+      widget->setToolTip(libraryItem->error());
+      widget->errorLabel->setVisible(true);
+    }else{
+      widget->setToolTip(libraryItem->description());
+      widget->errorLabel->setVisible(false);
+    }
 
     // Drag
     
@@ -610,14 +711,12 @@ void LibraryListController::createItems()
 
   // create items
   openstudio::path userMeasuresDir = BCLMeasure::userMeasuresDir();
+
   for( const auto & measure : measures )
   {
     if( m_taxonomyTag.compare(QString::fromStdString(measure.taxonomyTag()),Qt::CaseInsensitive) == 0 )
     {
-      // cannot use measures that rely on SketchUpAPI in this application
-      if (measure.usesSketchUpAPI()){
-        continue;
-      }
+      // filter on any measure attributes we want
 
       LocalLibrary::LibrarySource source = m_source;
       if (source == LocalLibrary::COMBINED){

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "SizingSystem.hpp"
 #include "SizingSystem_Impl.hpp"
@@ -24,7 +33,9 @@
 #include "Model.hpp"
 #include "Model_Impl.hpp"
 #include <utilities/idd/IddFactory.hxx>
+
 #include <utilities/idd/OS_Sizing_System_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 #include "../utilities/core/Assert.hpp"
 
 namespace openstudio {
@@ -234,6 +245,122 @@ bool SizingSystem_Impl::isSystemOutdoorAirMethodDefaulted() const {
   return isEmpty(OS_Sizing_SystemFields::SystemOutdoorAirMethod);
 }
 
+double SizingSystem_Impl::zoneMaximumOutdoorAirFraction() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::ZoneMaximumOutdoorAirFraction,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::coolingSupplyAirFlowRatePerFloorArea() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::CoolingSupplyAirFlowRatePerFloorArea,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::coolingFractionofAutosizedCoolingSupplyAirFlowRate() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::CoolingFractionofAutosizedCoolingSupplyAirFlowRate,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::coolingSupplyAirFlowRatePerUnitCoolingCapacity() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::CoolingSupplyAirFlowRatePerUnitCoolingCapacity,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::heatingSupplyAirFlowRatePerFloorArea() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::HeatingSupplyAirFlowRatePerFloorArea,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::heatingFractionofAutosizedHeatingSupplyAirFlowRate() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::HeatingFractionofAutosizedHeatingSupplyAirFlowRate,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::heatingFractionofAutosizedCoolingSupplyAirFlowRate() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::HeatingFractionofAutosizedCoolingSupplyAirFlowRate,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::heatingSupplyAirFlowRatePerUnitHeatingCapacity() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::HeatingSupplyAirFlowRatePerUnitHeatingCapacity,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+std::string SizingSystem_Impl::coolingDesignCapacityMethod() const {
+  boost::optional<std::string> value = getString(OS_Sizing_SystemFields::CoolingDesignCapacityMethod,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+boost::optional<double> SizingSystem_Impl::coolingDesignCapacity() const {
+  return getDouble(OS_Sizing_SystemFields::CoolingDesignCapacity,true);
+}
+
+bool SizingSystem_Impl::isCoolingDesignCapacityAutosized() const {
+  bool result = false;
+  boost::optional<std::string> value = getString(OS_Sizing_SystemFields::CoolingDesignCapacity, true);
+  if (value) {
+    result = openstudio::istringEqual(value.get(), "autosize");
+  }
+  return result;
+}
+
+double SizingSystem_Impl::coolingDesignCapacityPerFloorArea() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::CoolingDesignCapacityPerFloorArea,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::fractionofAutosizedCoolingDesignCapacity() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::FractionofAutosizedCoolingDesignCapacity,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+std::string SizingSystem_Impl::heatingDesignCapacityMethod() const {
+  boost::optional<std::string> value = getString(OS_Sizing_SystemFields::HeatingDesignCapacityMethod,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+boost::optional<double> SizingSystem_Impl::heatingDesignCapacity() const {
+  return getDouble(OS_Sizing_SystemFields::HeatingDesignCapacity,true);
+}
+
+bool SizingSystem_Impl::isHeatingDesignCapacityAutosized() const {
+  bool result = false;
+  boost::optional<std::string> value = getString(OS_Sizing_SystemFields::HeatingDesignCapacity, true);
+  if (value) {
+    result = openstudio::istringEqual(value.get(), "autosize");
+  }
+  return result;
+}
+
+double SizingSystem_Impl::heatingDesignCapacityPerFloorArea() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::HeatingDesignCapacityPerFloorArea,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+double SizingSystem_Impl::fractionofAutosizedHeatingDesignCapacity() const {
+  boost::optional<double> value = getDouble(OS_Sizing_SystemFields::FractionofAutosizedHeatingDesignCapacity,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+std::string SizingSystem_Impl::centralCoolingCapacityControlMethod() const {
+  boost::optional<std::string> value = getString(OS_Sizing_SystemFields::CentralCoolingCapacityControlMethod,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
 bool SizingSystem_Impl::setTypeofLoadtoSizeOn(std::string typeofLoadtoSizeOn) {
   bool result = setString(OS_Sizing_SystemFields::TypeofLoadtoSizeOn, typeofLoadtoSizeOn);
   return result;
@@ -409,6 +536,107 @@ void SizingSystem_Impl::resetSystemOutdoorAirMethod() {
   OS_ASSERT(result);
 }
 
+bool SizingSystem_Impl::setZoneMaximumOutdoorAirFraction(double zoneMaximumOutdoorAirFraction) {
+  bool result = setDouble(OS_Sizing_SystemFields::ZoneMaximumOutdoorAirFraction, zoneMaximumOutdoorAirFraction);
+  return result;
+}
+
+bool SizingSystem_Impl::setCoolingSupplyAirFlowRatePerFloorArea(double coolingSupplyAirFlowRatePerFloorArea) {
+  bool result = setDouble(OS_Sizing_SystemFields::CoolingSupplyAirFlowRatePerFloorArea, coolingSupplyAirFlowRatePerFloorArea);
+  return result;
+}
+
+bool SizingSystem_Impl::setCoolingFractionofAutosizedCoolingSupplyAirFlowRate(double coolingFractionofAutosizedCoolingSupplyAirFlowRate) {
+  bool result = setDouble(OS_Sizing_SystemFields::CoolingFractionofAutosizedCoolingSupplyAirFlowRate, coolingFractionofAutosizedCoolingSupplyAirFlowRate);
+  return result;
+}
+
+bool SizingSystem_Impl::setCoolingSupplyAirFlowRatePerUnitCoolingCapacity(double coolingSupplyAirFlowRatePerUnitCoolingCapacity) {
+  bool result = setDouble(OS_Sizing_SystemFields::CoolingSupplyAirFlowRatePerUnitCoolingCapacity, coolingSupplyAirFlowRatePerUnitCoolingCapacity);
+  return result;
+}
+
+bool SizingSystem_Impl::setHeatingSupplyAirFlowRatePerFloorArea(double heatingSupplyAirFlowRatePerFloorArea) {
+  bool result = setDouble(OS_Sizing_SystemFields::HeatingSupplyAirFlowRatePerFloorArea, heatingSupplyAirFlowRatePerFloorArea);
+  return result;
+}
+
+bool SizingSystem_Impl::setHeatingFractionofAutosizedHeatingSupplyAirFlowRate(double heatingFractionofAutosizedHeatingSupplyAirFlowRate) {
+  bool result = setDouble(OS_Sizing_SystemFields::HeatingFractionofAutosizedHeatingSupplyAirFlowRate, heatingFractionofAutosizedHeatingSupplyAirFlowRate);
+  return result;
+}
+
+bool SizingSystem_Impl::setHeatingFractionofAutosizedCoolingSupplyAirFlowRate(double heatingFractionofAutosizedCoolingSupplyAirFlowRate) {
+  bool result = setDouble(OS_Sizing_SystemFields::HeatingFractionofAutosizedCoolingSupplyAirFlowRate, heatingFractionofAutosizedCoolingSupplyAirFlowRate);
+  return result;
+}
+
+bool SizingSystem_Impl::setHeatingSupplyAirFlowRatePerUnitHeatingCapacity(double heatingSupplyAirFlowRatePerUnitHeatingCapacity) {
+  bool result = setDouble(OS_Sizing_SystemFields::HeatingSupplyAirFlowRatePerUnitHeatingCapacity, heatingSupplyAirFlowRatePerUnitHeatingCapacity);
+  return result;
+}
+
+bool SizingSystem_Impl::setCoolingDesignCapacityMethod(std::string coolingDesignCapacityMethod) {
+  bool result = setString(OS_Sizing_SystemFields::CoolingDesignCapacityMethod, coolingDesignCapacityMethod);
+  return result;
+}
+
+bool SizingSystem_Impl::setCoolingDesignCapacity(boost::optional<double> coolingDesignCapacity) {
+  bool result(false);
+  if (coolingDesignCapacity) {
+    result = setDouble(OS_Sizing_SystemFields::CoolingDesignCapacity, coolingDesignCapacity.get());
+  }
+  return result;
+}
+
+void SizingSystem_Impl::autosizeCoolingDesignCapacity() {
+  bool result = setString(OS_Sizing_SystemFields::CoolingDesignCapacity, "autosize");
+  OS_ASSERT(result);
+}
+
+bool SizingSystem_Impl::setCoolingDesignCapacityPerFloorArea(double coolingDesignCapacityPerFloorArea) {
+  bool result = setDouble(OS_Sizing_SystemFields::CoolingDesignCapacityPerFloorArea, coolingDesignCapacityPerFloorArea);
+  return result;
+}
+
+bool SizingSystem_Impl::setFractionofAutosizedCoolingDesignCapacity(double fractionofAutosizedCoolingDesignCapacity) {
+  bool result = setDouble(OS_Sizing_SystemFields::FractionofAutosizedCoolingDesignCapacity, fractionofAutosizedCoolingDesignCapacity);
+  return result;
+}
+
+bool SizingSystem_Impl::setHeatingDesignCapacityMethod(std::string heatingDesignCapacityMethod) {
+  bool result = setString(OS_Sizing_SystemFields::HeatingDesignCapacityMethod, heatingDesignCapacityMethod);
+  return result;
+}
+
+bool SizingSystem_Impl::setHeatingDesignCapacity(boost::optional<double> heatingDesignCapacity) {
+  bool result(false);
+  if (heatingDesignCapacity) {
+    result = setDouble(OS_Sizing_SystemFields::HeatingDesignCapacity, heatingDesignCapacity.get());
+  }
+  return result;
+}
+
+void SizingSystem_Impl::autosizeHeatingDesignCapacity() {
+  bool result = setString(OS_Sizing_SystemFields::HeatingDesignCapacity, "autosize");
+  OS_ASSERT(result);
+}
+
+bool SizingSystem_Impl::setHeatingDesignCapacityPerFloorArea(double heatingDesignCapacityPerFloorArea) {
+  bool result = setDouble(OS_Sizing_SystemFields::HeatingDesignCapacityPerFloorArea, heatingDesignCapacityPerFloorArea);
+  return result;
+}
+
+bool SizingSystem_Impl::setFractionofAutosizedHeatingDesignCapacity(double fractionofAutosizedHeatingDesignCapacity) {
+  bool result = setDouble(OS_Sizing_SystemFields::FractionofAutosizedHeatingDesignCapacity, fractionofAutosizedHeatingDesignCapacity);
+  return result;
+}
+
+bool SizingSystem_Impl::setCentralCoolingCapacityControlMethod(std::string centralCoolingCapacityControlMethod) {
+  bool result = setString(OS_Sizing_SystemFields::CentralCoolingCapacityControlMethod, centralCoolingCapacityControlMethod);
+  return result;
+}
+
 AirLoopHVAC SizingSystem_Impl::airLoopHVAC() const
 {
   WorkspaceObject wo = getTarget(OS_Sizing_SystemFields::AirLoopName).get();
@@ -435,7 +663,6 @@ SizingSystem::SizingSystem(const Model& model, const AirLoopHVAC & airLoopHVAC)
 
   setAirLoopHVAC(airLoopHVAC);
 
-  //these default sizing:system settings are suitable for a multizone VAV system.
   setTypeofLoadtoSizeOn("Sensible");
   autosizeDesignOutdoorAirFlowRate();
   setMinimumSystemAirFlowRatio(0.3);
@@ -455,7 +682,23 @@ SizingSystem::SizingSystem(const Model& model, const AirLoopHVAC & airLoopHVAC)
   setHeatingDesignAirFlowMethod("DesignDay");
   setHeatingDesignAirFlowRate(0.0);
   setSystemOutdoorAirMethod("ZoneSum");
-
+  setZoneMaximumOutdoorAirFraction(1.0);
+  setCoolingSupplyAirFlowRatePerFloorArea(9.9676501E-3);
+  setCoolingFractionofAutosizedCoolingSupplyAirFlowRate(1.0);
+  setCoolingSupplyAirFlowRatePerUnitCoolingCapacity(3.9475456E-5);
+  setHeatingSupplyAirFlowRatePerFloorArea(9.9676501E-3);
+  setHeatingFractionofAutosizedHeatingSupplyAirFlowRate(1.0);
+  setHeatingFractionofAutosizedCoolingSupplyAirFlowRate(1.0);
+  setHeatingSupplyAirFlowRatePerUnitHeatingCapacity(3.1588213E-5);
+  setCoolingDesignCapacityMethod("CoolingDesignCapacity");
+  autosizeCoolingDesignCapacity();
+  setCoolingDesignCapacityPerFloorArea(234.7);
+  setFractionofAutosizedCoolingDesignCapacity(1.0);
+  setHeatingDesignCapacityMethod("HeatingDesignCapacity");
+  autosizeHeatingDesignCapacity();
+  setHeatingDesignCapacityPerFloorArea(157.0);
+  setFractionofAutosizedHeatingDesignCapacity(1.0);
+  setCentralCoolingCapacityControlMethod("OnOff");
 }
 
 IddObjectType SizingSystem::iddObjectType() {
@@ -616,6 +859,82 @@ bool SizingSystem::isSystemOutdoorAirMethodDefaulted() const {
   return getImpl<detail::SizingSystem_Impl>()->isSystemOutdoorAirMethodDefaulted();
 }
 
+double SizingSystem::zoneMaximumOutdoorAirFraction() const {
+  return getImpl<detail::SizingSystem_Impl>()->zoneMaximumOutdoorAirFraction();
+}
+
+double SizingSystem::coolingSupplyAirFlowRatePerFloorArea() const {
+  return getImpl<detail::SizingSystem_Impl>()->coolingSupplyAirFlowRatePerFloorArea();
+}
+
+double SizingSystem::coolingFractionofAutosizedCoolingSupplyAirFlowRate() const {
+  return getImpl<detail::SizingSystem_Impl>()->coolingFractionofAutosizedCoolingSupplyAirFlowRate();
+}
+
+double SizingSystem::coolingSupplyAirFlowRatePerUnitCoolingCapacity() const {
+  return getImpl<detail::SizingSystem_Impl>()->coolingSupplyAirFlowRatePerUnitCoolingCapacity();
+}
+
+double SizingSystem::heatingSupplyAirFlowRatePerFloorArea() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingSupplyAirFlowRatePerFloorArea();
+}
+
+double SizingSystem::heatingFractionofAutosizedHeatingSupplyAirFlowRate() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingFractionofAutosizedHeatingSupplyAirFlowRate();
+}
+
+double SizingSystem::heatingFractionofAutosizedCoolingSupplyAirFlowRate() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingFractionofAutosizedCoolingSupplyAirFlowRate();
+}
+
+double SizingSystem::heatingSupplyAirFlowRatePerUnitHeatingCapacity() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingSupplyAirFlowRatePerUnitHeatingCapacity();
+}
+
+std::string SizingSystem::coolingDesignCapacityMethod() const {
+  return getImpl<detail::SizingSystem_Impl>()->coolingDesignCapacityMethod();
+}
+
+boost::optional<double> SizingSystem::coolingDesignCapacity() const {
+  return getImpl<detail::SizingSystem_Impl>()->coolingDesignCapacity();
+}
+
+bool SizingSystem::isCoolingDesignCapacityAutosized() const {
+  return getImpl<detail::SizingSystem_Impl>()->isCoolingDesignCapacityAutosized();
+}
+
+double SizingSystem::coolingDesignCapacityPerFloorArea() const {
+  return getImpl<detail::SizingSystem_Impl>()->coolingDesignCapacityPerFloorArea();
+}
+
+double SizingSystem::fractionofAutosizedCoolingDesignCapacity() const {
+  return getImpl<detail::SizingSystem_Impl>()->fractionofAutosizedCoolingDesignCapacity();
+}
+
+std::string SizingSystem::heatingDesignCapacityMethod() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingDesignCapacityMethod();
+}
+
+boost::optional<double> SizingSystem::heatingDesignCapacity() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingDesignCapacity();
+}
+
+bool SizingSystem::isHeatingDesignCapacityAutosized() const {
+  return getImpl<detail::SizingSystem_Impl>()->isHeatingDesignCapacityAutosized();
+}
+
+double SizingSystem::heatingDesignCapacityPerFloorArea() const {
+  return getImpl<detail::SizingSystem_Impl>()->heatingDesignCapacityPerFloorArea();
+}
+
+double SizingSystem::fractionofAutosizedHeatingDesignCapacity() const {
+  return getImpl<detail::SizingSystem_Impl>()->fractionofAutosizedHeatingDesignCapacity();
+}
+
+std::string SizingSystem::centralCoolingCapacityControlMethod() const {
+  return getImpl<detail::SizingSystem_Impl>()->centralCoolingCapacityControlMethod();
+}
+
 bool SizingSystem::setTypeofLoadtoSizeOn(std::string typeofLoadtoSizeOn) {
   return getImpl<detail::SizingSystem_Impl>()->setTypeofLoadtoSizeOn(typeofLoadtoSizeOn);
 }
@@ -742,6 +1061,82 @@ bool SizingSystem::setSystemOutdoorAirMethod(std::string systemOutdoorAirMethod)
 
 void SizingSystem::resetSystemOutdoorAirMethod() {
   getImpl<detail::SizingSystem_Impl>()->resetSystemOutdoorAirMethod();
+}
+
+bool SizingSystem::setZoneMaximumOutdoorAirFraction(double zoneMaximumOutdoorAirFraction) {
+  return getImpl<detail::SizingSystem_Impl>()->setZoneMaximumOutdoorAirFraction(zoneMaximumOutdoorAirFraction);
+}
+
+bool SizingSystem::setCoolingSupplyAirFlowRatePerFloorArea(double coolingSupplyAirFlowRatePerFloorArea) {
+  return getImpl<detail::SizingSystem_Impl>()->setCoolingSupplyAirFlowRatePerFloorArea(coolingSupplyAirFlowRatePerFloorArea);
+}
+
+bool SizingSystem::setCoolingFractionofAutosizedCoolingSupplyAirFlowRate(double coolingFractionofAutosizedCoolingSupplyAirFlowRate) {
+  return getImpl<detail::SizingSystem_Impl>()->setCoolingFractionofAutosizedCoolingSupplyAirFlowRate(coolingFractionofAutosizedCoolingSupplyAirFlowRate);
+}
+
+bool SizingSystem::setCoolingSupplyAirFlowRatePerUnitCoolingCapacity(double coolingSupplyAirFlowRatePerUnitCoolingCapacity) {
+  return getImpl<detail::SizingSystem_Impl>()->setCoolingSupplyAirFlowRatePerUnitCoolingCapacity(coolingSupplyAirFlowRatePerUnitCoolingCapacity);
+}
+
+bool SizingSystem::setHeatingSupplyAirFlowRatePerFloorArea(double heatingSupplyAirFlowRatePerFloorArea) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingSupplyAirFlowRatePerFloorArea(heatingSupplyAirFlowRatePerFloorArea);
+}
+
+bool SizingSystem::setHeatingFractionofAutosizedHeatingSupplyAirFlowRate(double heatingFractionofAutosizedHeatingSupplyAirFlowRate) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingFractionofAutosizedHeatingSupplyAirFlowRate(heatingFractionofAutosizedHeatingSupplyAirFlowRate);
+}
+
+bool SizingSystem::setHeatingFractionofAutosizedCoolingSupplyAirFlowRate(double heatingFractionofAutosizedCoolingSupplyAirFlowRate) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingFractionofAutosizedCoolingSupplyAirFlowRate(heatingFractionofAutosizedCoolingSupplyAirFlowRate);
+}
+
+bool SizingSystem::setHeatingSupplyAirFlowRatePerUnitHeatingCapacity(double heatingSupplyAirFlowRatePerUnitHeatingCapacity) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingSupplyAirFlowRatePerUnitHeatingCapacity(heatingSupplyAirFlowRatePerUnitHeatingCapacity);
+}
+
+bool SizingSystem::setCoolingDesignCapacityMethod(std::string coolingDesignCapacityMethod) {
+  return getImpl<detail::SizingSystem_Impl>()->setCoolingDesignCapacityMethod(coolingDesignCapacityMethod);
+}
+
+bool SizingSystem::setCoolingDesignCapacity(double coolingDesignCapacity) {
+  return getImpl<detail::SizingSystem_Impl>()->setCoolingDesignCapacity(coolingDesignCapacity);
+}
+
+void SizingSystem::autosizeCoolingDesignCapacity() {
+  getImpl<detail::SizingSystem_Impl>()->autosizeCoolingDesignCapacity();
+}
+
+bool SizingSystem::setCoolingDesignCapacityPerFloorArea(double coolingDesignCapacityPerFloorArea) {
+  return getImpl<detail::SizingSystem_Impl>()->setCoolingDesignCapacityPerFloorArea(coolingDesignCapacityPerFloorArea);
+}
+
+bool SizingSystem::setFractionofAutosizedCoolingDesignCapacity(double fractionofAutosizedCoolingDesignCapacity) {
+  return getImpl<detail::SizingSystem_Impl>()->setFractionofAutosizedCoolingDesignCapacity(fractionofAutosizedCoolingDesignCapacity);
+}
+
+bool SizingSystem::setHeatingDesignCapacityMethod(std::string heatingDesignCapacityMethod) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingDesignCapacityMethod(heatingDesignCapacityMethod);
+}
+
+bool SizingSystem::setHeatingDesignCapacity(double heatingDesignCapacity) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingDesignCapacity(heatingDesignCapacity);
+}
+
+void SizingSystem::autosizeHeatingDesignCapacity() {
+  getImpl<detail::SizingSystem_Impl>()->autosizeHeatingDesignCapacity();
+}
+
+bool SizingSystem::setHeatingDesignCapacityPerFloorArea(double heatingDesignCapacityPerFloorArea) {
+  return getImpl<detail::SizingSystem_Impl>()->setHeatingDesignCapacityPerFloorArea(heatingDesignCapacityPerFloorArea);
+}
+
+bool SizingSystem::setFractionofAutosizedHeatingDesignCapacity(double fractionofAutosizedHeatingDesignCapacity) {
+  return getImpl<detail::SizingSystem_Impl>()->setFractionofAutosizedHeatingDesignCapacity(fractionofAutosizedHeatingDesignCapacity);
+}
+
+bool SizingSystem::setCentralCoolingCapacityControlMethod(std::string centralCoolingCapacityControlMethod) {
+  return getImpl<detail::SizingSystem_Impl>()->setCentralCoolingCapacityControlMethod(centralCoolingCapacityControlMethod);
 }
 
 AirLoopHVAC SizingSystem::airLoopHVAC() const

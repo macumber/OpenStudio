@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "OSQuantityVector.hpp"
 #include "Quantity.hpp"
@@ -89,7 +98,7 @@ UnitSystem OSQuantityVector::system() const {
   return m_units.system();
 }
 
-const Scale& OSQuantityVector::scale() const {
+Scale OSQuantityVector::scale() const {
   return m_units.scale();
 }
 
@@ -228,9 +237,18 @@ void OSQuantityVector::lbfToLbm() {
 }
 
 OSQuantityVector& OSQuantityVector::operator+=(OSQuantityVector rVector) {
+
   if (this == &rVector) {
     (*this) *= 2.0;
     return *this;
+  }
+
+  if (isTemperature() && rVector.isTemperature()) {
+    if (!isAbsolute() && rVector.isAbsolute()) {
+      setAsAbsolute();
+    }else if (isAbsolute() && !rVector.isAbsolute()) {
+      rVector.setAsAbsolute();
+    }
   }
 
   if (units() != rVector.units()) {
@@ -252,16 +270,19 @@ OSQuantityVector& OSQuantityVector::operator+=(OSQuantityVector rVector) {
     m_values[i] += rValues[i];
   }
 
-  if (isTemperature() && rVector.isTemperature()) {
-    if (!isAbsolute() && rVector.isAbsolute()) {
-      setAsAbsolute();
-    }
-  }
-
   return *this;
 }
 
 OSQuantityVector& OSQuantityVector::operator+=(Quantity rQuantity) {
+
+  if (isTemperature() && rQuantity.isTemperature()) {
+    if (!isAbsolute() && rQuantity.isAbsolute()) {
+      setAsAbsolute();
+    } else if (isAbsolute() && !rQuantity.isAbsolute()) {
+      rQuantity.setAsAbsolute();
+    }
+  }
+
   if (units() != rQuantity.units()) {
     LOG_AND_THROW("Cannot add OSQuantityVector and Quantity with different units (" << units()
                   << " and " << rQuantity.units() << ").");
@@ -276,21 +297,32 @@ OSQuantityVector& OSQuantityVector::operator+=(Quantity rQuantity) {
     m_values[i] += value;
   }
 
-  if (isTemperature() && rQuantity.isTemperature()) {
-    if (!isAbsolute() && rQuantity.isAbsolute()) {
-      setAsAbsolute();
-    }
-  }
-
   return *this;
 }
 
 OSQuantityVector& OSQuantityVector::operator-=(OSQuantityVector rVector) {
+
   unsigned n = size();
   if (this == &rVector) {
     clear();
     resize(n,0.0);
     return *this;
+  }
+
+  if (isTemperature() && rVector.isTemperature()) {
+    if (isAbsolute() && rVector.isAbsolute()) {
+      // units must be the same, check that exponent on this is 1
+      std::vector<std::string> bus = m_units.baseUnits();
+      assert(bus.size() == 1);
+      if (m_units.baseUnitExponent(bus[0]) == 1) {
+        setAsRelative();
+        rVector.setAsRelative();
+      }
+    } else if (!isAbsolute() && rVector.isAbsolute()) {
+      setAsAbsolute();
+    } else if (isAbsolute() && !rVector.isAbsolute()) {
+      rVector.setAsAbsolute();
+    }
   }
 
   if (units() != rVector.units()) {
@@ -311,24 +343,27 @@ OSQuantityVector& OSQuantityVector::operator-=(OSQuantityVector rVector) {
     m_values[i] -= rValues[i];
   }
 
-  if (isTemperature() && rVector.isTemperature()) {
-    if (isAbsolute() && rVector.isAbsolute()) {
+  return *this;
+}
+
+OSQuantityVector& OSQuantityVector::operator-=(Quantity rQuantity) {
+
+  if (isTemperature() && rQuantity.isTemperature()) {
+    if (isAbsolute() && rQuantity.isAbsolute()) {
       // units must be the same, check that exponent on this is 1
       std::vector<std::string> bus = m_units.baseUnits();
       assert(bus.size() == 1);
       if (m_units.baseUnitExponent(bus[0]) == 1) {
         setAsRelative();
+        rQuantity.setAsRelative();
       }
-    }
-    else if (!isAbsolute() && rVector.isAbsolute()) {
+    } else if (!isAbsolute() && rQuantity.isAbsolute()) {
       setAsAbsolute();
+    } else if (isAbsolute() && !rQuantity.isAbsolute()) {
+      rQuantity.setAsAbsolute();
     }
   }
 
-  return *this;
-}
-
-OSQuantityVector& OSQuantityVector::operator-=(Quantity rQuantity) {
   if (units() != rQuantity.units()) {
     LOG_AND_THROW("Cannot subtract OSQuantityVector and Quantity with different units (" << units()
                   << " and " << rQuantity.units() << ").");
@@ -341,20 +376,6 @@ OSQuantityVector& OSQuantityVector::operator-=(Quantity rQuantity) {
   double value = rQuantity.value();
   for (unsigned i = 0, n = size(); i < n; ++i) {
     m_values[i] -= value;
-  }
-
-  if (isTemperature() && rQuantity.isTemperature()) {
-    if (isAbsolute() && rQuantity.isAbsolute()) {
-      // units must be the same, check that exponent on this is 1
-      std::vector<std::string> bus = m_units.baseUnits();
-      assert(bus.size() == 1);
-      if (m_units.baseUnitExponent(bus[0]) == 1) {
-        setAsRelative();
-      }
-    }
-    else if (!isAbsolute() && rQuantity.isAbsolute()) {
-      setAsAbsolute();
-    }
   }
 
   return *this;

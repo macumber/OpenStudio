@@ -19,16 +19,6 @@ set(${target_name}_SRC
   BCLComponentItem.hpp
   BuildingInspectorView.cpp
   BuildingInspectorView.hpp
-  BuildingStoriesController.cpp
-  BuildingStoriesController.hpp
-  BuildingStoriesTabController.cpp
-  BuildingStoriesTabController.hpp
-  BuildingStoriesTabView.cpp
-  BuildingStoriesTabView.hpp
-  BuildingStoriesView.cpp
-  BuildingStoriesView.hpp
-  BuildingStoryInspectorView.cpp
-  BuildingStoryInspectorView.hpp
   CollapsibleInspector.cpp
   CollapsibleInspector.hpp
   ConstructionCfactorUndergroundWallInspectorView.cpp
@@ -51,36 +41,34 @@ set(${target_name}_SRC
   ConstructionsView.hpp
   ConstructionWindowDataFileInspectorView.cpp
   ConstructionWindowDataFileInspectorView.hpp
-  DaylightingControlInspectorView.cpp
-  DaylightingControlInspectorView.hpp
   DefaultConstructionSetInspectorView.cpp
   DefaultConstructionSetInspectorView.hpp
   DefaultConstructionSetsController.cpp
   DefaultConstructionSetsController.hpp
   DefaultConstructionSetsView.cpp
   DefaultConstructionSetsView.hpp
+  DesignDayGridView.cpp
+  DesignDayGridView.hpp
   ElectricEquipmentInspectorView.cpp
   ElectricEquipmentInspectorView.hpp
-  FacilityController.cpp
-  FacilityController.hpp
+  FacilityExteriorEquipmentGridView.cpp
+  FacilityExteriorEquipmentGridView.hpp
+  FacilityShadingGridView.cpp
+  FacilityShadingGridView.hpp
+  FacilityStoriesGridView.cpp
+  FacilityStoriesGridView.hpp
   FacilityTabController.cpp
   FacilityTabController.hpp
   FacilityTabView.cpp
   FacilityTabView.hpp
-  FacilityTreeWidget.cpp
-  FacilityTreeWidget.hpp
-  FacilityView.cpp
-  FacilityView.hpp
-  FileOperations.cpp
-  FileOperations.hpp
   GasEquipmentInspectorView.cpp
   GasEquipmentInspectorView.hpp
-  GlareSensorInspectorView.cpp
-  GlareSensorInspectorView.hpp
   GridItem.cpp
   GridItem.hpp
   GridScene.cpp
   GridScene.hpp
+  GridViewSubTab.cpp
+  GridViewSubTab.hpp
   HorizontalTabWidget.cpp
   HorizontalTabWidget.hpp
   HVACSystemsController.cpp
@@ -95,16 +83,10 @@ set(${target_name}_SRC
   HVACTemplateHelperDialog.hpp
   IconLibrary.cpp
   IconLibrary.hpp
-  IlluminanceMapInspectorView.cpp
-  IlluminanceMapInspectorView.hpp
   InspectorController.cpp
   InspectorController.hpp
   InspectorView.cpp
   InspectorView.hpp
-  InteriorPartitionSurfaceGroupInspectorView.cpp
-  InteriorPartitionSurfaceGroupInspectorView.hpp
-  InteriorPartitionSurfaceInspectorView.cpp
-  InteriorPartitionSurfaceInspectorView.hpp
   InternalMassInspectorView.cpp
   InternalMassInspectorView.hpp
   LibraryTabWidget.cpp
@@ -232,6 +214,8 @@ set(${target_name}_SRC
   RunTabController.hpp
   RunTabView.cpp
   RunTabView.hpp
+  ScheduleDayView.cpp
+  ScheduleDayView.hpp  
   ScheduleDialog.cpp
   ScheduleDialog.hpp
   ScheduleSetInspectorView.cpp
@@ -246,12 +230,8 @@ set(${target_name}_SRC
   SchedulesTabView.hpp
   SchedulesView.cpp
   SchedulesView.hpp
-  ScriptFolderListView.cpp
-  ScriptFolderListView.hpp
   ScriptItem.cpp
   ScriptItem.hpp
-  ScriptsListView.cpp
-  ScriptsListView.hpp
   ScriptsTabController.cpp
   ScriptsTabController.hpp
   ScriptsTabView.cpp
@@ -260,24 +240,40 @@ set(${target_name}_SRC
   ServiceWaterGridItems.hpp
   ServiceWaterScene.cpp
   ServiceWaterScene.hpp
-  ShadingSurfaceGroupInspectorView.cpp
-  ShadingSurfaceGroupInspectorView.hpp
-  ShadingSurfaceInspectorView.cpp
-  ShadingSurfaceInspectorView.hpp
   SimSettingsTabController.cpp
   SimSettingsTabController.hpp
   SimSettingsTabView.cpp
   SimSettingsTabView.hpp
   SimSettingsView.cpp
   SimSettingsView.hpp
-  SpaceInspectorView.cpp
-  SpaceInspectorView.hpp
   SpaceLoadInstancesWidget.cpp
   SpaceLoadInstancesWidget.hpp
+  SpacesDaylightingGridView.cpp
+  SpacesDaylightingGridView.hpp
+  SpacesInteriorPartitionsGridView.cpp
+  SpacesInteriorPartitionsGridView.hpp
+  SpacesLoadsGridView.cpp
+  SpacesLoadsGridView.hpp
+  SpacesShadingGridView.cpp
+  SpacesShadingGridView.hpp
+  SpacesSpacesGridView.cpp
+  SpacesSpacesGridView.hpp
+  SpacesSubsurfacesGridView.cpp
+  SpacesSubsurfacesGridView.hpp  
+  SpacesSubtabGridView.cpp
+  SpacesSubtabGridView.hpp
+  SpacesSurfacesGridView.cpp
+  SpacesSurfacesGridView.hpp
+  SpacesTabController.cpp
+  SpacesTabController.hpp
+  SpacesTabView.cpp
+  SpacesTabView.hpp
   SpaceTypeInspectorView.cpp
   SpaceTypeInspectorView.hpp
   SpaceTypesController.cpp
   SpaceTypesController.hpp
+  SpaceTypesGridView.cpp
+  SpaceTypesGridView.hpp
   SpaceTypesTabController.cpp
   SpaceTypesTabController.hpp
   SpaceTypesTabView.cpp
@@ -286,10 +282,12 @@ set(${target_name}_SRC
   SpaceTypesView.hpp
   StandardOpaqueMaterialInspectorView.cpp
   StandardOpaqueMaterialInspectorView.hpp
+  StandardsInformationConstructionWidget.cpp
+  StandardsInformationConstructionWidget.hpp
+  StandardsInformationMaterialWidget.cpp
+  StandardsInformationMaterialWidget.hpp
   SteamEquipmentInspectorView.cpp
   SteamEquipmentInspectorView.hpp
-  SubSurfaceInspectorView.cpp
-  SubSurfaceInspectorView.hpp
   SubTabController.cpp
   SubTabController.hpp
   SubTabView.cpp
@@ -298,10 +296,10 @@ set(${target_name}_SRC
   SummaryTabController.hpp
   SummaryTabView.cpp
   SummaryTabView.hpp
-  SurfaceInspectorView.cpp
-  SurfaceInspectorView.hpp
   ThermalZonesController.cpp
   ThermalZonesController.hpp
+  ThermalZonesGridView.cpp
+  ThermalZonesGridView.hpp
   ThermalZonesTabController.cpp
   ThermalZonesTabController.hpp
   ThermalZonesTabView.cpp
@@ -332,6 +330,8 @@ set(${target_name}_SRC
   WaterUseEquipmentInspectorView.hpp
   WindowMaterialBlindInspectorView.cpp
   WindowMaterialBlindInspectorView.hpp
+  WindowMaterialDaylightRedirectionDeviceInspectorView.cpp
+  WindowMaterialDaylightRedirectionDeviceInspectorView.hpp
   WindowMaterialGasInspectorView.cpp
   WindowMaterialGasInspectorView.hpp
   WindowMaterialGasMixtureInspectorView.cpp
@@ -422,6 +422,8 @@ set(${target_name}_SRC
   ../shared_gui_components/OSListController.hpp
   ../shared_gui_components/OSListView.cpp
   ../shared_gui_components/OSListView.hpp
+  ../shared_gui_components/OSLoadNamePixmapLineEdit.cpp
+  ../shared_gui_components/OSLoadNamePixmapLineEdit.hpp  
   ../shared_gui_components/OSQObjectController.cpp
   ../shared_gui_components/OSQObjectController.hpp
   ../shared_gui_components/OSQuantityEdit.cpp
@@ -440,12 +442,14 @@ set(${target_name}_SRC
   ../shared_gui_components/SyncMeasuresDialog.hpp
   ../shared_gui_components/SyncMeasuresDialogCentralWidget.cpp
   ../shared_gui_components/SyncMeasuresDialogCentralWidget.hpp
+  ../shared_gui_components/TextEditDialog.cpp
+  ../shared_gui_components/TextEditDialog.hpp 
   ../shared_gui_components/TIDItemModel.cpp
   ../shared_gui_components/TIDItemModel.hpp
-  ../shared_gui_components/VariableList.cpp
-  ../shared_gui_components/VariableList.hpp
-  ../shared_gui_components/VariableView.cpp
-  ../shared_gui_components/VariableView.hpp
+  ../shared_gui_components/WorkflowController.cpp
+  ../shared_gui_components/WorkflowController.hpp
+  ../shared_gui_components/WorkflowView.cpp
+  ../shared_gui_components/WorkflowView.hpp
   ../shared_gui_components/WaitDialog.cpp
   ../shared_gui_components/WaitDialog.hpp
   ../shared_gui_components/WorkflowTools.cpp
@@ -459,11 +463,6 @@ set(${target_name}_moc
   ApplyMeasureNowDialog.hpp
   BCLComponentItem.hpp
   BuildingInspectorView.hpp
-  BuildingStoriesController.hpp
-  BuildingStoriesTabController.hpp
-  BuildingStoriesTabView.hpp
-  BuildingStoriesView.hpp
-  BuildingStoryInspectorView.hpp
   CollapsibleInspector.hpp
   ConstructionCfactorUndergroundWallInspectorView.hpp
   ConstructionFfactorGroundFloorInspectorView.hpp
@@ -475,31 +474,28 @@ set(${target_name}_moc
   ConstructionsTabView.hpp
   ConstructionsView.hpp
   ConstructionWindowDataFileInspectorView.hpp
-  DaylightingControlInspectorView.hpp
   DefaultConstructionSetInspectorView.hpp
   DefaultConstructionSetsController.hpp
   DefaultConstructionSetsView.hpp
+  DesignDayGridView.hpp
   ElectricEquipmentInspectorView.hpp
-  FacilityController.hpp
+  FacilityExteriorEquipmentGridView.hpp
+  FacilityShadingGridView.hpp
+  FacilityStoriesGridView.hpp
   FacilityTabController.hpp
   FacilityTabView.hpp
-  FacilityTreeWidget.hpp
-  FacilityView.hpp
   GasEquipmentInspectorView.hpp
-  GlareSensorInspectorView.hpp
   GridItem.hpp
   GridScene.hpp
+  GridViewSubTab.hpp
   HorizontalTabWidget.hpp
   HVACSystemsController.hpp
   HVACSystemsTabController.hpp
   HVACSystemsTabView.hpp
   HVACSystemsView.hpp
   HVACTemplateHelperDialog.hpp
-  IlluminanceMapInspectorView.hpp
   InspectorController.hpp
   InspectorView.hpp
-  InteriorPartitionSurfaceGroupInspectorView.hpp
-  InteriorPartitionSurfaceInspectorView.hpp
   InternalMassInspectorView.hpp
   LibraryTabWidget.hpp
   LifeCycleCostsTabView.hpp
@@ -563,6 +559,7 @@ set(${target_name}_moc
   ResultsTabView.hpp
   RunTabController.hpp
   RunTabView.hpp
+  ScheduleDayView.hpp
   ScheduleDialog.hpp
   ScheduleSetInspectorView.hpp
   ScheduleSetsController.hpp
@@ -570,34 +567,41 @@ set(${target_name}_moc
   SchedulesTabController.hpp
   SchedulesTabView.hpp
   SchedulesView.hpp
-  ScriptFolderListView.hpp
   ScriptItem.hpp
-  ScriptsListView.hpp
   ScriptsTabController.hpp
   ScriptsTabView.hpp
   ServiceWaterGridItems.hpp
   ServiceWaterScene.hpp
-  ShadingSurfaceGroupInspectorView.hpp
-  ShadingSurfaceInspectorView.hpp
   SimSettingsTabController.hpp
   SimSettingsTabView.hpp
   SimSettingsView.hpp
-  SpaceInspectorView.hpp
   SpaceLoadInstancesWidget.hpp
+  SpacesDaylightingGridView.hpp
+  SpacesInteriorPartitionsGridView.hpp
+  SpacesLoadsGridView.hpp
+  SpacesShadingGridView.hpp
+  SpacesSpacesGridView.hpp
+  SpacesSubsurfacesGridView.hpp
+  SpacesSubtabGridView.hpp
+  SpacesSurfacesGridView.hpp
+  SpacesTabController.hpp
+  SpacesTabView.hpp
   SpaceTypeInspectorView.hpp
   SpaceTypesController.hpp
+  SpaceTypesGridView.hpp
   SpaceTypesTabController.hpp
   SpaceTypesTabView.hpp
   SpaceTypesView.hpp
   StandardOpaqueMaterialInspectorView.hpp
+  StandardsInformationConstructionWidget.hpp
+  StandardsInformationMaterialWidget.hpp
   SteamEquipmentInspectorView.hpp
-  SubSurfaceInspectorView.hpp
   SubTabController.hpp
   SubTabView.hpp
   SummaryTabController.hpp
   SummaryTabView.hpp
-  SurfaceInspectorView.hpp
   ThermalZonesController.hpp
+  ThermalZonesGridView.hpp
   ThermalZonesTabController.hpp
   ThermalZonesTabView.hpp
   ThermalZonesView.hpp
@@ -613,6 +617,7 @@ set(${target_name}_moc
   VRFGraphicsItems.hpp
   WaterUseEquipmentInspectorView.hpp
   WindowMaterialBlindInspectorView.hpp
+  WindowMaterialDaylightRedirectionDeviceInspectorView.hpp
   WindowMaterialGasInspectorView.hpp
   WindowMaterialGasMixtureInspectorView.hpp
   WindowMaterialGlazingGroupThermochromicInspectorView.hpp
@@ -656,6 +661,7 @@ set(${target_name}_moc
   ../shared_gui_components/OSLineEdit.hpp
   ../shared_gui_components/OSListController.hpp
   ../shared_gui_components/OSListView.hpp
+  ../shared_gui_components/OSLoadNamePixmapLineEdit.hpp  
   ../shared_gui_components/OSQObjectController.hpp
   ../shared_gui_components/OSQuantityEdit.hpp
   ../shared_gui_components/OSSwitch.hpp
@@ -664,13 +670,20 @@ set(${target_name}_moc
   ../shared_gui_components/PageNavigator.hpp
   ../shared_gui_components/SyncMeasuresDialog.hpp
   ../shared_gui_components/SyncMeasuresDialogCentralWidget.hpp
+  ../shared_gui_components/TextEditDialog.hpp 
   ../shared_gui_components/TIDItemModel.hpp
-  ../shared_gui_components/VariableList.hpp
-  ../shared_gui_components/VariableView.hpp
+  ../shared_gui_components/WorkflowController.hpp
+  ../shared_gui_components/WorkflowView.hpp
   ../shared_gui_components/WaitDialog.hpp
   ../shared_gui_components/NetworkProxyDialog.hpp
 
 )
+
+#if(${Qt5Widgets_VERSION} VERSION_LESS "5.4.0")
+#  list(APPEND ${target_name}_moc ResultsWebView.hpp)
+#else()
+#  list(APPEND ${target_name}_moc ResultsWebEngineView.hpp)
+#endif()
 
 # resource files
 set(${target_name}_qrc
@@ -683,7 +696,8 @@ qt5_wrap_cpp_minimally(${target_name}_moc_src ${${target_name}_moc})
 # generate rules for building source files from the resources
 qt5_add_resources(${target_name}_qrcs ${${target_name}_qrc})
 
-add_library(${target_name} SHARED
+
+add_library(${target_name}
   ${${target_name}_SRC}
   ${${target_name}_moc_src}
   ${${target_name}_moc}
@@ -694,25 +708,17 @@ set(depends
   openstudio_model
   openstudio_energyplus
   openstudio_modeleditor
-  openstudio_runmanager
-  #openstudio_ruleset
-  openstudio_analysis
-  openstudio_analysisdriver
+  openstudio_measure
   openstudio_sdd
   openstudio_gbxml
-  ${QT_LIBS}
-  #${RUBY_LIBRARY}
+  ${QT_WEB_LIBS}
 )
 
 target_link_libraries(${target_name} ${depends})
-AddPCH(${target_name})
 
-if(NOT APPLE)
-  install(TARGETS ${target_name}
-    RUNTIME DESTINATION bin 
-    LIBRARY DESTINATION lib
-  )
-endif()
+target_link_libraries(${target_name} ${QT_SHARED_LIBS})
+
+AddPCH(${target_name})
 
 set(${target_name}_test_src
   test/OpenStudioLibFixture.hpp
@@ -727,15 +733,5 @@ set(${target_name}_test_depends
 CREATE_TEST_TARGETS(${target_name} "${${target_name}_test_src}" "${${target_name}_test_depends}")
 CREATE_SRC_GROUPS("${${target_name}_test_src}")
 if(BUILD_TESTING)
-
-  #add_dependencies("${target_name}_tests" 
-  #  openstudio_lib_resources 
-  #)
   
 endif()
-
-set(${target_name}_swig_src
-  OpenStudioLib.i
-)
-
-MAKE_SWIG_TARGET(OpenStudioLib openstudiolib "${CMAKE_CURRENT_SOURCE_DIR}/OpenStudioLib.i" "${${target_name}_swig_src}" ${target_name} "OpenStudioEnergyPlus;OpenStudioModelEditor;OpenStudioRunManager;OpenStudioRuleset")

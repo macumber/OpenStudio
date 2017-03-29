@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "VRFController.hpp"
 #include "VRFGraphicsItems.hpp"
@@ -33,8 +42,13 @@
 #include "../model/ZoneHVACTerminalUnitVariableRefrigerantFlow_Impl.hpp"
 #include "../model/ThermalZone.hpp"
 #include "../model/ThermalZone_Impl.hpp"
+#include "../model/Component.hpp"
+#include "../model/Component_Impl.hpp"
+#include "../model/ComponentData.hpp"
+#include "../model/ComponentData_Impl.hpp"
 #include "../utilities/core/Compare.hpp"
 #include "../shared_gui_components/GraphicsItems.hpp"
+#include <utilities/idd/OS_ComponentData_FieldEnums.hxx>
 #include <QGraphicsScene>
 #include <QGraphicsView>
 #include <QTimer>
@@ -44,7 +58,7 @@ namespace openstudio {
 
 VRFController::VRFController()
   : QObject(),
-    m_detailView(0),
+    m_detailView(nullptr),
     m_dirty(false)
 {
   m_currentSystem = boost::none;
@@ -97,17 +111,17 @@ void VRFController::refreshNow()
 
     if( m_currentSystem )
     {
-      m_detailView->setId(OSItemId(m_currentSystem->handle().toString(),modelToSourceId(m_currentSystem->model()),false));
+      m_detailView->setId(OSItemId(toQString(m_currentSystem->handle()), modelToSourceId(m_currentSystem->model()),false));
 
-      connect(m_detailView, &VRFSystemView::inspectClicked, this, &VRFController::inspectOSItem);
+      connect(m_detailView.data(), &VRFSystemView::inspectClicked, this, &VRFController::inspectOSItem);
 
       std::vector<model::ZoneHVACTerminalUnitVariableRefrigerantFlow> terminals = m_currentSystem->terminals();
-      for(std::vector<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>::iterator it = terminals.begin();
+      for(auto it = terminals.begin();
           it != terminals.end();
           ++it)
       {
-        VRFTerminalView * vrfTerminalView = new VRFTerminalView();
-        vrfTerminalView->setId(OSItemId(it->handle().toString(),modelToSourceId(it->model()),false));
+        auto vrfTerminalView = new VRFTerminalView();
+        vrfTerminalView->setId(OSItemId(toQString(it->handle()), modelToSourceId(it->model()),false));
         m_detailView->addVRFTerminalView(vrfTerminalView);
         connect(vrfTerminalView, &VRFTerminalView::componentDroppedOnZone, this, &VRFController::onVRFTerminalViewDrop);
         connect(vrfTerminalView, &VRFTerminalView::removeZoneClicked, this, &VRFController::onRemoveZoneClicked);
@@ -147,6 +161,21 @@ void VRFController::onVRFSystemViewDrop(const OSItemId & itemid)
 
       refresh();
     }
+  } else {
+    if( auto component = doc->getComponent(itemid) ) {
+      if( auto terminal = component->primaryObject().optionalCast<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>() ) {
+        // Ugly hack to avoid the component being treated as a resource.
+        component->componentData().setString(OS_ComponentDataFields::UUID, toString(createUUID()));
+        std::cout << component->componentData().getString(OS_ComponentDataFields::UUID) << std::endl;;
+        if( auto componentData = m_currentSystem->model().insertComponent(component.get()) ) {
+          terminal = componentData->primaryComponentObject().optionalCast<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>();
+          OS_ASSERT(terminal);
+          m_currentSystem->addTerminal(terminal.get());
+
+          refresh();
+        }
+      }
+    }
   }
 }
 
@@ -185,21 +214,35 @@ void VRFController::onVRFSystemViewZoneDrop(const OSItemId & itemid)
 void VRFController::onVRFTerminalViewDrop(const OSItemId & terminalId, const OSItemId & thermalZoneId)
 {
   OS_ASSERT(m_currentSystem);
-  std::shared_ptr<OSDocument> doc = OSAppBase::instance()->currentDocument();
+  auto doc = OSAppBase::instance()->currentDocument();
 
   if( doc->fromModel(thermalZoneId) )
   {
-    boost::optional<model::ModelObject> mo = doc->getModelObject(thermalZoneId);
+    auto mo = doc->getModelObject(thermalZoneId);
     OS_ASSERT(mo); 
-    if( boost::optional<model::ThermalZone> thermalZone = mo->optionalCast<model::ThermalZone>() )
+    if( auto thermalZone = mo->optionalCast<model::ThermalZone>() )
     {
-      mo = doc->getModelObject(terminalId);
-      OS_ASSERT(mo);
-      boost::optional<model::ZoneHVACTerminalUnitVariableRefrigerantFlow> terminal = mo->optionalCast<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>();
-      OS_ASSERT(terminal);
-      terminal->addToThermalZone(thermalZone.get());
+      if( (mo = doc->getModelObject(terminalId)) ) {
+        if( auto terminal = mo->optionalCast<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>() ) {
+          terminal->addToThermalZone(thermalZone.get());
 
-      refresh();
+          refresh();
+        }
+      } else {
+        if( auto component = doc->getComponent(terminalId) ) {
+          if( auto terminal = component->primaryObject().optionalCast<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>() ) {
+            // Ugly hack to avoid the component being treated as a resource.
+            component->componentData().setString(OS_ComponentDataFields::UUID, toString(createUUID()));
+            if( auto componentData = m_currentSystem->model().insertComponent(component.get()) ) {
+              terminal = componentData->primaryComponentObject().optionalCast<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>();
+              OS_ASSERT(terminal);
+              terminal->addToThermalZone(thermalZone.get());
+
+              refresh();
+            }
+          }
+        }
+      }
     }
   }
 }
@@ -272,7 +315,7 @@ void VRFController::zoomOutToSystemGridView()
 void VRFController::inspectOSItem(const OSItemId & itemid)
 {
   OS_ASSERT(m_currentSystem);
-  boost::optional<model::ModelObject> mo = m_currentSystem->model().getModelObject<model::ModelObject>(Handle(itemid.itemId()));
+  boost::optional<model::ModelObject> mo = m_currentSystem->model().getModelObject<model::ModelObject>(toUUID(itemid.itemId()));
 
   std::shared_ptr<OSDocument> doc = OSAppBase::instance()->currentDocument();
   OS_ASSERT(doc);
@@ -312,7 +355,7 @@ QSharedPointer<OSListItem> VRFSystemListController::itemAt(int i)
 
 int VRFSystemListController::count()
 {
-  return systems().size() + 1;
+  return (int)(systems().size() + 1);
 }
 
 int VRFSystemListController::systemIndex(const model::AirConditionerVariableRefrigerantFlow & system) const
@@ -348,22 +391,30 @@ void VRFSystemListController::createNewSystem()
 
 void VRFSystemListController::addSystem(const OSItemId & itemid)
 {
-  std::shared_ptr<OSDocument> doc = OSAppBase::instance()->currentDocument();
+  auto doc = OSAppBase::instance()->currentDocument();
+  auto model = OSAppBase::instance()->currentModel();
 
-  if( doc->fromComponentLibrary(itemid) )
-  {
-    boost::optional<model::ModelObject> mo = doc->getModelObject(itemid);
+  if( ! model ) return;
 
-    boost::optional<model::Model> model = OSAppBase::instance()->currentModel();
+  if( doc->fromComponentLibrary(itemid) ) {
+    auto mo = doc->getModelObject(itemid);
 
-    if( mo && model )
-    {
-      if( boost::optional<model::AirConditionerVariableRefrigerantFlow> system = mo->optionalCast<model::AirConditionerVariableRefrigerantFlow>() )
-      {
-        model::AirConditionerVariableRefrigerantFlow systemClone = 
-          system->clone(model.get()).cast<model::AirConditionerVariableRefrigerantFlow>();
-
+    if( mo ) {
+      if( auto system = mo->optionalCast<model::AirConditionerVariableRefrigerantFlow>() ) {
+        auto systemClone = system->clone(model.get()).cast<model::AirConditionerVariableRefrigerantFlow>();
         emit itemInserted(systemIndex(systemClone));
+      }
+    }
+  } else {
+    if( auto component = doc->getComponent(itemid) ) {
+      if( auto system = component->primaryObject().optionalCast<model::AirConditionerVariableRefrigerantFlow>() ) {
+        // Ugly hack to avoid the component being treated as a resource.
+        component->componentData().setString(OS_ComponentDataFields::UUID, toString(createUUID()));
+        if( auto componentData = model->insertComponent(component.get()) ) {
+          system = componentData->primaryComponentObject().optionalCast<model::AirConditionerVariableRefrigerantFlow>();
+          OS_ASSERT(system);
+          emit itemInserted(systemIndex(system.get()));
+        }
       }
     }
   }
@@ -377,7 +428,7 @@ void VRFSystemListController::removeSystem(model::AirConditionerVariableRefriger
     QMessageBox message(m_vrfController->vrfView());
     
     QString text;
-    int size = terminals.size();
+    int size = (int)terminals.size();
     if( size == 1 )
     {
       text.append("There is ");
@@ -404,7 +455,7 @@ void VRFSystemListController::removeSystem(model::AirConditionerVariableRefriger
 
   int i = systemIndex(vrfSystem);
 
-  for(std::vector<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>::iterator it = terminals.begin();
+  for(auto it = terminals.begin();
       it != terminals.end();
       ++it)
   {
@@ -450,7 +501,7 @@ int VRFSystemListItem::numberOfConnectedZones() const
   int result = 0;
   std::vector<model::ZoneHVACTerminalUnitVariableRefrigerantFlow> terminals;
   terminals = m_vrfSystem.terminals();
-  for(std::vector<model::ZoneHVACTerminalUnitVariableRefrigerantFlow>::iterator it = terminals.begin();
+  for(auto it = terminals.begin();
       it != terminals.end();
       ++it)
   {
@@ -479,11 +530,11 @@ VRFSystemListDropZoneItem::VRFSystemListDropZoneItem(OSListController * listCont
 
 QGraphicsObject * VRFSystemItemDelegate::view(QSharedPointer<OSListItem> dataSource)
 {
-  QGraphicsObject * itemView = NULL;
+  QGraphicsObject * itemView = nullptr;
 
   if( QSharedPointer<VRFSystemListItem> listItem = dataSource.dynamicCast<VRFSystemListItem>() )
   {
-    VRFSystemMiniView * vrfSystemMiniView = new VRFSystemMiniView();
+    auto vrfSystemMiniView = new VRFSystemMiniView();
 
     connect(vrfSystemMiniView->removeButtonItem, &RemoveButtonItem::mouseClicked, listItem.data(), &VRFSystemListItem::remove);
 
@@ -497,7 +548,7 @@ QGraphicsObject * VRFSystemItemDelegate::view(QSharedPointer<OSListItem> dataSou
   }
   else if( dataSource.dynamicCast<VRFSystemListDropZoneItem>() )
   {
-    VRFSystemDropZoneView * vrfSystemDropZoneView = new VRFSystemDropZoneView();
+    auto vrfSystemDropZoneView = new VRFSystemDropZoneView();
 
     connect(vrfSystemDropZoneView, &VRFSystemDropZoneView::componentDropped,
       qobject_cast<VRFSystemListController *>(dataSource->controller()), &VRFSystemListController::addSystem);

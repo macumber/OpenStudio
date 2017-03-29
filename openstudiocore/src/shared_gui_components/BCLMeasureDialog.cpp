@@ -1,35 +1,48 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "BCLMeasureDialog.hpp"
 
 #include "../utilities/core/Assert.hpp"
+#include "../utilities/core/StringHelpers.hpp"
+#include "../utilities/core/PathHelpers.hpp"
 
+#include <QBoxLayout>
+#include <QComboBox>
+#include <QGroupBox>
 #include <QLabel>
 #include <QLineEdit>
-#include <QTextEdit>
-#include <QComboBox>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QRadioButton>
-#include <QGroupBox>
+#include <QTextEdit>
 
 namespace openstudio {
   
@@ -38,6 +51,7 @@ BCLMeasureDialog::BCLMeasureDialog(QWidget* parent)
   : OSDialog(false, parent)
 {
   setWindowTitle("Create New Measure");
+  setWindowModality(Qt::ApplicationModal);
 
   init();
 
@@ -56,7 +70,7 @@ BCLMeasureDialog::BCLMeasureDialog(const BCLMeasure& bclMeasure, QWidget* parent
 
   init();
 
-  m_nameLineEdit->setText(toQString(bclMeasure.name() + " Copy"));
+  m_nameLineEdit->setText(toQString(bclMeasure.displayName() + " Copy"));
   m_descriptionTextEdit->setText(toQString(bclMeasure.description()));
   m_modelerDescriptionTextEdit->setText(toQString(bclMeasure.modelerDescription()));
 
@@ -85,7 +99,27 @@ BCLMeasureDialog::BCLMeasureDialog(const BCLMeasure& bclMeasure, QWidget* parent
     m_taxonomySecondLevelComboBox->setCurrentIndex(index);
   }
 
-  // todo: initialize uses sketchup api and requires e+ results
+  std::vector<std::string> intendedSoftwareTools = bclMeasure.intendedSoftwareTools();
+  QList<QListWidgetItem *> items = m_intendedSoftwareToolListWidget->findItems(".*", Qt::MatchRegExp);
+  for (QListWidgetItem * item : items){
+    std::string intendedSoftwareTool = toString(item->text());
+    if (std::find(intendedSoftwareTools.begin(), intendedSoftwareTools.end(), intendedSoftwareTool) == intendedSoftwareTools.end()){
+      item->setCheckState(Qt::Unchecked);
+    } else {
+      item->setCheckState(Qt::Checked);
+    }
+  }
+
+  std::vector<std::string> intendedUseCases = bclMeasure.intendedUseCases();
+  items = m_intendedUseCaseListWidget->findItems(".*", Qt::MatchRegExp);
+  for (QListWidgetItem * item : items){
+    std::string intendedUseCase = toString(item->text());
+    if (std::find(intendedUseCases.begin(), intendedUseCases.end(), intendedUseCase) == intendedUseCases.end()){
+      item->setCheckState(Qt::Unchecked);
+    } else {
+      item->setCheckState(Qt::Checked);
+    }
+  }
 }
 
 BCLMeasureDialog::~BCLMeasureDialog()
@@ -99,8 +133,16 @@ QSize BCLMeasureDialog::sizeHint() const
 
 boost::optional<openstudio::BCLMeasure> BCLMeasureDialog::createMeasure()
 {
+  openstudio::path userMeasuresDir = BCLMeasure::userMeasuresDir();
+
+  if (isNetworkPath(userMeasuresDir) && !isNetworkPathAvailable(userMeasuresDir)) {
+    QMessageBox::information(this, "Cannot Create Measure", "Your My Measures Directory appears to be on a network drive that is not currently available.\nYou can change your specified My Measures Directory using 'Preferences->Change My Measures Directory'.", QMessageBox::Ok);
+    return boost::optional<openstudio::BCLMeasure>();
+  }
+
   std::string name = toString(m_nameLineEdit->text());
-  std::string className = BCLMeasure::className(name);
+  std::string className = BCLMeasure::makeClassName(name);
+  std::string lowerClassName = toUnderscoreCase(className);
   std::string description = toString(m_descriptionTextEdit->toPlainText());
   std::string modelerDescription = toString(m_modelerDescriptionTextEdit->toPlainText());
 
@@ -116,18 +158,20 @@ boost::optional<openstudio::BCLMeasure> BCLMeasureDialog::createMeasure()
     measureType = MeasureType::ReportingMeasure;
   }
 
-  bool usesSketchUpAPI = false; //disabled for now, m_usesSketchUpAPI->isChecked();
-
-  openstudio::path userMeasuresDir = BCLMeasure::userMeasuresDir();
-  QString folderName = toQString(className).append("/");
+  QString folderName = toQString(lowerClassName).append("/");
   openstudio::path measureDir = userMeasuresDir / toPath(folderName);
 
   // prompt user ???
-  int i = 1;
-  while (boost::filesystem::exists(measureDir)){
-    folderName = toQString(className).append(" ").append(QString::number(i)).append("/");
-    measureDir = userMeasuresDir / toPath(folderName);
-    ++i;
+  if (openstudio::filesystem::exists(measureDir)){
+    int i = 1;
+    while (openstudio::filesystem::exists(measureDir)){
+      folderName = toQString(lowerClassName).append(" ").append(QString::number(i)).append("/");
+      measureDir = userMeasuresDir / toPath(folderName);
+      ++i;
+    }
+    // DLM: do we want to alter the class name to indicate this copy?
+    //className = className + toString(QString::number(i));
+    //lowerClassName = lowerClassName + toString(QString::number(i));
   }
 
   QStringList taxonomyParts;
@@ -139,28 +183,69 @@ boost::optional<openstudio::BCLMeasure> BCLMeasureDialog::createMeasure()
   }
   std::string taxonomyTag = toString(taxonomyParts.join("."));
 
+  std::vector<Attribute> attributes;
+
+  QList<QListWidgetItem *> items = m_intendedSoftwareToolListWidget->findItems(".*", Qt::MatchRegExp);
+  for (QListWidgetItem * item : items){
+    if (item->checkState() == Qt::Checked){
+      std::string intendedSoftwareTool = toString(item->text());
+      attributes.push_back(Attribute("Intended Software Tool", intendedSoftwareTool));
+    }
+  }
+
+  items = m_intendedUseCaseListWidget->findItems(".*", Qt::MatchRegExp);
+  for (QListWidgetItem * item : items){
+    if (item->checkState() == Qt::Checked){
+      std::string intendedUseCase = toString(item->text());
+      attributes.push_back(Attribute("Intended Use Case", intendedUseCase));
+    }
+  }
+
   boost::optional<BCLMeasure> result;
   if (m_bclMeasureToCopy){
     // have measure to copy, use clone
     result = m_bclMeasureToCopy->clone(measureDir);
     if (result){
       result->changeUID();
-      result->setName(name);
-      // todo: change class name? this would require opening the ruby files
+
+      // change the files on disk
+      result->updateMeasureScript(m_bclMeasureToCopy->measureType(), measureType, 
+                                  m_bclMeasureToCopy->className(), className, 
+                                  name, description, modelerDescription);
+
+      result->updateMeasureTests(m_bclMeasureToCopy->className(), className);
+
+      result->checkForUpdatesFiles();
+
+      // change the xml
+      std::string lowerClassName = toUnderscoreCase(className);
+
+      result->setName(lowerClassName);
+      result->setClassName(className);
+      result->setDisplayName(name);
       result->setDescription(description);
       result->setModelerDescription(modelerDescription);
+      result->setArguments(m_bclMeasureToCopy->arguments());
       result->setTaxonomyTag(taxonomyTag);
       result->setMeasureType(measureType);
-      result->setUsesSketchUpAPI(usesSketchUpAPI);
+
+      // xml checksum is out of date
+
+      for (const Attribute& attribute : attributes){
+        result->addAttribute(attribute);
+      }
+
       result->save();
     }
   }else{
     try{
     // starting new measure
-    result = BCLMeasure(name, className, measureDir, taxonomyTag,
-                        measureType, usesSketchUpAPI);
-    result->setDescription(description);
-    result->setModelerDescription(modelerDescription);
+    result = BCLMeasure(name, className, measureDir, taxonomyTag, measureType, description, modelerDescription);
+
+    for (const Attribute& attribute : attributes){
+      result->addAttribute(attribute);
+    }
+
     result->save();
     }catch(std::exception&){
     }
@@ -171,7 +256,7 @@ boost::optional<openstudio::BCLMeasure> BCLMeasureDialog::createMeasure()
 
 void BCLMeasureDialog::nameChanged(const QString& newName)
 {
-  std::string className = BCLMeasure::className(toString(newName));
+  std::string className = BCLMeasure::makeClassName(toString(newName));
   m_classNameLabel->setText(toQString(className));
 }
 
@@ -181,7 +266,21 @@ void BCLMeasureDialog::measureTypeChanged(const QString& newName)
     int index = m_taxonomyFirstLevelComboBox->findText("Reporting");
     m_taxonomyFirstLevelComboBox->setCurrentIndex(index);
   }else{
+    // DLM: do we want to toggle this back?
     m_taxonomyFirstLevelComboBox->setCurrentIndex(0);
+  }
+
+  if (newName == "OpenStudio Measure"){
+    // DLM: do we want to toggle this back?
+    QList<QListWidgetItem *> items = m_intendedSoftwareToolListWidget->findItems("Apply Measure Now", Qt::MatchFixedString);
+    for (QListWidgetItem * item : items){
+      item->setCheckState(Qt::Checked);
+    }
+  }else{
+    QList<QListWidgetItem *> items = m_intendedSoftwareToolListWidget->findItems("Apply Measure Now", Qt::MatchFixedString);
+    for (QListWidgetItem * item : items){
+      item->setCheckState(Qt::Unchecked);
+    }
   }
 }
 
@@ -190,75 +289,16 @@ void BCLMeasureDialog::firstLevelTaxonomyChanged(const QString& newName)
   m_taxonomySecondLevelComboBox->clear();
   m_taxonomySecondLevelComboBox->setEnabled(false);
 
-  if (newName == "Envelope"){
-    m_taxonomySecondLevelComboBox->addItem("Form");
-    m_taxonomySecondLevelComboBox->addItem("Opaque");
-    m_taxonomySecondLevelComboBox->addItem("Fenestration");
-    m_taxonomySecondLevelComboBox->addItem("Construction Sets");
-    m_taxonomySecondLevelComboBox->addItem("Daylighting");
-    m_taxonomySecondLevelComboBox->addItem("Infiltration");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Electric Lighting"){
-    m_taxonomySecondLevelComboBox->addItem("Electric Lighting Controls");
-    m_taxonomySecondLevelComboBox->addItem("Lighting Equipment");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Equipment"){
-    m_taxonomySecondLevelComboBox->addItem("Equipment Controls");
-    m_taxonomySecondLevelComboBox->addItem("Electric Equipment");
-    m_taxonomySecondLevelComboBox->addItem("Gas Equipment");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "People"){
-    m_taxonomySecondLevelComboBox->addItem("Characteristics");
-    m_taxonomySecondLevelComboBox->addItem("People Schedules");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "HVAC"){
-    m_taxonomySecondLevelComboBox->addItem("HVAC Controls");
-    m_taxonomySecondLevelComboBox->addItem("Heating");
-    m_taxonomySecondLevelComboBox->addItem("Cooling");
-    m_taxonomySecondLevelComboBox->addItem("Heat Rejection");
-    m_taxonomySecondLevelComboBox->addItem("Energy Recovery");
-    m_taxonomySecondLevelComboBox->addItem("Distribution");
-    m_taxonomySecondLevelComboBox->addItem("Ventilation");
-    m_taxonomySecondLevelComboBox->addItem("Whole System");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Refrigeration"){
-    m_taxonomySecondLevelComboBox->addItem("Refrigeration Controls");
-    m_taxonomySecondLevelComboBox->addItem("Cases and Walkins");
-    m_taxonomySecondLevelComboBox->addItem("Compressors");
-    m_taxonomySecondLevelComboBox->addItem("Condensers");
-    m_taxonomySecondLevelComboBox->addItem("Heat Reclaim");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);    
-  }else if (newName == "Service Water Heating"){
-    m_taxonomySecondLevelComboBox->addItem("Water Use");
-    m_taxonomySecondLevelComboBox->addItem("Water Heating");
-    m_taxonomySecondLevelComboBox->addItem("Distribution");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Onsite Power Generation"){
-    m_taxonomySecondLevelComboBox->addItem("Photovoltaic");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Whole Building"){
-    m_taxonomySecondLevelComboBox->addItem("Whole Building Schedules");
-    m_taxonomySecondLevelComboBox->addItem("Space Types");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Economics"){
-    m_taxonomySecondLevelComboBox->addItem("Life Cycle Cost Analysis");
-    m_taxonomySecondLevelComboBox->setCurrentIndex(0);
-    m_taxonomySecondLevelComboBox->setEnabled(true);
-  }else if (newName == "Reporting"){
-    m_taxonomySecondLevelComboBox->addItem("QAQC");
-    m_taxonomySecondLevelComboBox->addItem("Troubleshooting");
+  std::vector<std::string> secondLevelTerms = BCLMeasure::suggestedSecondLevelTaxonomyTerms(toString(newName));
+
+  if (!secondLevelTerms.empty()){
+    for (const std::string& secondLevelTerm : secondLevelTerms){
+      m_taxonomySecondLevelComboBox->addItem(toQString(secondLevelTerm));
+    }
     m_taxonomySecondLevelComboBox->setCurrentIndex(0);
     m_taxonomySecondLevelComboBox->setEnabled(true);
   }
+
 }
 
 void BCLMeasureDialog::init()
@@ -319,66 +359,98 @@ void BCLMeasureDialog::init()
   vLayout->addWidget(m_modelerDescriptionTextEdit);
   vLayout->addSpacing(10);
 
-  auto vLayout2 = new QVBoxLayout;
+  tempHLayout = new QHBoxLayout;
+  vLayout->addLayout(tempHLayout);
+
+  auto tempVLayout = new QVBoxLayout;
 
   label = new QLabel;
   label->setText("Measure Type:");
   label->setObjectName("H2");
-  vLayout2->addWidget(label);
+  tempVLayout->addWidget(label);
   m_measureTypeComboBox = new QComboBox(this);
   m_measureTypeComboBox->addItem("OpenStudio Measure");
   m_measureTypeComboBox->addItem("EnergyPlus Measure");
   //m_measureTypeComboBox->addItem("Utility Measure"); // Disable for now
   m_measureTypeComboBox->addItem("Reporting Measure");
   m_measureTypeComboBox->setCurrentIndex(0);
-  vLayout2->addWidget(m_measureTypeComboBox);
-  vLayout2->addSpacing(10);
+  tempVLayout->addWidget(m_measureTypeComboBox);
+  tempVLayout->addSpacing(10);
+  tempHLayout->addLayout(tempVLayout);
+
+  tempVLayout = new QVBoxLayout;
 
   label = new QLabel;
   label->setText("Taxonomy:");
   label->setObjectName("H2");
-  vLayout2->addWidget(label);
-  tempHLayout = new QHBoxLayout;
+  tempVLayout->addWidget(label);
   m_taxonomyFirstLevelComboBox = new QComboBox(this);
-  m_taxonomyFirstLevelComboBox->addItem("Envelope");
-  m_taxonomyFirstLevelComboBox->addItem("Electric Lighting");
-  m_taxonomyFirstLevelComboBox->addItem("Equipment");
-  m_taxonomyFirstLevelComboBox->addItem("People");
-  m_taxonomyFirstLevelComboBox->addItem("HVAC");
-  m_taxonomyFirstLevelComboBox->addItem("Refrigeration");
-  m_taxonomyFirstLevelComboBox->addItem("Service Water Heating");
-  m_taxonomyFirstLevelComboBox->addItem("Onsite Power Generation");
-  m_taxonomyFirstLevelComboBox->addItem("Whole Building");
-  m_taxonomyFirstLevelComboBox->addItem("Economics");
-  m_taxonomyFirstLevelComboBox->addItem("Reporting");
-  tempHLayout->addWidget(m_taxonomyFirstLevelComboBox);
+
+  std::vector<std::string> firstLevelTerms = BCLMeasure::suggestedFirstLevelTaxonomyTerms();
+  for (const std::string& firstLevelTerm : firstLevelTerms){
+    m_taxonomyFirstLevelComboBox->addItem(toQString(firstLevelTerm));
+  }
+
   m_taxonomySecondLevelComboBox = new QComboBox(this);
-  tempHLayout->addWidget(m_taxonomySecondLevelComboBox);
-  vLayout2->addLayout(tempHLayout);
-  vLayout2->addSpacing(10);
+  auto tempHLayout2 = new QHBoxLayout;
+  tempHLayout2->addWidget(m_taxonomyFirstLevelComboBox);
+  tempHLayout2->addWidget(m_taxonomySecondLevelComboBox);
+  tempVLayout->addLayout(tempHLayout2);
+  tempVLayout->addSpacing(10);
+  tempHLayout->addLayout(tempVLayout);
 
-  /* Disable for now 
-  m_usesSketchUpAPI = new QRadioButton(this);
-  m_usesSketchUpAPI->setText("Yes");
-  m_usesSketchUpAPI->setChecked(false);
-  QRadioButton* notUsesSketchUpAPI = new QRadioButton(this);
-  notUsesSketchUpAPI->setText("No");
-  notUsesSketchUpAPI->setChecked(true);
   tempHLayout = new QHBoxLayout;
-  tempHLayout->addWidget(m_usesSketchUpAPI);
-  tempHLayout->addWidget(notUsesSketchUpAPI);
-  tempHLayout->addStretch();
-  groupBox = new QGroupBox(this);
-  groupBox->setTitle("Uses SketchUp API");
-  groupBox->setLayout(tempHLayout);
-  vLayout2->addWidget(groupBox);
-  vLayout2->addSpacing(10);
-  */
+  vLayout->addLayout(tempHLayout);
 
-  auto hLayout = new QHBoxLayout;
-  hLayout->addLayout(vLayout2);
-  hLayout->addStretch();
-  vLayout->addLayout(hLayout);
+  tempVLayout = new QVBoxLayout;
+
+  label = new QLabel;
+  label->setText("Intended Software Tools:");
+  label->setObjectName("H2");
+  tempVLayout->addWidget(label);
+  m_intendedSoftwareToolListWidget = new QListWidget(this);
+  tempVLayout->addWidget(m_intendedSoftwareToolListWidget);
+  QStringList intendedSoftwareTools;
+  for (const std::string& suggestedTool : BCLMeasure::suggestedIntendedSoftwareTools()){
+    intendedSoftwareTools.append(toQString(suggestedTool));
+  }
+  QStringListIterator it(intendedSoftwareTools);
+  while (it.hasNext()){
+    QString intendedSoftwareTool = it.next();
+    auto listItem = new QListWidgetItem(intendedSoftwareTool, m_intendedSoftwareToolListWidget);
+    // DLM: defaults per David
+    if (intendedSoftwareTool == "Analysis Spreadsheet"){
+      listItem->setCheckState(Qt::Unchecked);
+    }else{
+      listItem->setCheckState(Qt::Checked);
+    }
+    listItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
+    m_intendedSoftwareToolListWidget->addItem(listItem);
+  }
+  tempHLayout->addLayout(tempVLayout);
+  
+  tempVLayout = new QVBoxLayout;
+
+  label = new QLabel;
+  label->setText("Intended Use Cases:");
+  label->setObjectName("H2");
+  tempVLayout->addWidget(label);
+  m_intendedUseCaseListWidget = new QListWidget();
+  tempVLayout->addWidget(m_intendedUseCaseListWidget);
+  QStringList intendedUseCases;
+  for (const std::string& suggestedUseCase : BCLMeasure::suggestedIntendedUseCases()){
+    intendedUseCases.append(toQString(suggestedUseCase));
+  }
+  it = QStringListIterator(intendedUseCases);
+  while (it.hasNext()){
+    QString intendedUseCase = it.next();
+    auto listItem = new QListWidgetItem(intendedUseCase, m_intendedUseCaseListWidget);
+    // DLM: default to unchecked per David
+    listItem->setCheckState(Qt::Unchecked);
+    listItem->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
+    m_intendedUseCaseListWidget->addItem(listItem);
+  }
+  tempHLayout->addLayout(tempVLayout);
 
   QBoxLayout* upperLayout = this->upperLayout();
   upperLayout->addLayout(vLayout);

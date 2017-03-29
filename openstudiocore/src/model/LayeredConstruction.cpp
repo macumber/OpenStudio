@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "LayeredConstruction.hpp"
 #include "LayeredConstruction_Impl.hpp"
@@ -47,7 +56,7 @@
 #include "ModelExtensibleGroup.hpp"
 
 #include "../utilities/idf/ValidityReport.hpp"
-
+#include "../utilities/sql/SqlFile.hpp"
 #include "../utilities/core/Assert.hpp"
 
 namespace openstudio {
@@ -130,8 +139,19 @@ namespace detail {
   bool LayeredConstruction_Impl::insertLayer(unsigned layerIndex, 
                                              const Material& material) 
   {
-    OS_ASSERT(material.model() == model());
+    if (material.model() != model()){
+      return false;
+    }
     layerIndex = mf_clearNullLayers(layerIndex);
+
+    // DLM: duplicates check in layersAreValid which is not called if strictness < Final
+    if (isFenestration()){
+      if (layerIndex >= 8){
+        return false;
+      }
+    }else if (layerIndex >= 10){
+      return false;
+    }
 
     unsigned n = numLayers();
     MaterialVector layers = this->layers();
@@ -160,7 +180,9 @@ namespace detail {
   bool LayeredConstruction_Impl::setLayer(unsigned layerIndex, 
                                           const Material& material)
   {
-    OS_ASSERT(material.model() == model());
+    if (material.model() != model()){
+      return false;
+    }
     layerIndex = mf_clearNullLayers(layerIndex);
     if (layerIndex >= numLayers()) {
       LOG(Info,"Asked to change the Material at layer " << layerIndex << " in "
@@ -184,13 +206,29 @@ namespace detail {
 
   bool LayeredConstruction_Impl::setLayers(const std::vector<Material>& materials) {
     
+    // DLM: duplicates check in layersAreValid which is not called if strictness < Final
+    if (materials.empty()){
+      // ok
+    }else if (materials[0].optionalCast<FenestrationMaterial>()){
+      if (materials.size() > 8){
+        return false;
+      }
+    } else if (materials.size() > 10){
+      return false;
+    }
+    for (const Material& material : materials) {
+      if (material.model() != model()){
+        return false;
+      }
+    }
+
     if ((model().strictnessLevel() < StrictnessLevel::Final) || 
         LayeredConstruction::layersAreValid(materials)) 
     {
       clearExtensibleGroups();
       for (const Material& material : materials) {
         OS_ASSERT(material.model() == model());
-        ModelExtensibleGroup group = pushExtensibleGroup(StringVector()).cast<ModelExtensibleGroup>();
+        ModelExtensibleGroup group = pushExtensibleGroup(StringVector(), false).cast<ModelExtensibleGroup>();
         OS_ASSERT(!group.empty());
         bool ok = group.setPointer(0,material.handle());
         OS_ASSERT(ok);
@@ -203,9 +241,11 @@ namespace detail {
 
   bool LayeredConstruction_Impl::setLayer(const ModelPartitionMaterial& modelPartitionMaterial) {
 
-    OS_ASSERT(modelPartitionMaterial.model() == model());
+    if (modelPartitionMaterial.model() != model()){
+      return false;
+    }
     clearExtensibleGroups();
-    ModelExtensibleGroup group = pushExtensibleGroup(StringVector()).cast<ModelExtensibleGroup>();
+    ModelExtensibleGroup group = pushExtensibleGroup(StringVector(), false).cast<ModelExtensibleGroup>();
     OS_ASSERT(!group.empty());
     bool ok = group.setPointer(0,modelPartitionMaterial.handle());
     OS_ASSERT(ok);
@@ -555,15 +595,39 @@ namespace detail {
       }
       catch (...) {}
     }
-    return result;
-  }
+    /*
+    // duplicates code in PlanarSurface_Impl::visibleTransmittance
+    if (!result){
+      OptionalSqlFile mySqlFile = model().sqlFile();
+      if (mySqlFile && mySqlFile->connectionOpen())
+      {
+        boost::optional<std::string> name = this->name();
+        if (name){
+          std::string query = "SELECT RowName FROM tabulardatawithstrings WHERE \
+ReportName = 'EnvelopeSummary' AND \
+ReportForString = 'Entire Facility' AND \
+ColumnName = 'Construction' AND \
+Value = '";
+          query += boost::to_upper_copy(*name);
+          query += "';";
+          boost::optional<std::string> surfaceName = mySqlFile->execAndReturnFirstString(query);
+          if (surfaceName){
 
-  ValidityReport LayeredConstruction_Impl::validityReport(StrictnessLevel level,
-                                                          bool checkNames) const 
-  {
-    ValidityReport report(level,getObject<model::LayeredConstruction>());
-    populateValidityReport(report,checkNames);
-    return report;
+            query = "SELECT Value FROM tabulardatawithstrings WHERE \
+ReportName = 'EnvelopeSummary' AND \
+ReportForString = 'Entire Facility' AND \
+ColumnName = 'Glass Visible Transmittance' AND \
+RowName = '";
+            query += boost::to_upper_copy(*surfaceName);
+            query += "';";
+            result = mySqlFile->execAndReturnFirstDouble(query);
+          }
+        }
+      }
+    }
+    */
+    
+    return result;
   }
 
   boost::optional<OpaqueMaterial> LayeredConstruction_Impl::insulation() const {
@@ -621,35 +685,6 @@ namespace detail {
         bool test = group.setPointer(0, newMaterial.handle());
         OS_ASSERT(test);
       } 
-    }
-  }
-
-  void LayeredConstruction_Impl::populateValidityReport(ValidityReport& report,bool checkNames) const
-  {
-    // Inherit lower-level errors
-    ModelObject_Impl::populateValidityReport(report,checkNames);
-
-    if (report.level() > StrictnessLevel::None) {
-      // construction should be of one type
-      if (!((numLayers() == 0) || isOpaque() || isFenestration() || isModelPartition())) {
-        report.insertError(DataError(getObject<LayeredConstruction>(),DataErrorType::DataType));
-      }
-    }
-
-    if (report.level() == StrictnessLevel::Final) {
-      // opaque and fenestration layers should be valid, taken as a whole
-      if (isOpaque() && !LayeredConstruction::layersAreValid(castVector<OpaqueMaterial>(layers()))) {
-        report.insertError(DataError(getObject<LayeredConstruction>(),DataErrorType::DataType));
-      }
-      if (isFenestration() && !LayeredConstruction::layersAreValid(castVector<FenestrationMaterial>(layers()))) {
-        report.insertError(DataError(getObject<LayeredConstruction>(),DataErrorType::DataType));
-      }
-      // there should be no nullLayers()
-      for (unsigned layerIndex : nullLayers()) {
-        report.insertError(DataError(iddObject().index(ExtensibleIndex(layerIndex,0)),
-                                     getObject<LayeredConstruction>(),
-                                     DataErrorType::NullAndRequired));
-      }
     }
   }
 
@@ -815,6 +850,12 @@ bool LayeredConstruction::layersAreValid(const std::vector<OpaqueMaterial>& opaq
 {
   // Rule 1: AirGap must have non-AirGap on either side.
   // Rule 2: RoofVegetation must be on exterior layer.
+  // Rule 3: Up to 10 layers are allowed, IDD limit
+
+  // Rule 3
+  if (opaqueMaterials.size() > 10){
+    return false;
+  }
 
   bool previousWasNonAirGap = false;
   for (unsigned i = 0, n = opaqueMaterials.size(); i < n; ++i) {
@@ -851,6 +892,13 @@ bool LayeredConstruction::layersAreValid(const std::vector<FenestrationMaterial>
   // Rule 1 -- SimpleGlazing cannot be combined with other Glazings or any GasLayers.
   // Rule 2 -- GasLayers must have non-GasLayer on either side.
   // Rule 3 -- Ultimately, GasLayers must have Glazing on either side.
+  // Rule 4 -- Up to 8 layers are allowed, IDD limit
+
+  // Rule 4
+  if (fenestrationMaterials.size() > 8){
+    return false;
+  }
+
   bool hasSimpleGlazing = false;
   bool hasGlazing = false;
   bool hasGasLayer = false;

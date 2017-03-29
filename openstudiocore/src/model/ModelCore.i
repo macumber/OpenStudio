@@ -11,8 +11,6 @@
 #if defined SWIGRUBY
 
   %init %{
-    rb_eval_string("OpenStudio::IdfObject.class_eval { define_method(:to_ModelObject) { OpenStudio::Model::toModelObject(self); } }");
-    rb_eval_string("OpenStudio::IdfExtensibleGroup.class_eval { define_method(:to_ModelExtensibleGroup) { OpenStudio::Model::toModelExtensibleGroup(self); } }");
     rb_eval_string("OpenStudio::Workspace.class_eval { define_method(:to_Model) { OpenStudio::Model::toModel(self); } }");
     rb_eval_string("OpenStudio::Workspace.class_eval { define_method(:to_OptionalModel) { OpenStudio::Model::toOptionalModel(self); } }");
     rb_eval_string("OpenStudio::Workspace.class_eval { define_method(:to_Component) { OpenStudio::Component::toComponent(self); } }");
@@ -37,12 +35,12 @@
     using System;
     using System.Runtime.InteropServices;
         
-    public partial class IdfObject {
-      public OptionalModelObject to_ModelObject()
-      {
-        return OpenStudio.OpenStudioModelCore.toModelObject(this);
-      }
-    }    
+    //public partial class IdfObject {
+    //  public OptionalModelObject to_ModelObject()
+    //  {
+    //   return OpenStudio.OpenStudioModelCore.toModelObject(this);
+    //  }
+    //}    
   %}
   
 #else
@@ -66,15 +64,15 @@
 
 // templates for non-ModelObjects
 %template(ModelVector) std::vector<openstudio::model::Model>;
+%template(OptionalModel)boost::optional<openstudio::model::Model>;
 %ignore std::vector<openstudio::model::Component>::vector(size_type);
 %ignore std::vector<openstudio::model::Component>::resize(size_type);
 %template(ComponentVector) std::vector<openstudio::model::Component>;
-%template(OptionalModel) boost::optional<openstudio::model::Model>;
 %template(OptionalComponent) boost::optional<openstudio::model::Component>;
 %ignore std::vector<openstudio::model::Relationship>::vector(size_type);
 %ignore std::vector<openstudio::model::Relationship>::resize(size_type);
-%template(RelationshipVector) std::vector<openstudio::model::Relationship>;
-%template(OptionalRelationship) boost::optional<openstudio::model::Relationship>;
+// %template(RelationshipVector) std::vector<openstudio::model::Relationship>;
+// %template(OptionalRelationship) boost::optional<openstudio::model::Relationship>;
 
 // ignore visitor for now.
 %ignore openstudio::model::ModelObject::accept;
@@ -85,18 +83,14 @@
 // Ignore plenum space type
 %ignore openstudio::model::Model::plenumSpaceType;
 
-// templates for ModelObject
+// templates 
 %ignore std::vector<openstudio::model::ModelObject>::vector(size_type);
 %ignore std::vector<openstudio::model::ModelObject>::resize(size_type);
-%template(ModelObjectVector) std::vector<openstudio::model::ModelObject>;
+%template(ModelObjectVector)std::vector<openstudio::model::ModelObject>;
 %template(ModelObjectVectorVector) std::vector<std::vector<openstudio::model::ModelObject> >;
 %template(ModelObjectSet) std::set<openstudio::model::ModelObject>;
-%template(OptionalModelObject) boost::optional<openstudio::model::ModelObject>;
+%template(OptionalModelObject)boost::optional<openstudio::model::ModelObject>;
 %template(getModelObjectHandles) openstudio::getHandles<openstudio::model::ModelObject>;
-%ignore std::vector<openstudio::model::ModelExtensibleGroup>::vector(size_type);
-%ignore std::vector<openstudio::model::ModelExtensibleGroup>::resize(size_type);
-%template(ModelExtensibleGroupVector) std::vector<openstudio::model::ModelExtensibleGroup>;
-%template(OptionalModelExtensibleGroup) boost::optional<openstudio::model::ModelExtensibleGroup>;
 %template(ScheduleTypeKey) std::pair<std::string,std::string>;
 %template(ScheduleTypeKeyVector) std::vector< std::pair<std::string,std::string> >;
 
@@ -106,16 +100,11 @@
 %include <model/Model.hpp>
 %include <model/ModelExtensibleGroup.hpp>
 %include <model/Component.hpp>
-%include <model/Relationship.hpp>
-
-%extend openstudio::model::Model {
-  %template(getModelObjects) getModelObjects<openstudio::model::ModelObject>;
-}
+// %include <model/Relationship.hpp>
+%include <model/FileOperations.hpp>
 
 namespace openstudio {
 namespace model {
-  boost::optional<ModelObject> toModelObject(const openstudio::IdfObject& idfObject);
-  boost::optional<ModelExtensibleGroup> toModelExtensibleGroup(const openstudio::IdfExtensibleGroup& idfEG);
   Model toModel(const openstudio::Workspace& workspace);
   boost::optional<Model> toOptionalModel(const openstudio::Workspace& workspace);
   Component toComponent(const openstudio::Workspace& workspace);
@@ -127,13 +116,6 @@ namespace model {
 
   namespace openstudio {
   namespace model {
-    boost::optional<ModelObject> toModelObject(const openstudio::IdfObject& idfObject) {
-      return idfObject.optionalCast<ModelObject>();
-    }
-    boost::optional<ModelExtensibleGroup> toModelExtensibleGroup(const openstudio::IdfExtensibleGroup& idfEG) 
-    {
-      return idfEG.optionalCast<ModelExtensibleGroup>();
-    }
     Model toModel(const openstudio::Workspace& workspace) {
       return workspace.cast<Model>();
     }
@@ -158,20 +140,24 @@ namespace model {
     return os.str();
   }
 
-  // This really shouldnt be necessary
+  // This really shouldn't be necessary
   IdfObject toIdfObject() const {
     return *self;
   }
 };
 
+//MODELOBJECT_TEMPLATES(ModelObject); // swig preprocessor did not seem to see these for other objects so these are defined above 
+MODELEXTENSIBLEGROUP_TEMPLATES(ModelExtensibleGroup);
 MODELOBJECT_TEMPLATES(ParentObject);
 MODELOBJECT_TEMPLATES(ResourceObject);
 UNIQUEMODELOBJECT_TEMPLATES(Version);
 UNIQUEMODELOBJECT_TEMPLATES(LifeCycleCostParameters);
 UNIQUEMODELOBJECT_TEMPLATES(RadianceParameters);
-MODELOBJECT_TEMPLATES(Meter);
-MODELOBJECT_TEMPLATES(LifeCycleCost); // Probably need to make a ModelEconomics.i file for these
-MODELOBJECT_TEMPLATES(UtilityBill); // Probably need to make a ModelEconomics.i file for these
+MODELOBJECT_TEMPLATES(OutputMeter);
+MODELOBJECT_TEMPLATES(MeterCustom);
+MODELOBJECT_TEMPLATES(MeterCustomDecrement);
+MODELOBJECT_TEMPLATES(LifeCycleCost); 
+MODELOBJECT_TEMPLATES(UtilityBill); 
 MODELEXTENSIBLEGROUP_TEMPLATES(BillingPeriod)
 MODELOBJECT_TEMPLATES(ComponentData);
 MODELOBJECT_TEMPLATES(ScheduleTypeLimits); // Needed for OutputVariable
@@ -185,15 +171,33 @@ MODELOBJECT_TEMPLATES(ScheduleRuleset);
 MODELOBJECT_TEMPLATES(OutputVariable);
 MODELOBJECT_TEMPLATES(GenericModelObject);
 MODELOBJECT_TEMPLATES(ModelObjectList);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemSensor);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemActuator);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemConstructionIndexVariable);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemCurveOrTableIndexVariable);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemGlobalVariable);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemInternalVariable);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemMeteredOutputVariable);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemTrendVariable);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemSubroutine);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemProgram);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemProgramCallingManager);
+MODELOBJECT_TEMPLATES(EnergyManagementSystemOutputVariable);
+UNIQUEMODELOBJECT_TEMPLATES(OutputEnergyManagementSystem);
 
+SWIG_MODELOBJECT(ModelObject, 0);
+SWIG_MODELEXTENSIBLEGROUP(ModelExtensibleGroup);
 SWIG_MODELOBJECT(ParentObject, 0);
 SWIG_MODELOBJECT(ResourceObject, 0);
 SWIG_UNIQUEMODELOBJECT(Version);
 SWIG_UNIQUEMODELOBJECT(LifeCycleCostParameters);
 SWIG_UNIQUEMODELOBJECT(RadianceParameters);
-SWIG_MODELOBJECT(Meter, 1);
-SWIG_MODELOBJECT(LifeCycleCost, 1); // Probably need to make a ModelEconomics.i file for these
-SWIG_MODELOBJECT(UtilityBill, 1); // Probably need to make a ModelEconomics.i file for these
+SWIG_MODELOBJECT(OutputMeter, 1);
+SWIG_MODELOBJECT(MeterCustom, 1);
+SWIG_MODELOBJECT(MeterCustomDecrement, 1);
+SWIG_MODELOBJECT(LifeCycleCost, 1);
+SWIG_MODELOBJECT(UtilityBill, 1); 
+SWIG_MODELEXTENSIBLEGROUP(BillingPeriod);
 SWIG_MODELOBJECT(ComponentData, 1);
 SWIG_MODELOBJECT(ScheduleTypeLimits, 1); // Needed for OutputVariable
 SWIG_MODELOBJECT(ScheduleBase, 0); // Needed for OutputVariable
@@ -206,5 +210,18 @@ SWIG_MODELOBJECT(ScheduleRuleset, 1);
 SWIG_MODELOBJECT(OutputVariable, 1);
 SWIG_MODELOBJECT(GenericModelObject, 0); 
 SWIG_MODELOBJECT(ModelObjectList, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemSensor, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemActuator, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemConstructionIndexVariable, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemCurveOrTableIndexVariable, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemGlobalVariable, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemInternalVariable, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemMeteredOutputVariable, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemTrendVariable, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemSubroutine, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemProgram, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemProgramCallingManager, 1);
+SWIG_MODELOBJECT(EnergyManagementSystemOutputVariable, 1);
+SWIG_UNIQUEMODELOBJECT(OutputEnergyManagementSystem);
 
 #endif //MODEL_CORE_I 

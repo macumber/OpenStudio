@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "PlantLoop.hpp"
 #include "PlantLoop_Impl.hpp"
@@ -42,8 +51,19 @@
 #include "CoilHeatingWater_Impl.hpp"
 #include "ControllerWaterCoil.hpp"
 #include "ControllerWaterCoil_Impl.hpp"
-#include <utilities/idd/OS_PlantLoop_FieldEnums.hxx>
+#include "PlantEquipmentOperationScheme.hpp"
+#include "PlantEquipmentOperationScheme_Impl.hpp"
+#include "PlantEquipmentOperationHeatingLoad.hpp"
+#include "PlantEquipmentOperationHeatingLoad_Impl.hpp"
+#include "PlantEquipmentOperationCoolingLoad.hpp"
+#include "PlantEquipmentOperationCoolingLoad_Impl.hpp"
+#include "ScheduleTypeRegistry.hpp"
+#include "Schedule.hpp"
+#include "Schedule_Impl.hpp"
 #include "../utilities/core/Assert.hpp"
+#include <utilities/idd/OS_PlantLoop_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
+#include <utilities/idd/IddFactory.hxx>
 
 namespace openstudio {
 
@@ -70,13 +90,6 @@ PlantLoop_Impl::PlantLoop_Impl(const PlantLoop_Impl& other,
                                    bool keepHandle)
   : Loop_Impl(other,model,keepHandle)
 {
-}
-
-std::vector<ModelObject> PlantLoop_Impl::demandComponents( HVACComponent inletComp,
-                                                           HVACComponent outletComp,
-                                                           openstudio::IddObjectType type )
-{
-  return Loop_Impl::demandComponents(inletComp,outletComp,type);
 }
 
 std::vector<openstudio::IdfObject> PlantLoop_Impl::remove()
@@ -146,28 +159,9 @@ IddObjectType PlantLoop_Impl::iddObjectType() const {
   return PlantLoop::iddObjectType();
 }
 
-std::vector<ModelObject> PlantLoop_Impl::demandComponents(openstudio::IddObjectType type)
-{
-  return demandComponents( demandInletNode(), demandOutletNode(), type );
-}
-
-OptionalModelObject PlantLoop_Impl::component(openstudio::Handle handle)
-{
-  return Loop_Impl::component( handle );
-}
-
 ModelObject PlantLoop_Impl::clone(Model model) const
 {
   return Loop_Impl::clone(model);
-}
-
-std::vector<ModelObject> PlantLoop_Impl::demandComponents(
-    std::vector<HVACComponent> inletComps,
-    std::vector<HVACComponent> outletComps,
-    openstudio::IddObjectType type
-  )
-{
-  return Loop_Impl::demandComponents(inletComps, outletComps, type);
 }
 
 unsigned PlantLoop_Impl::supplyInletPort() const
@@ -200,9 +194,19 @@ Node PlantLoop_Impl::supplyOutletNode() const
   return connectedObject(supplyOutletPort())->optionalCast<Node>().get();
 }
 
+std::vector<Node> PlantLoop_Impl::supplyOutletNodes() const
+{
+  return std::vector<Node> { supplyOutletNode() };
+}
+
 Node PlantLoop_Impl::demandInletNode() const
 {
   return connectedObject(demandInletPort())->optionalCast<Node>().get();
+}
+
+std::vector<Node> PlantLoop_Impl::demandInletNodes() const
+{
+  return std::vector<Node> { demandInletNode() };
 }
 
 Node PlantLoop_Impl::demandOutletNode() const
@@ -275,7 +279,7 @@ bool PlantLoop_Impl::removeSupplyBranchWithComponent( HVACComponent component )
   return removeBranchWithComponent(component,supplySplitter(),supplyMixer(),true);
 }
 
-bool PlantLoop_Impl::addDemandBranchForComponent( HVACComponent component )
+bool PlantLoop_Impl::addDemandBranchForComponent( HVACComponent component, bool tertiary )
 {
   Model _model = this->model();
 
@@ -296,7 +300,16 @@ bool PlantLoop_Impl::addDemandBranchForComponent( HVACComponent component )
         if ( (node->outletModelObject().get() == mixer) &&       
               (node->inletModelObject().get() == splitter) )       
         {
-          return component.addToNode(node.get());
+          if( auto waterToWater = component.optionalCast<WaterToWaterComponent>() ) {
+            if( tertiary ) {
+              return waterToWater->addToTertiaryNode(node.get());
+            } else {
+              return waterToWater->addToNode(node.get());
+            }
+          }
+          else {
+            return component.addToNode(node.get());
+          }
         }
       }
     }
@@ -313,7 +326,20 @@ bool PlantLoop_Impl::addDemandBranchForComponent( HVACComponent component )
   _model.connect(splitter,nextOutletPort,node,node.inletPort());
   _model.connect(node,node.outletPort(),mixer,nextInletPort);
 
-  if( component.addToNode(node) )
+   bool result = false;
+
+   if( auto waterToWater = component.optionalCast<WaterToWaterComponent>() ) {
+     if( tertiary ) {
+       result = waterToWater->addToTertiaryNode(node);
+     } else {
+       result = waterToWater->addToNode(node);
+     }
+   }
+   else {
+     result = component.addToNode(node);
+   }
+
+  if( result )
   {
     return true;
   }
@@ -449,6 +475,23 @@ Mixer PlantLoop_Impl::demandMixer()
 Splitter PlantLoop_Impl::demandSplitter()
 {
   return demandComponents( IddObjectType::OS_Connector_Splitter ).front().cast<ConnectorSplitter>();
+}
+
+std::string PlantLoop_Impl::loadDistributionScheme()
+{
+  auto value = getString(OS_PlantLoopFields::LoadDistributionScheme,true);
+  OS_ASSERT(value);
+  return value.get();
+}
+
+bool PlantLoop_Impl::setLoadDistributionScheme(std::string scheme)
+{
+  if( istringEqual(scheme,"Sequential") ) {
+    scheme = "SequentialLoad";
+  } else if( istringEqual(scheme,"Uniform") ) {
+    scheme = "UniformLoad";
+  }
+  return setString(OS_PlantLoopFields::LoadDistributionScheme,scheme);
 }
 
 double PlantLoop_Impl::maximumLoopTemperature()
@@ -625,6 +668,133 @@ void PlantLoop_Impl::resetCommonPipeSimulation()
   setString(OS_PlantLoopFields::CommonPipeSimulation,"");
 }
 
+  boost::optional<PlantEquipmentOperationHeatingLoad> PlantLoop_Impl::plantEquipmentOperationHeatingLoad() const {
+    return getObject<ModelObject>().getModelObjectTarget<PlantEquipmentOperationHeatingLoad>(OS_PlantLoopFields::PlantEquipmentOperationHeatingLoad);
+  }
+
+  bool PlantLoop_Impl::setPlantEquipmentOperationHeatingLoad(const boost::optional<PlantEquipmentOperationHeatingLoad>& plantEquipmentOperationHeatingLoad) {
+    bool result(false);
+    if (plantEquipmentOperationHeatingLoad) {
+      result = setPointer(OS_PlantLoopFields::PlantEquipmentOperationHeatingLoad, plantEquipmentOperationHeatingLoad.get().handle());
+    }
+    else {
+      resetPlantEquipmentOperationHeatingLoad();
+      result = true;
+    }
+    return result;
+  }
+
+  void PlantLoop_Impl::resetPlantEquipmentOperationHeatingLoad() {
+    bool result = setString(OS_PlantLoopFields::PlantEquipmentOperationHeatingLoad, "");
+    OS_ASSERT(result);
+  }
+
+  boost::optional<PlantEquipmentOperationCoolingLoad> PlantLoop_Impl::plantEquipmentOperationCoolingLoad() const {
+    return getObject<ModelObject>().getModelObjectTarget<PlantEquipmentOperationCoolingLoad>(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoad);
+  }
+
+  bool PlantLoop_Impl::setPlantEquipmentOperationCoolingLoad(const boost::optional<PlantEquipmentOperationCoolingLoad>& plantEquipmentOperationCoolingLoad) {
+    bool result(false);
+    if (plantEquipmentOperationCoolingLoad) {
+      result = setPointer(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoad, plantEquipmentOperationCoolingLoad.get().handle());
+    }
+    else {
+      resetPlantEquipmentOperationCoolingLoad();
+      result = true;
+    }
+    return result;
+  }
+
+  void PlantLoop_Impl::resetPlantEquipmentOperationCoolingLoad() {
+    bool result = setString(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoad, "");
+    OS_ASSERT(result);
+  }
+
+  boost::optional<PlantEquipmentOperationScheme> PlantLoop_Impl::primaryPlantEquipmentOperationScheme() const {
+    return getObject<ModelObject>().getModelObjectTarget<PlantEquipmentOperationScheme>(OS_PlantLoopFields::PrimaryPlantEquipmentOperationScheme);
+  }
+
+  bool PlantLoop_Impl::setPrimaryPlantEquipmentOperationScheme(const boost::optional<PlantEquipmentOperationScheme>& plantEquipmentOperationScheme) {
+    bool result(false);
+    if (plantEquipmentOperationScheme) {
+      result = setPointer(OS_PlantLoopFields::PrimaryPlantEquipmentOperationScheme, plantEquipmentOperationScheme.get().handle());
+    }
+    else {
+      resetPrimaryPlantEquipmentOperationScheme();
+      result = true;
+    }
+    return result;
+  }
+
+  void PlantLoop_Impl::resetPrimaryPlantEquipmentOperationScheme() {
+    bool result = setString(OS_PlantLoopFields::PrimaryPlantEquipmentOperationScheme, "");
+    OS_ASSERT(result);
+  }
+
+  bool PlantLoop_Impl::setPlantEquipmentOperationHeatingLoadSchedule(Schedule & schedule) {
+    bool result = setSchedule(OS_PlantLoopFields::PlantEquipmentOperationHeatingLoadSchedule,
+                              "PlantLoop",
+                              "Plant Equipment Operation Heating Load Schedule",
+                              schedule);
+    return result;
+  }
+  
+  void PlantLoop_Impl::resetPlantEquipmentOperationHeatingLoadSchedule() {
+    setString(OS_PlantLoopFields::PlantEquipmentOperationHeatingLoadSchedule, "");
+  }
+  
+  boost::optional<Schedule> PlantLoop_Impl::plantEquipmentOperationHeatingLoadSchedule() const {
+    return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_PlantLoopFields::PlantEquipmentOperationHeatingLoadSchedule);
+  }
+  
+  bool PlantLoop_Impl::setPlantEquipmentOperationCoolingLoadSchedule(Schedule & schedule) {
+    bool result = setSchedule(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoadSchedule,
+                              "PlantLoop",
+                              "Plant Equipment Operation Cooling Load Schedule",
+                              schedule);
+    return result;
+  }
+  
+  boost::optional<Schedule> PlantLoop_Impl::plantEquipmentOperationCoolingLoadSchedule() const {
+    return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoadSchedule);
+  }
+  
+  void PlantLoop_Impl::resetPlantEquipmentOperationCoolingLoadSchedule() {
+    setString(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoadSchedule, "");
+  }
+  
+  bool PlantLoop_Impl::setPrimaryPlantEquipmentOperationSchemeSchedule(Schedule & schedule) {
+    bool result = setSchedule(OS_PlantLoopFields::PrimaryPlantEquipmentOperationSchemeSchedule,
+                              "PlantLoop",
+                              "Primary Plant Equipment Operation Scheme Schedule",
+                              schedule);
+    return result;
+  }
+  
+  void PlantLoop_Impl::resetPrimaryPlantEquipmentOperationSchemeSchedule() {
+    setString(OS_PlantLoopFields::PlantEquipmentOperationCoolingLoadSchedule, "");
+  }
+  
+  boost::optional<Schedule> PlantLoop_Impl::primaryPlantEquipmentOperationSchemeSchedule() const {
+    return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_PlantLoopFields::PrimaryPlantEquipmentOperationSchemeSchedule);
+  }
+  
+  bool PlantLoop_Impl::setComponentSetpointOperationSchemeSchedule(Schedule & schedule) {
+    bool result = setSchedule(OS_PlantLoopFields::ComponentSetpointOperationSchemeSchedule,
+                              "PlantLoop",
+                              "Component Setpoint Operation Scheme Schedule",
+                              schedule);
+    return result;
+  }
+  
+  boost::optional<Schedule> PlantLoop_Impl::componentSetpointOperationSchemeSchedule() const {
+    return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_PlantLoopFields::ComponentSetpointOperationSchemeSchedule);
+  }
+  
+  void PlantLoop_Impl::resetComponentSetpointOperationSchemeSchedule() {
+    setString(OS_PlantLoopFields::ComponentSetpointOperationSchemeSchedule, "");
+  }
+
 } // detail
 
 PlantLoop::PlantLoop(Model& model)
@@ -635,6 +805,7 @@ PlantLoop::PlantLoop(Model& model)
   SizingPlant sizingPlant(model,*this);
 
   autocalculatePlantLoopVolume();
+  setLoadDistributionScheme("Optimal");
 
   // supply side
 
@@ -692,7 +863,6 @@ PlantLoop::PlantLoop(Model& model)
   setLoopTemperatureSetpointNode(supplyOutletNode);
 
   setString(OS_PlantLoopFields::DemandSideConnectorListName,"");
-  setString(OS_PlantLoopFields::LoadDistributionScheme,"");
   setString(OS_PlantLoopFields::AvailabilityManagerListName,"");
   setString(OS_PlantLoopFields::PlantLoopDemandCalculationScheme,"");
   setString(OS_PlantLoopFields::CommonPipeSimulation,"");
@@ -703,64 +873,14 @@ PlantLoop::PlantLoop(std::shared_ptr<detail::PlantLoop_Impl> impl)
   : Loop(impl)
 {}
 
-//std::vector<ModelObject> PlantLoop::supplyComponents(HVACComponent inletComp,
-//                                                     HVACComponent outletComp,
-//                                                     openstudio::IddObjectType type)
-//{
-//  return getImpl<detail::PlantLoop_Impl>()->supplyComponents(inletComp, outletComp, type);
-//}
-
-std::vector<ModelObject> PlantLoop::demandComponents(HVACComponent inletComp,
-                                                     HVACComponent outletComp,
-                                                     openstudio::IddObjectType type)
-{
-  return getImpl<detail::PlantLoop_Impl>()->demandComponents(inletComp, outletComp, type);
-}
-
 std::vector<IdfObject> PlantLoop::remove()
 {
   return getImpl<detail::PlantLoop_Impl>()->remove();
 }
 
-//std::vector<ModelObject> PlantLoop::components(openstudio::IddObjectType type)
-//{
-//  return getImpl<detail::PlantLoop_Impl>()->components( type );
-//}
-
-//std::vector<ModelObject> PlantLoop::supplyComponents(openstudio::IddObjectType type)
-//{
-//  return getImpl<detail::PlantLoop_Impl>()->supplyComponents( type );
-//}
-
-std::vector<ModelObject> PlantLoop::demandComponents(openstudio::IddObjectType type)
-{
-  return getImpl<detail::PlantLoop_Impl>()->demandComponents( type );
-}
-
-boost::optional<ModelObject> PlantLoop::component(openstudio::Handle handle)
-{
-  return getImpl<detail::PlantLoop_Impl>()->component( handle );
-}
-
 ModelObject PlantLoop::clone(Model model) const
 {
   return getImpl<detail::PlantLoop_Impl>()->clone( model );
-}
-
-//std::vector<ModelObject> PlantLoop::supplyComponents(std::vector<HVACComponent> inletComps,
-//    std::vector<HVACComponent> outletComps,
-//    openstudio::IddObjectType type
-//  )
-//{
-//  return getImpl<detail::PlantLoop_Impl>()->supplyComponents( inletComps, outletComps, type);
-//}
-
-std::vector<ModelObject> PlantLoop::demandComponents(std::vector<HVACComponent> inletComps,
-    std::vector<HVACComponent> outletComps,
-    openstudio::IddObjectType type
-  )
-{
-  return getImpl<detail::PlantLoop_Impl>()->demandComponents( inletComps, outletComps, type);
 }
 
 unsigned PlantLoop::supplyInletPort() const
@@ -793,9 +913,19 @@ Node PlantLoop::supplyOutletNode() const
   return getImpl<detail::PlantLoop_Impl>()->supplyOutletNode();
 }
 
+std::vector<Node> PlantLoop::supplyOutletNodes() const
+{
+  return getImpl<detail::PlantLoop_Impl>()->supplyOutletNodes();
+}
+
 Node PlantLoop::demandInletNode() const
 {
   return getImpl<detail::PlantLoop_Impl>()->demandInletNode();
+}
+
+std::vector<Node> PlantLoop::demandInletNodes() const
+{
+  return getImpl<detail::PlantLoop_Impl>()->demandInletNodes();
 }
 
 Node PlantLoop::demandOutletNode() const
@@ -803,9 +933,9 @@ Node PlantLoop::demandOutletNode() const
   return getImpl<detail::PlantLoop_Impl>()->demandOutletNode();
 }
 
-bool PlantLoop::addDemandBranchForComponent( HVACComponent component )
+bool PlantLoop::addDemandBranchForComponent( HVACComponent component, bool tertiary )
 {
-  return getImpl<detail::PlantLoop_Impl>()->addDemandBranchForComponent( component );
+  return getImpl<detail::PlantLoop_Impl>()->addDemandBranchForComponent( component, tertiary );
 }
 
 bool PlantLoop::addSupplyBranchForComponent( HVACComponent component )
@@ -968,6 +1098,104 @@ void PlantLoop::resetCommonPipeSimulation()
   getImpl<detail::PlantLoop_Impl>()->resetCommonPipeSimulation();
 }
 
+boost::optional<PlantEquipmentOperationHeatingLoad> PlantLoop::plantEquipmentOperationHeatingLoad() const {
+  return getImpl<detail::PlantLoop_Impl>()->plantEquipmentOperationHeatingLoad();
+}
+
+bool PlantLoop::setPlantEquipmentOperationHeatingLoad(const PlantEquipmentOperationHeatingLoad& plantOperation) {
+  return getImpl<detail::PlantLoop_Impl>()->setPlantEquipmentOperationHeatingLoad(plantOperation);
+}
+
+void PlantLoop::resetPlantEquipmentOperationHeatingLoad() {
+  getImpl<detail::PlantLoop_Impl>()->resetPlantEquipmentOperationHeatingLoad();
+}
+
+boost::optional<PlantEquipmentOperationCoolingLoad> PlantLoop::plantEquipmentOperationCoolingLoad() const {
+  return getImpl<detail::PlantLoop_Impl>()->plantEquipmentOperationCoolingLoad();
+}
+
+bool PlantLoop::setPlantEquipmentOperationCoolingLoad(const PlantEquipmentOperationCoolingLoad& plantOperation) {
+  return getImpl<detail::PlantLoop_Impl>()->setPlantEquipmentOperationCoolingLoad(plantOperation);
+}
+
+void PlantLoop::resetPlantEquipmentOperationCoolingLoad() {
+  getImpl<detail::PlantLoop_Impl>()->resetPlantEquipmentOperationCoolingLoad();
+}
+
+boost::optional<PlantEquipmentOperationScheme> PlantLoop::primaryPlantEquipmentOperationScheme() const {
+  return getImpl<detail::PlantLoop_Impl>()->primaryPlantEquipmentOperationScheme();
+}
+
+bool PlantLoop::setPrimaryPlantEquipmentOperationScheme(const PlantEquipmentOperationScheme& plantOperation) {
+  return getImpl<detail::PlantLoop_Impl>()->setPrimaryPlantEquipmentOperationScheme(plantOperation);
+}
+
+void PlantLoop::resetPrimaryPlantEquipmentOperationScheme() {
+  getImpl<detail::PlantLoop_Impl>()->resetPrimaryPlantEquipmentOperationScheme();
+}
+
+std::string PlantLoop::loadDistributionScheme()
+{
+  return getImpl<detail::PlantLoop_Impl>()->loadDistributionScheme();
+}
+
+bool PlantLoop::setLoadDistributionScheme(std::string scheme)
+{
+  return getImpl<detail::PlantLoop_Impl>()->setLoadDistributionScheme(scheme);
+}
+
+std::vector<std::string> PlantLoop::loadDistributionSchemeValues() {
+  return getIddKeyNames(IddFactory::instance().getObject(iddObjectType()).get(),
+                        OS_PlantLoopFields::LoadDistributionScheme);
+}
+
+bool PlantLoop::setPlantEquipmentOperationHeatingLoadSchedule(Schedule & schedule) {
+  return getImpl<detail::PlantLoop_Impl>()->setPlantEquipmentOperationHeatingLoadSchedule(schedule);
+}
+
+void PlantLoop::resetPlantEquipmentOperationHeatingLoadSchedule() {
+  getImpl<detail::PlantLoop_Impl>()->resetPlantEquipmentOperationHeatingLoadSchedule();
+}
+
+boost::optional<Schedule> PlantLoop::plantEquipmentOperationHeatingLoadSchedule() const {
+  return getImpl<detail::PlantLoop_Impl>()->plantEquipmentOperationHeatingLoadSchedule();
+}
+
+bool PlantLoop::setPlantEquipmentOperationCoolingLoadSchedule(Schedule & schedule) {
+  return getImpl<detail::PlantLoop_Impl>()->setPlantEquipmentOperationCoolingLoadSchedule(schedule);
+}
+
+boost::optional<Schedule> PlantLoop::plantEquipmentOperationCoolingLoadSchedule() const {
+  return getImpl<detail::PlantLoop_Impl>()->plantEquipmentOperationCoolingLoadSchedule();
+}
+
+void PlantLoop::resetPlantEquipmentOperationCoolingLoadSchedule() {
+  getImpl<detail::PlantLoop_Impl>()->resetPlantEquipmentOperationCoolingLoadSchedule();
+}
+
+bool PlantLoop::setPrimaryPlantEquipmentOperationSchemeSchedule(Schedule & schedule) {
+  return getImpl<detail::PlantLoop_Impl>()->setPrimaryPlantEquipmentOperationSchemeSchedule(schedule);
+}
+
+void PlantLoop::resetPrimaryPlantEquipmentOperationSchemeSchedule() {
+  getImpl<detail::PlantLoop_Impl>()->resetPrimaryPlantEquipmentOperationSchemeSchedule();
+}
+
+boost::optional<Schedule> PlantLoop::primaryPlantEquipmentOperationSchemeSchedule() const {
+  return getImpl<detail::PlantLoop_Impl>()->primaryPlantEquipmentOperationSchemeSchedule();
+}
+
+bool PlantLoop::setComponentSetpointOperationSchemeSchedule(Schedule & schedule) {
+  return getImpl<detail::PlantLoop_Impl>()->setComponentSetpointOperationSchemeSchedule(schedule);
+}
+
+boost::optional<Schedule> PlantLoop::componentSetpointOperationSchemeSchedule() const {
+  return getImpl<detail::PlantLoop_Impl>()->componentSetpointOperationSchemeSchedule();
+}
+
+void PlantLoop::resetComponentSetpointOperationSchemeSchedule() {
+  getImpl<detail::PlantLoop_Impl>()->resetComponentSetpointOperationSchemeSchedule();
+}
 
 } // model
 } // openstudio

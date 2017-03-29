@@ -1,22 +1,33 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
+#include <vector>
+#include <string>
 #include "SiteGroundTemperatureBuildingSurface.hpp"
 #include "SiteGroundTemperatureBuildingSurface_Impl.hpp"
 
@@ -26,8 +37,9 @@
 #include "Site_Impl.hpp"
 
 #include <utilities/idd/OS_Site_GroundTemperature_BuildingSurface_FieldEnums.hxx>
-
+#include <utilities/idd/IddEnums.hxx>
 #include "../utilities/core/Assert.hpp"
+#include "../utilities/time/Date.hpp"
 
 namespace openstudio {
 namespace model {
@@ -35,8 +47,8 @@ namespace model {
 namespace detail {
 
   SiteGroundTemperatureBuildingSurface_Impl::SiteGroundTemperatureBuildingSurface_Impl(
-      const IdfObject& idfObject, 
-      Model_Impl* model, 
+      const IdfObject& idfObject,
+      Model_Impl* model,
       bool keepHandle)
     : ModelObject_Impl(idfObject,model,keepHandle)
   {
@@ -195,6 +207,63 @@ namespace detail {
     return isEmpty(OS_Site_GroundTemperature_BuildingSurfaceFields::DecemberGroundTemperature);
   }
 
+  double SiteGroundTemperatureBuildingSurface_Impl::getTemperatureByMonth(int month) const {
+    double retval;
+    switch(month) {
+      case 1 : retval = januaryGroundTemperature(); break;
+      case 2 : retval = februaryGroundTemperature(); break;
+      case 3 : retval = marchGroundTemperature(); break;
+      case 4 : retval = aprilGroundTemperature(); break;
+      case 5 : retval = mayGroundTemperature(); break;
+      case 6 : retval = juneGroundTemperature(); break;
+      case 7 : retval = julyGroundTemperature(); break;
+      case 8 : retval = augustGroundTemperature(); break;
+      case 9 : retval = septemberGroundTemperature(); break;
+      case 10 : retval = octoberGroundTemperature(); break;
+      case 11 : retval = novemberGroundTemperature(); break;
+      case 12 : retval = decemberGroundTemperature(); break;
+      default : LOG_AND_THROW("SiteGroundTemperature::getTemperatureByMonth: Invalid Month " + std::to_string(month)); break;
+    }
+    return retval;
+  }
+
+  double SiteGroundTemperatureBuildingSurface_Impl::getTemperatureByMonth(const openstudio::MonthOfYear & month) const {
+    return getTemperatureByMonth(month.value());
+  }
+
+  bool SiteGroundTemperatureBuildingSurface_Impl::isMonthDefaulted(int month) const {
+    bool is_defaulted;
+    switch(month) {
+      case 1 : is_defaulted = isJanuaryGroundTemperatureDefaulted(); break;
+      case 2 : is_defaulted = isFebruaryGroundTemperatureDefaulted(); break;
+      case 3 : is_defaulted = isMarchGroundTemperatureDefaulted(); break;
+      case 4 : is_defaulted = isAprilGroundTemperatureDefaulted(); break;
+      case 5 : is_defaulted = isMayGroundTemperatureDefaulted(); break;
+      case 6 : is_defaulted = isJuneGroundTemperatureDefaulted(); break;
+      case 7 : is_defaulted = isJulyGroundTemperatureDefaulted(); break;
+      case 8 : is_defaulted = isAugustGroundTemperatureDefaulted(); break;
+      case 9 : is_defaulted = isSeptemberGroundTemperatureDefaulted(); break;
+      case 10 : is_defaulted = isOctoberGroundTemperatureDefaulted(); break;
+      case 11 : is_defaulted = isNovemberGroundTemperatureDefaulted(); break;
+      case 12 : is_defaulted = isDecemberGroundTemperatureDefaulted(); break;
+      default : LOG_AND_THROW("SiteGroundTemperature::getTemperatureByMonth: Invalid Month " + std::to_string(month)); break;
+    }
+    return is_defaulted;
+  }
+
+  bool SiteGroundTemperatureBuildingSurface_Impl::isMonthDefaulted(const openstudio::MonthOfYear & month) const {
+    return isMonthDefaulted(month.value());
+  }
+
+  std::vector<double> SiteGroundTemperatureBuildingSurface_Impl::getAllMonthlyTemperatures() const {
+    std::vector<double> monthly_temperatures;
+    monthly_temperatures.reserve(12);
+    for (int i=1; i <= 12; ++i) {
+      monthly_temperatures.push_back(getTemperatureByMonth(i));
+    }
+    return monthly_temperatures;
+  }
+
   void SiteGroundTemperatureBuildingSurface_Impl::setJanuaryGroundTemperature(double januaryGroundTemperature) {
     bool result = setDouble(OS_Site_GroundTemperature_BuildingSurfaceFields::JanuaryGroundTemperature, januaryGroundTemperature);
     OS_ASSERT(result);
@@ -315,6 +384,67 @@ namespace detail {
     OS_ASSERT(result);
   }
 
+  void SiteGroundTemperatureBuildingSurface_Impl::setTemperatureByMonth(int month, double temperature) {
+    switch(month) {
+      case 1 : setJanuaryGroundTemperature(temperature); break;
+      case 2 : setFebruaryGroundTemperature(temperature); break;
+      case 3 : setMarchGroundTemperature(temperature); break;
+      case 4 : setAprilGroundTemperature(temperature); break;
+      case 5 : setMayGroundTemperature(temperature); break;
+      case 6 : setJuneGroundTemperature(temperature); break;
+      case 7 : setJulyGroundTemperature(temperature); break;
+      case 8 : setAugustGroundTemperature(temperature); break;
+      case 9 : setSeptemberGroundTemperature(temperature); break;
+      case 10 : setOctoberGroundTemperature(temperature); break;
+      case 11 : setNovemberGroundTemperature(temperature); break;
+      case 12 : setDecemberGroundTemperature(temperature); break;
+      default : LOG_AND_THROW("SiteGroundTemperature::getTemperatureByMonth: Invalid Month " + std::to_string(month)); break;
+    }
+  }
+
+  void SiteGroundTemperatureBuildingSurface_Impl::setTemperatureByMonth(const openstudio::MonthOfYear & month, double temperature) {
+    return setTemperatureByMonth(month.value(), temperature);
+  }
+
+  void SiteGroundTemperatureBuildingSurface_Impl::resetTemperatureByMonth(int month) {
+    switch(month) {
+      case 1 : resetJanuaryGroundTemperature(); break;
+      case 2 : resetFebruaryGroundTemperature(); break;
+      case 3 : resetMarchGroundTemperature(); break;
+      case 4 : resetAprilGroundTemperature(); break;
+      case 5 : resetMayGroundTemperature(); break;
+      case 6 : resetJuneGroundTemperature(); break;
+      case 7 : resetJulyGroundTemperature(); break;
+      case 8 : resetAugustGroundTemperature(); break;
+      case 9 : resetSeptemberGroundTemperature(); break;
+      case 10 : resetOctoberGroundTemperature(); break;
+      case 11 : resetNovemberGroundTemperature(); break;
+      case 12 : resetDecemberGroundTemperature(); break;
+      default : LOG_AND_THROW("SiteGroundTemperature::getTemperatureByMonth: Invalid Month " + std::to_string(month)); break;
+    }
+  }
+
+  void SiteGroundTemperatureBuildingSurface_Impl::resetTemperatureByMonth(const openstudio::MonthOfYear & month) {
+    return resetTemperatureByMonth(month.value());
+  }
+
+  void SiteGroundTemperatureBuildingSurface_Impl::resetAllMonths() {
+    for (int i = 1; i <= 12; ++i) {
+      resetTemperatureByMonth(i);
+    }
+  }
+
+  bool SiteGroundTemperatureBuildingSurface_Impl::setAllMonthlyTemperatures(const std::vector<double> &monthly_temperatures) {
+    if (monthly_temperatures.size() == 12) {
+      for (int i = 1; i <= 12; ++i) {
+        setTemperatureByMonth(i, monthly_temperatures[i-1]);
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+
 } // detail
 
 IddObjectType SiteGroundTemperatureBuildingSurface::iddObjectType() {
@@ -418,6 +548,26 @@ bool SiteGroundTemperatureBuildingSurface::isDecemberGroundTemperatureDefaulted(
   return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->isDecemberGroundTemperatureDefaulted();
 }
 
+double SiteGroundTemperatureBuildingSurface::getTemperatureByMonth(int month) const {
+  return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->getTemperatureByMonth(month);
+}
+
+double SiteGroundTemperatureBuildingSurface::getTemperatureByMonth(const openstudio::MonthOfYear & month) const {
+  return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->getTemperatureByMonth(month);
+}
+
+bool SiteGroundTemperatureBuildingSurface::isMonthDefaulted(int month) const {
+  return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->isMonthDefaulted(month);
+}
+
+bool SiteGroundTemperatureBuildingSurface::isMonthDefaulted(const openstudio::MonthOfYear & month) const {
+  return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->isMonthDefaulted(month);
+}
+
+std::vector<double> SiteGroundTemperatureBuildingSurface::getAllMonthlyTemperatures() const {
+  return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->getAllMonthlyTemperatures();
+}
+
 void SiteGroundTemperatureBuildingSurface::setJanuaryGroundTemperature(double januaryGroundTemperature) {
   getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->setJanuaryGroundTemperature(januaryGroundTemperature);
 }
@@ -514,6 +664,30 @@ void SiteGroundTemperatureBuildingSurface::resetDecemberGroundTemperature() {
   getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->resetDecemberGroundTemperature();
 }
 
+void SiteGroundTemperatureBuildingSurface::setTemperatureByMonth(int month, double temperature) {
+  getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->setTemperatureByMonth(month, temperature);
+}
+
+void SiteGroundTemperatureBuildingSurface::setTemperatureByMonth(const openstudio::MonthOfYear & month, double temperature) {
+  getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->setTemperatureByMonth(month, temperature);
+}
+
+void SiteGroundTemperatureBuildingSurface::resetTemperatureByMonth(int month) {
+  getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->resetTemperatureByMonth(month);
+}
+
+void SiteGroundTemperatureBuildingSurface::resetTemperatureByMonth(const openstudio::MonthOfYear & month) {
+  getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->resetTemperatureByMonth(month);
+}
+
+void SiteGroundTemperatureBuildingSurface::resetAllMonths() {
+  getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->resetAllMonths();
+}
+
+bool SiteGroundTemperatureBuildingSurface::setAllMonthlyTemperatures(const std::vector<double> &monthly_temperatures) {
+  return getImpl<detail::SiteGroundTemperatureBuildingSurface_Impl>()->setAllMonthlyTemperatures(monthly_temperatures);
+}
+
 /// @cond
 SiteGroundTemperatureBuildingSurface::SiteGroundTemperatureBuildingSurface(std::shared_ptr<detail::SiteGroundTemperatureBuildingSurface_Impl> impl)
   : ModelObject(impl)
@@ -527,4 +701,3 @@ SiteGroundTemperatureBuildingSurface::SiteGroundTemperatureBuildingSurface(Model
 
 } // model
 } // openstudio
-

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "../ForwardTranslator.hpp"
 #include "../../model/Model.hpp"
@@ -23,6 +32,10 @@
 #include "../../model/Schedule_Impl.hpp"
 #include "../../model/FanOnOff.hpp"
 #include "../../model/FanOnOff_Impl.hpp"
+#include "../../model/AirLoopHVAC.hpp"
+#include "../../model/AirLoopHVAC_Impl.hpp"
+#include "../../model/FanConstantVolume.hpp"
+#include "../../model/FanConstantVolume_Impl.hpp"
 #include "../../model/Node.hpp"
 #include "../../model/Node_Impl.hpp"
 #include "../../model/ThermalZone.hpp"
@@ -43,9 +56,11 @@
 #include "../../utilities/core/Assert.hpp"
 #include <utilities/idd/ZoneHVAC_TerminalUnit_VariableRefrigerantFlow_FieldEnums.hxx>
 #include <utilities/idd/Fan_OnOff_FieldEnums.hxx>
+#include <utilities/idd/Fan_ConstantVolume_FieldEnums.hxx>
 #include <utilities/idd/OutdoorAir_Mixer_FieldEnums.hxx>
 #include <utilities/idd/Coil_Cooling_DX_VariableRefrigerantFlow_FieldEnums.hxx>
 #include <utilities/idd/Coil_Heating_DX_VariableRefrigerantFlow_FieldEnums.hxx>
+#include "../../utilities/idd/IddEnums.hpp"
 #include <utilities/idd/IddEnums.hxx>
 
 using namespace openstudio::model;
@@ -73,6 +88,8 @@ boost::optional<IdfObject> ForwardTranslator::translateZoneHVACTerminalUnitVaria
     idfObject.setName(*s);
   }
 
+  auto t_airLoopHVAC = modelObject.airLoopHVAC();
+
   // TerminalUnitAvailabilityschedule
 
   if( boost::optional<model::Schedule> schedule = modelObject.terminalUnitAvailabilityschedule() )
@@ -87,77 +104,77 @@ boost::optional<IdfObject> ForwardTranslator::translateZoneHVACTerminalUnitVaria
   
   if( modelObject.isSupplyAirFlowRateDuringCoolingOperationAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateDuringCoolingOperation,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::CoolingSupplyAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.supplyAirFlowRateDuringCoolingOperation()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateDuringCoolingOperation,value.get()); 
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::CoolingSupplyAirFlowRate,value.get()); 
   }
   
   // SupplyAirFlowRateWhenNoCoolingisNeeded
 
   if( modelObject.isSupplyAirFlowRateWhenNoCoolingisNeededAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateWhenNoCoolingisNeeded,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::NoCoolingSupplyAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.supplyAirFlowRateWhenNoCoolingisNeeded()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateWhenNoCoolingisNeeded,value.get());
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::NoCoolingSupplyAirFlowRate,value.get());
   }
 
   // SupplyAirFlowRateDuringHeatingOperation
   
   if( modelObject.isSupplyAirFlowRateDuringHeatingOperationAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateDuringHeatingOperation,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::HeatingSupplyAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.supplyAirFlowRateDuringHeatingOperation()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateDuringHeatingOperation,value.get()); 
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::HeatingSupplyAirFlowRate,value.get()); 
   }
   
   // SupplyAirFlowRateWhenNoHeatingisNeeded
 
   if( modelObject.isSupplyAirFlowRateWhenNoHeatingisNeededAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateWhenNoHeatingisNeeded,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::NoHeatingSupplyAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.supplyAirFlowRateWhenNoHeatingisNeeded()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFlowRateWhenNoHeatingisNeeded,value.get());
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::NoHeatingSupplyAirFlowRate,value.get());
   }
 
   // OutdoorAirFlowRateDuringCoolingOperation
 
   if( modelObject.isOutdoorAirFlowRateDuringCoolingOperationAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutdoorAirFlowRateDuringCoolingOperation,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::CoolingOutdoorAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.outdoorAirFlowRateDuringCoolingOperation()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutdoorAirFlowRateDuringCoolingOperation,value.get());
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::CoolingOutdoorAirFlowRate,value.get());
   }
 
   // OutdoorAirFlowRateDuringHeatingOperation
 
   if( modelObject.isOutdoorAirFlowRateDuringHeatingOperationAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutdoorAirFlowRateDuringHeatingOperation,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::HeatingOutdoorAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.outdoorAirFlowRateDuringHeatingOperation()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutdoorAirFlowRateDuringHeatingOperation,value.get());
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::HeatingOutdoorAirFlowRate,value.get());
   }
 
   // OutdoorAirFlowRateWhenNoCoolingorHeatingisNeeded
 
   if( modelObject.isOutdoorAirFlowRateWhenNoCoolingorHeatingisNeededAutosized() )
   {
-    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutdoorAirFlowRateWhenNoCoolingorHeatingisNeeded,"Autosize");
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::NoLoadOutdoorAirFlowRate,"Autosize");
   }
   else if( (value = modelObject.outdoorAirFlowRateWhenNoCoolingorHeatingisNeeded()) )
   {
-    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutdoorAirFlowRateWhenNoCoolingorHeatingisNeeded,value.get());
+    idfObject.setDouble(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::NoLoadOutdoorAirFlowRate,value.get());
   }
 
   // SupplyAirFanOperatingModeScheduleName
@@ -221,43 +238,43 @@ boost::optional<IdfObject> ForwardTranslator::translateZoneHVACTerminalUnitVaria
 
     idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::SupplyAirFanObjectName,_fan->name().get());
 
-    if( fan.iddObject().type() == model::FanOnOff::iddObjectType() )
-    {
+    if( fan.iddObject().type() == model::FanOnOff::iddObjectType() ) {
       _fan->setString(Fan_OnOffFields::AirInletNodeName,heatOutletNodeName);
-
       _fan->setString(Fan_OnOffFields::AirOutletNodeName,outletNodeName);
-    }
-    else
-    {
+    } else if( fan.iddObject().type() == model::FanConstantVolume::iddObjectType() ) {
+      _fan->setString(Fan_ConstantVolumeFields::AirInletNodeName,heatOutletNodeName);
+      _fan->setString(Fan_ConstantVolumeFields::AirOutletNodeName,outletNodeName);
+    } else {
       LOG(Error, "VRF named " << modelObject.name().get() << " uses an unsupported fan type.");
     }
   }
 
   // OutdoorAirMixer
+  if( ! t_airLoopHVAC ) {
+    IdfObject _outdoorAirMixer(IddObjectType::OutdoorAir_Mixer);
+    _outdoorAirMixer.setName(modelObject.name().get() + " OA Mixer");
+    m_idfObjects.push_back(_outdoorAirMixer);
 
-  IdfObject _outdoorAirMixer(IddObjectType::OutdoorAir_Mixer);
-  _outdoorAirMixer.setName(modelObject.name().get() + " OA Mixer");
-  m_idfObjects.push_back(_outdoorAirMixer);
+    _outdoorAirMixer.setString(OutdoorAir_MixerFields::MixedAirNodeName,mixerOutletNodeName);
 
-  _outdoorAirMixer.setString(OutdoorAir_MixerFields::MixedAirNodeName,mixerOutletNodeName);
+    _outdoorAirMixer.setString(OutdoorAir_MixerFields::ReturnAirStreamNodeName,inletNodeName);
 
-  _outdoorAirMixer.setString(OutdoorAir_MixerFields::ReturnAirStreamNodeName,inletNodeName);
+    IdfObject _oaNodeList(openstudio::IddObjectType::OutdoorAir_NodeList);
+    _oaNodeList.setString(0,oaNodeName);
+    m_idfObjects.push_back(_oaNodeList);
 
-  IdfObject _oaNodeList(openstudio::IddObjectType::OutdoorAir_NodeList);
-  _oaNodeList.setString(0,oaNodeName);
-  m_idfObjects.push_back(_oaNodeList);
+    _outdoorAirMixer.setString(OutdoorAir_MixerFields::ReliefAirStreamNodeName,modelObject.name().get() + " Relief Node Name");
 
-  _outdoorAirMixer.setString(OutdoorAir_MixerFields::ReliefAirStreamNodeName,modelObject.name().get() + " Relief Node Name");
+    _outdoorAirMixer.setString(OutdoorAir_MixerFields::OutdoorAirStreamNodeName,oaNodeName);
 
-  _outdoorAirMixer.setString(OutdoorAir_MixerFields::OutdoorAirStreamNodeName,oaNodeName);
+    // OutsideAirMixerObjectType
 
-  // OutsideAirMixerObjectType
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutsideAirMixerObjectType,_outdoorAirMixer.iddObject().name());
 
-  idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutsideAirMixerObjectType,_outdoorAirMixer.iddObject().name());
+    // OutsideAirMixerObjectName
 
-  // OutsideAirMixerObjectName
-
-  idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutsideAirMixerObjectName,_outdoorAirMixer.name().get());
+    idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::OutsideAirMixerObjectName,_outdoorAirMixer.name().get());
+  }
 
   model::ModelObject coolingCoil = modelObject.coolingCoil();
   
@@ -271,7 +288,12 @@ boost::optional<IdfObject> ForwardTranslator::translateZoneHVACTerminalUnitVaria
     
     idfObject.setString(ZoneHVAC_TerminalUnit_VariableRefrigerantFlowFields::CoolingCoilObjectName,_coolingCoil->name().get());
 
-    _coolingCoil->setString(Coil_Cooling_DX_VariableRefrigerantFlowFields::CoilAirInletNode,mixerOutletNodeName);
+    std::string coolingCoilInletNodeName = mixerOutletNodeName;
+    if( t_airLoopHVAC ) {
+      coolingCoilInletNodeName = inletNodeName;
+    }
+
+    _coolingCoil->setString(Coil_Cooling_DX_VariableRefrigerantFlowFields::CoilAirInletNode,coolingCoilInletNodeName);
 
     _coolingCoil->setString(Coil_Cooling_DX_VariableRefrigerantFlowFields::CoilAirOutletNode,coolOutletNodeName);
   }

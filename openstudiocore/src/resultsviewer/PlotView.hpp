@@ -1,24 +1,36 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef RESULTSVIEWER_PLOTVIEW_HPP
 #define RESULTSVIEWER_PLOTVIEW_HPP
+
+#include "FloodPlot.hpp"
+#include "LinePlot.hpp"
 
 #include <QWidget>
 #include <QAction>
@@ -45,7 +57,6 @@
 #include <qwt/qwt_plot_grid.h>
 #include <qwt/qwt_text.h>
 #include <qwt/qwt_legend.h>
-#include <qwt/qwt_array.h>
 #include <qwt/qwt_plot_layout.h>
 #include <qwt/qwt_plot_panner.h>
 #include <qwt/qwt_plot_picker.h>
@@ -59,8 +70,6 @@
 
 #include "../utilities/data/TimeSeries.hpp"
 #include "../utilities/time/Date.hpp"
-#include "../utilities/plot/FloodPlot.hpp"
-#include "../utilities/plot/LinePlot.hpp"
 
 namespace resultsviewer{
 
@@ -91,11 +100,11 @@ namespace resultsviewer{
     QStringList& plotSource() {return m_plotSource;}
 
     double yUnscaled(int i) {return m_yUnscaled[i];}
-    void setYUnscaled(QwtArray<double>& yUnscaled) {m_yUnscaled = yUnscaled;}
+    void setYUnscaled(QVector<double>& yUnscaled) {m_yUnscaled = yUnscaled;}
     double yScaled(int i) {return m_yScaled[i];}
-    void setYScaled(QwtArray<double>& yScaled) {m_yScaled = yScaled;}
+    void setYScaled(QVector<double>& yScaled) {m_yScaled = yScaled;}
     double xValues(int i) {return m_xValues[i];}
-    void setXValues(QwtArray<double>& xValues) {m_xValues = xValues;}
+    void setXValues(QVector<double>& xValues) {m_xValues = xValues;}
 
     // assign data and update array members
     void setDataMode(YValueType yType);
@@ -110,9 +119,9 @@ namespace resultsviewer{
     QStringList m_alias;
     QStringList m_plotSource;
     QString m_legend;
-    QwtArray<double> m_yScaled;
-    QwtArray<double> m_yUnscaled;
-    QwtArray<double> m_xValues; // mid point
+    QVector<double> m_yScaled;
+    QVector<double> m_yUnscaled;
+    QVector<double> m_xValues; // mid point
     YValueType m_yType;
     LinePlotStyleType m_linePlotStyle;
 
@@ -130,11 +139,11 @@ namespace resultsviewer{
     void refreshLegend();
 
   private:
-    void mouseMoveEvent(QMouseEvent *e);
-    void mousePressEvent(QMouseEvent *e);
+    void mouseMoveEvent(QMouseEvent *e) override;
+    void mousePressEvent(QMouseEvent *e) override;
     void performDrag(QPoint pos);
 
-    void paintEvent(QPaintEvent *evt);
+    void paintEvent(QPaintEvent *evt) override;
     void addLegendItem(resultsviewer::LinePlotCurve *curve);
     void updateLegend();
     void clearLegend(QLayout *li);
@@ -185,7 +194,7 @@ namespace resultsviewer{
       m_plotType = plotType;
     }
 
-    virtual QwtText label(double fracDays) const
+    virtual QwtText label(double fracDays) const override
     {
       openstudio::Time timeFromFracDays(fracDays);
       //    openstudio::Date date = openstudio::Date::fromDayOfYear(timeFromFracDays.days()); Date issue with day 366 in year 2009
@@ -241,9 +250,10 @@ namespace resultsviewer{
   class Zoomer: public QwtPlotZoomer
   {
   public:
-    Zoomer(int xAxis, int yAxis, QwtPlotCanvas *canvas):   QwtPlotZoomer(xAxis, yAxis, canvas)
+    Zoomer(int xAxis, int yAxis, QWidget *canvas)
+      : QwtPlotZoomer(xAxis, yAxis, canvas)
     {
-      setSelectionFlags(QwtPicker::DragSelection | QwtPicker::CornerToCorner);
+      //setSelectionFlags(QwtPicker::DragSelection | QwtPicker::CornerToCorner);
       setTrackerMode(QwtPicker::AlwaysOff);
       setRubberBand(QwtPicker::NoRubberBand);
 
@@ -254,6 +264,9 @@ namespace resultsviewer{
 
       //    setMousePattern(QwtEventPattern::MouseSelect3, Qt::RightButton);
     }
+
+    virtual ~Zoomer()
+    {}
   };
 
 
@@ -266,7 +279,7 @@ namespace resultsviewer{
     PlotViewToolbar(const QString &title, QWidget *parent = nullptr);
 
   protected:
-    void mouseDoubleClickEvent(QMouseEvent *evt);
+    void mouseDoubleClickEvent(QMouseEvent *evt) override;
 
 signals:
     void signalDoubleClick();
@@ -284,6 +297,7 @@ signals:
 
     PlotView(int plotType=RVPV_LINEPLOT, QWidget* parent=nullptr);
     PlotView(QString& path, int plotType=RVPV_LINEPLOT, QWidget* parent=nullptr);
+    virtual ~PlotView();
 
 
     // plot view data handler
@@ -298,7 +312,7 @@ signals:
     // access to plot type
     int plotType() {return m_plotType;}
 
-    // spectorgram and countour
+    // spectrogram and contour
     bool spectrogramOn() {return m_spectrogramOn;}
     bool contourOn() {return m_contourOn;}
     void showContour(bool on);
@@ -369,7 +383,7 @@ signals:
 
     // send float or dock signal
     // void mouseDoubleClickEvent(QMouseEvent *evt);
-    void closeEvent(QCloseEvent *evt);
+    void closeEvent(QCloseEvent *evt) override;
     QwtPlot *m_plot;
     // menu and toolbar
     QMenuBar *m_menuBar;
@@ -455,9 +469,9 @@ signals:
     QwtLinearColorMap m_colorMap;
     QwtPlotSpectrogram* m_spectrogram;
     QwtScaleWidget* m_rightAxis;
-    openstudio::FloodPlotData::Ptr m_floodPlotData;
+    openstudio::FloodPlotData* m_floodPlotData;
     openstudio::FloodPlotColorMap::ColorMapList m_colorMapType;
-    QwtDoubleInterval m_dataRange;
+    QwtInterval m_dataRange;
     openstudio::Vector m_colorLevels;
     void initColorMap();
     void initColorBar();
@@ -467,7 +481,7 @@ signals:
     void contourLevels(openstudio::Vector& contourValues);
     void colorMapRange(double min, double max);
     void colorLevels(openstudio::Vector& colorLevels);
-    // spectorgram and countour
+    // spectrogram and contour
     bool m_spectrogramOn;
     bool m_contourOn;
 
@@ -475,7 +489,7 @@ signals:
     void xCenterSpan(double center, double span);
 
     // set base rect for zoomer - reinitialize zoom stack if reset true
-    void updateZoomBase(const QwtDoubleRect& base, bool reset);
+    void updateZoomBase(const QRectF& base, bool reset);
 
     // image export functions
     void generateImage(QString& file, int w, int h);
@@ -502,7 +516,7 @@ signals:
 
     // illuminance map hourly report indices
     std::vector< std::pair<int, openstudio::DateTime> > m_illuminanceMapReportIndicesDates;
-    std::vector<openstudio::FloodPlotData::Ptr> m_illuminanceMapData;
+    std::vector<openstudio::FloodPlotData*> m_illuminanceMapData;
     // difference index
     std::vector< std::pair<int,int> > m_illuminanceMapDifferenceReportIndices;
     void plotDataAvailable(bool available);
@@ -519,11 +533,11 @@ signals:
 
   protected:
     /// drop target support for drag/drop operations
-    void dropEvent(QDropEvent *e);
+    void dropEvent(QDropEvent *e) override;
     /// drop target support for drag/drop operations
-    void dragEnterEvent(QDragEnterEvent *e) { e->accept(); };
+    void dragEnterEvent(QDragEnterEvent *e) override { e->accept(); };
     /// trac 1383 right mouse click for properties
-    void mousePressEvent(QMouseEvent *e);
+    void mousePressEvent(QMouseEvent *e) override;
 
   signals:
     void signalFloatOrDockMe(resultsviewer::PlotView *plotView);
@@ -543,7 +557,7 @@ signals:
       void slotValueInfoMode(bool on);
       void slotValueInfo(const QPoint& pos);
       // signal if zoomed - hide value info if rect changes
-      void slotZoomed(const QwtDoubleRect& rect);
+      void slotZoomed(const QRectF& rect);
 
       // zoom in and out in increments
       void slotZoomIn();
@@ -579,7 +593,11 @@ signals:
       // docking
       void slotFloatOrDock();
 
+    private:
 
+      // apply proper spacing so that illuminance map data pixels are centered on data point
+      // DLM: don't do this for now, data outside the map just gets clipped
+      void bufferIlluminanceMapGridPoints(std::vector<double>& x, std::vector<double>& y);
   };
 
 

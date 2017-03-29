@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef OPENSTUDIO_GRIDITEM_HPP
 #define OPENSTUDIO_GRIDITEM_HPP
@@ -24,6 +33,7 @@
 #include <QCoreApplication>
 #include <QPixmap>
 #include <QPointer>
+#include <nano/nano_signal_slot.hpp> // Signal-Slot replacement
 #include "../model/ModelObject.hpp"
 #include "../model/Node.hpp"
 #include "../model/Mixer.hpp"
@@ -42,45 +52,27 @@ class RemoveButtonItem;
 
 class NodeContextButtonItem;
 
-class GridItem : public QGraphicsObject
+class ModelObjectGraphicsItem : public QGraphicsObject, public Nano::Observer
 {
   Q_OBJECT;
 
   public:
 
-  GridItem(QGraphicsItem * parent = 0 );
+  ModelObjectGraphicsItem(QGraphicsItem * parent = nullptr);
 
-  virtual ~GridItem() {}
+  ~ModelObjectGraphicsItem() {}
 
   void setEnableHighlight(bool highlight);
 
-  virtual QRectF boundingRect() const;
+  void dragEnterEvent(QGraphicsSceneDragDropEvent *event) override;
 
-  void setGridPos(int x, int y);
+  void dragLeaveEvent(QGraphicsSceneDragDropEvent *event) override;
 
-  int getXGridPos();
+  void dropEvent(QGraphicsSceneDragDropEvent *event) override;
 
-  int getYGridPos();
+  void hoverEnterEvent(QGraphicsSceneHoverEvent * event) override;
 
-  void setHGridLength(int l);
-
-  void setVGridLength(int l);
-
-  int getHGridLength();
-
-  int getVGridLength();
-
-  void dragEnterEvent(QGraphicsSceneDragDropEvent *event);
-
-  void dragLeaveEvent(QGraphicsSceneDragDropEvent *event);
-
-  void dropEvent(QGraphicsSceneDragDropEvent *event);
-
-  void hoverEnterEvent(QGraphicsSceneHoverEvent * event);
-
-  void hoverLeaveEvent(QGraphicsSceneHoverEvent * event);
-
-  //virtual void mouseReleaseEvent( QGraphicsSceneMouseEvent * event );
+  void hoverLeaveEvent(QGraphicsSceneHoverEvent * event) override;
 
   virtual void setModelObject( model::OptionalModelObject modelObject );
 
@@ -102,17 +94,11 @@ class GridItem : public QGraphicsObject
 
   protected:
 
-  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
-
-  QVariant itemChange(GraphicsItemChange change, const QVariant & value);
+  QVariant itemChange(GraphicsItemChange change, const QVariant & value) override;
 
   bool m_deleteAble;
 
   bool m_highlight;
-
-  int  m_hLength;
-
-  int  m_vLength;
 
   model::OptionalModelObject m_modelObject;
 
@@ -125,8 +111,41 @@ class GridItem : public QGraphicsObject
   void onNameChange(); 
 
   void onRemoveButtonClicked();
+};
 
-  private:
+class GridItem : public ModelObjectGraphicsItem
+{
+  Q_OBJECT;
+
+  public:
+
+  GridItem(QGraphicsItem * parent = nullptr );
+
+  virtual ~GridItem() {}
+
+  virtual QRectF boundingRect() const override;
+
+  void setGridPos(int x, int y);
+
+  int getXGridPos();
+
+  int getYGridPos();
+
+  void setHGridLength(int l);
+
+  void setVGridLength(int l);
+
+  int getHGridLength();
+
+  int getVGridLength();
+
+  protected:
+
+  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+
+  int  m_hLength;
+
+  int  m_vLength;
 };
 
 class NodeContextButtonItem : public ButtonItem
@@ -156,30 +175,42 @@ class SplitterItem : public GridItem
 {
   public:
 
-  SplitterItem(QGraphicsItem * parent = 0);
+  SplitterItem(QGraphicsItem * parent = nullptr);
 
   void setNumberBranches( int branches );
 
   int numberBranches();
 
-  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+  // SingleDuct1 means a terminal is attached to the demand inlet node 1 branch
+  // SingleDuct2 means a terminal is attached to the demand inlet node 2 branch
+  // DualDuct means there is a dual duct terminal
+  enum TerminalType { SingleDuct1, SingleDuct2, DualDuct, None };
+
+  // The size of the types vector is equal to the number of zones connected to the system
+  // This is also expected to be equal to the number of branches
+  void setTerminalTypes( std::vector< TerminalType > types );
+
+  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
   private:
 
+  std::vector<TerminalType> m_terminalTypes;
   int m_numberBranches;
+  int m_firstDuct1Index;
+  int m_firstDuct2Index;
 };
 
 class MixerItem : public GridItem
 {
   public:
 
-  MixerItem(QGraphicsItem * parent = 0);
+  MixerItem(QGraphicsItem * parent = nullptr);
 
   void setNumberBranches( int branches );
 
   int numberBranches();
 
-  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
   private:
 
@@ -190,30 +221,37 @@ class SupplySplitterItem : public GridItem
 {
   public:
 
-  SupplySplitterItem(QGraphicsItem * parent = 0);
+  SupplySplitterItem(QGraphicsItem * parent = nullptr);
 
   void setNumberBranches( int branches );
 
   int numberBranches();
 
-  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+  // See related method HorizontalBranchGroupItem::branchBaselineGridPositions
+  // This method is used to get the splitter to line up with the horizontal lines in 
+  // the HorizontalBranchGroupItem.
+  // SupplySideItem will coordinate this
+  // The size should be equal to numberBranches
+  void setBranchGridPositions( const std::vector<int> & branchGridPositions );
+
+  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
   private:
 
-  int m_numberBranches;
+  std::vector<int> m_baselineBranchPositions; 
 };
 
 class SupplyMixerItem : public GridItem
 {
   public:
 
-  SupplyMixerItem(QGraphicsItem * parent = 0);
+  SupplyMixerItem(QGraphicsItem * parent = nullptr);
 
   void setNumberBranches( int branches );
 
   int numberBranches();
 
-  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = 0);
+  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 
   private:
 
@@ -224,67 +262,105 @@ class OneThreeNodeItem : public GridItem
 {
   public:
 
-  OneThreeNodeItem(QGraphicsItem * parent = 0 );
+  OneThreeNodeItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0); 
+             QWidget *widget = nullptr) override; 
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private:
 
   QPointer<NodeContextButtonItem> m_contextButton;
 };
 
+// This is a "dual path" squeezed into the space of a single GridItem
+// Used after the zone splitter, going into the zone terminal
+class OneThreeDualDuctItem : public GridItem
+{
+  public:
+
+  OneThreeDualDuctItem(QGraphicsItem * parent = nullptr );
+
+  void paint(QPainter *painter, 
+             const QStyleOptionGraphicsItem *option, 
+             QWidget *widget = nullptr) override; 
+
+  void setModelObject( model::OptionalModelObject modelObject ) override;
+
+  void setModelObject2( model::OptionalModelObject modelObject );
+
+  private:
+
+  boost::optional<model::ModelObject> m_modelObject2;
+};
+
 class FourFiveNodeItem : public GridItem
 {
   public:
 
-  FourFiveNodeItem(QGraphicsItem * parent = 0 );
+  FourFiveNodeItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class TwoFiveNodeItem : public GridItem
 {
   public:
 
-  TwoFiveNodeItem(QGraphicsItem * parent = 0 );
+  TwoFiveNodeItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class OneThreeStraightItem : public GridItem
 {
   public:
 
-  OneThreeStraightItem(QGraphicsItem * parent = 0 );
+  // if dual is true there are two parallel lines
+  OneThreeStraightItem(QGraphicsItem * parent = nullptr, bool dualDuct = false);
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   protected:
 
-  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event );
+  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event ) override;
+
+  private:
+
+  bool m_dualDuct;
+};
+
+class OneThreeDualDuctMixerItem : public GridItem
+{
+  public:
+
+  // if dual is true there are two parallel lines
+  OneThreeDualDuctMixerItem(QGraphicsItem * parent = nullptr, bool dualDuct = false);
+
+  void paint(QPainter *painter, 
+             const QStyleOptionGraphicsItem *option, 
+             QWidget *widget = nullptr) override;
 };
 
 class SupplyPlenumItem : public GridItem
 {
   public:
 
-  SupplyPlenumItem(const model::ModelObject & modelObject, QGraphicsItem * parent = 0);
+  SupplyPlenumItem(const model::ModelObject & modelObject, QGraphicsItem * parent = nullptr);
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private:
 
@@ -295,13 +371,13 @@ class ReturnPlenumItem : public GridItem
 {
   public:
 
-  ReturnPlenumItem(const model::ModelObject & modelObject, QGraphicsItem * parent = 0);
+  ReturnPlenumItem(const model::ModelObject & modelObject, QGraphicsItem * parent = nullptr);
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private:
 
@@ -314,11 +390,11 @@ class LinkItem : public QGraphicsObject
 
   public:
 
-  LinkItem(QGraphicsItem * parent = 0);
+  LinkItem(QGraphicsItem * parent = nullptr);
 
   virtual ~LinkItem() {}
 
-  QRectF boundingRect() const;
+  QRectF boundingRect() const override;
 
   signals:
 
@@ -326,17 +402,17 @@ class LinkItem : public QGraphicsObject
 
   protected:
 
-  void mousePressEvent(QGraphicsSceneMouseEvent * event);
+  void mousePressEvent(QGraphicsSceneMouseEvent * event) override;
 
-  void mouseReleaseEvent(QGraphicsSceneMouseEvent * event);
+  void mouseReleaseEvent(QGraphicsSceneMouseEvent * event) override;
 
-  void hoverEnterEvent(QGraphicsSceneHoverEvent * event);
+  void hoverEnterEvent(QGraphicsSceneHoverEvent * event) override;
 
-  void hoverLeaveEvent(QGraphicsSceneHoverEvent * event);
+  void hoverLeaveEvent(QGraphicsSceneHoverEvent * event) override;
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   private:
 
@@ -351,15 +427,15 @@ class OneThreeWaterToAirItem : public GridItem
 
   public:
 
-  OneThreeWaterToAirItem(QGraphicsItem * parent = 0 );
+  OneThreeWaterToAirItem(QGraphicsItem * parent = nullptr );
 
   virtual ~OneThreeWaterToAirItem() {}
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private slots:
 
@@ -367,7 +443,7 @@ class OneThreeWaterToAirItem : public GridItem
 
   protected:
 
-  void mouseReleaseEvent(QGraphicsSceneMouseEvent * event);
+  void mouseReleaseEvent(QGraphicsSceneMouseEvent * event) override;
 
   private:
 
@@ -380,15 +456,15 @@ class OneThreeWaterToWaterItem : public GridItem
 
   public:
 
-  OneThreeWaterToWaterItem(QGraphicsItem * parent = 0 );
+  OneThreeWaterToWaterItem(QGraphicsItem * parent = nullptr );
 
   virtual ~OneThreeWaterToWaterItem() {}
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private slots:
 
@@ -396,7 +472,7 @@ class OneThreeWaterToWaterItem : public GridItem
 
   protected:
 
-  void mouseReleaseEvent(QGraphicsSceneMouseEvent * event);
+  void mouseReleaseEvent(QGraphicsSceneMouseEvent * event) override;
 
   private:
 
@@ -434,54 +510,54 @@ class TwoFourStraightItem : public GridItem
 {
   public:
 
-  TwoFourStraightItem(QGraphicsItem * parent = 0 );
+  TwoFourStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class OASupplyStraightItem : public GridItem
 {
   public:
 
-  OASupplyStraightItem(QGraphicsItem * parent = 0 );
+  OASupplyStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   protected:
 
-  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event );
+  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event ) override;
 };
 
 class OAReliefStraightItem : public GridItem
 {
   public:
 
-  OAReliefStraightItem(QGraphicsItem * parent = 0 );
+  OAReliefStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   protected:
 
-  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event );
+  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event ) override;
 };
 
 class OAStraightNodeItem : public GridItem
 {
   public:
 
-  OAStraightNodeItem(QGraphicsItem * parent = 0 );
+  OAStraightNodeItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private:
 
@@ -494,13 +570,13 @@ class OASupplyBranchItem : public GridItem
 
   OASupplyBranchItem( std::vector<model::ModelObject> supplyModelObjects,
                       std::vector<model::ModelObject> reliefModelObjects,
-                      QGraphicsItem * parent = 0 );
+                      QGraphicsItem * parent = nullptr );
 
   void layout();
 
   void paint( QPainter *painter, 
               const QStyleOptionGraphicsItem *option, 
-              QWidget *widget = 0);
+              QWidget *widget = nullptr) override;
 
   private:
 
@@ -515,13 +591,13 @@ class OAReliefBranchItem : public GridItem
 
   OAReliefBranchItem( std::vector<model::ModelObject> reliefModelObjects,
                       std::vector<model::ModelObject> supplyModelObjects,
-                      QGraphicsItem * parent = 0 );
+                      QGraphicsItem * parent = nullptr );
 
   void layout();
 
   void paint( QPainter *painter, 
               const QStyleOptionGraphicsItem *option, 
-              QWidget *widget = 0);
+              QWidget *widget = nullptr) override;
 
   private:
 
@@ -534,46 +610,46 @@ class OAEndNodeItem : public GridItem
 {
   public:
 
-  OAEndNodeItem(QGraphicsItem * parent = 0 );
+  OAEndNodeItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class OAAirToAirItem : public GridItem
 {
   public:
 
-  OAAirToAirItem(QGraphicsItem * parent = 0 );
+  OAAirToAirItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class FourTwoStraightItem : public GridItem
 {
   public:
 
-  FourTwoStraightItem(QGraphicsItem * parent = 0 );
+  FourTwoStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class TwoFourNodeItem : public GridItem
 {
   public:
 
-  TwoFourNodeItem(QGraphicsItem * parent = 0 );
+  TwoFourNodeItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   private:
 
@@ -584,67 +660,117 @@ class OneFourStraightItem : public GridItem
 {
   public:
 
-  OneFourStraightItem(QGraphicsItem * parent = 0 );
+  OneFourStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class ThreeFourStraightItem : public GridItem
 {
   public:
 
-  ThreeFourStraightItem( QGraphicsItem * parent = 0 );
+  ThreeFourStraightItem( QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class TwoThreeStraightItem : public GridItem
 {
   public:
 
-  TwoThreeStraightItem(QGraphicsItem * parent = 0 );
+  TwoThreeStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class OneTwoStraightItem : public GridItem
 {
   public:
 
-  OneTwoStraightItem(QGraphicsItem * parent = 0 );
+  OneTwoStraightItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class OAMixerItem : public GridItem
 {
   public:
 
-  OAMixerItem(QGraphicsItem * parent = 0 );
+  OAMixerItem(QGraphicsItem * parent = nullptr );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   protected:
 
-  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event );
+  void mouseReleaseEvent( QGraphicsSceneMouseEvent * event ) override;
+};
+
+// These are used inside dual duct items that combine two paths inside one GridItem
+class HalfHeightItem : public ModelObjectGraphicsItem
+{
+  public:
+
+  HalfHeightItem(QGraphicsItem * parent = nullptr );
+
+  virtual ~HalfHeightItem() {}
+
+  virtual QRectF boundingRect() const override;
+};
+
+class HalfHeightOneThreeStraightItem : public HalfHeightItem
+{
+  public:
+
+  HalfHeightOneThreeStraightItem(QGraphicsItem * parent = nullptr);
+
+  virtual ~HalfHeightOneThreeStraightItem() {}
+
+  protected:
+
+  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
+};
+
+class HalfHeightOneThreeNodeItem : public HalfHeightItem
+{
+  public:
+
+  HalfHeightOneThreeNodeItem(QGraphicsItem * parent = nullptr);
+
+  virtual ~HalfHeightOneThreeNodeItem() {}
+
+  protected:
+
+  virtual void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
 };
 
 class HorizontalBranchItem : public GridItem
 {
   public:
 
+  // Dual duct means there will be two parallel paths within one item
   HorizontalBranchItem( std::vector<model::ModelObject> modelObjects,
-                        QGraphicsItem * parent = 0 );
+                        QGraphicsItem * parent = nullptr,
+                        bool dualDuct = false );
+
+  // This signature is always used on a dual duct
+  // modelObjectsBeforeTerminal is what it says, the outer pair for the two parallel paths
+  // After the terminal the paths come togethor (the dual duct terminal is a mixer) and we 
+  // have a single linear series of components from then on to the zone mixer
+  HorizontalBranchItem( std::pair< std::vector<model::ModelObject>, std::vector<model::ModelObject> > modelObjectsBeforeTerminal,
+                        std::vector<model::ModelObject> modelObjectsAfterTerminal,
+                        QGraphicsItem * parent = nullptr);
+
+  static std::vector<GridItem *> itemFactory(std::vector<model::ModelObject> modelObjects, QGraphicsItem * parent);
 
   void setPadding( unsigned );
 
@@ -658,15 +784,15 @@ class HorizontalBranchItem : public GridItem
 
   void setIsDropZone(bool isDropZone);
 
-  void setModelObject( model::OptionalModelObject modelObject );
+  void setModelObject( model::OptionalModelObject modelObject ) override;
 
   protected:
 
   virtual void paint(QPainter *painter, 
                      const QStyleOptionGraphicsItem *option, 
-                     QWidget *widget = 0);
+                     QWidget *widget = nullptr) override;
 
-  void dropEvent(QGraphicsSceneDragDropEvent *event);
+  void dropEvent(QGraphicsSceneDragDropEvent *event) override;
 
   private:
 
@@ -679,6 +805,8 @@ class HorizontalBranchItem : public GridItem
   QString m_text;
 
   bool m_hasDualTwoRightSidePipes;
+
+  bool m_dualDuct;
 };
 
 class HorizontalBranchGroupItem : public GridItem
@@ -687,7 +815,11 @@ class HorizontalBranchGroupItem : public GridItem
 
   HorizontalBranchGroupItem( model::Splitter & splitter,
                              model::Mixer & mixer,
-                             QGraphicsItem * parent = 0 );
+                             QGraphicsItem * parent = nullptr );
+
+  HorizontalBranchGroupItem( model::Splitter & splitter,
+                             std::vector<model::Node> & supplyOutletNodes,
+                             QGraphicsItem * parent ); 
 
   void layout();
 
@@ -695,20 +827,23 @@ class HorizontalBranchGroupItem : public GridItem
 
   unsigned numberOfBranches() const;
 
+  // HorizontalBranchGroupItem instances normally have a series of parallel branches
+  // that are each 1 grid unit in height. If we have a dual duct there might be oa systems on the branches
+  // and this messes up the assumption about each branch being 1 grid unit high.
+  // This method will return the "baseline" (ie where the horizontal black line is) grid pos
+  // for each branch.
+  std::vector<int> branchBaselineGridPositions() const;
+
   protected:
 
   virtual void paint(QPainter *painter, 
                      const QStyleOptionGraphicsItem *option, 
-                     QWidget *widget = 0);
+                     QWidget *widget = nullptr) override;
 
   private:
 
   model::Splitter m_splitter;
-
-  model::Mixer m_mixer;
-
   std::vector<HorizontalBranchItem *> m_branchItems;
-
   HorizontalBranchItem * m_dropZoneBranchItem;
 };
 
@@ -717,7 +852,7 @@ class VerticalBranchItem : public GridItem
   public:
 
   VerticalBranchItem( std::vector<model::ModelObject> modelObjects,
-                      QGraphicsItem * parent = 0 );
+                      QGraphicsItem * parent = nullptr );
 
   void setPadding( unsigned );
 
@@ -727,7 +862,7 @@ class VerticalBranchItem : public GridItem
 
   virtual void paint(QPainter *painter, 
                      const QStyleOptionGraphicsItem *option, 
-                     QWidget *widget = 0);
+                     QWidget *widget = nullptr) override;
 
   private:
 
@@ -741,7 +876,7 @@ class ReverseVerticalBranchItem : public GridItem
   public:
 
   ReverseVerticalBranchItem( std::vector<model::ModelObject> modelObjects,
-                      QGraphicsItem * parent = 0 );
+                      QGraphicsItem * parent = nullptr );
 
   void setPadding( unsigned );
 
@@ -754,17 +889,48 @@ class ReverseVerticalBranchItem : public GridItem
   std::vector<FourTwoStraightItem *> m_paddingItems;
 };
 
+// This is the thing on the demand side of a dual duct
+// where the second stream intersects the first forming a tee.
+// The streams are not physically combined but visual they combine,
+// into the same grid items (ie one grid item show both streams).
+class DualDuctTee : public GridItem
+{
+  public:
+
+  DualDuctTee(QGraphicsItem * parent = nullptr);
+
+  protected:
+
+  void paint(QPainter *painter, 
+             const QStyleOptionGraphicsItem *option, 
+             QWidget *widget = nullptr) override;
+};
+
+// This is the elbow used on the demand side of a dual duct
+class TwoThreeStraightItem2 : public GridItem
+{
+  public:
+
+  TwoThreeStraightItem2(QGraphicsItem * parent = nullptr);
+
+  protected:
+
+  void paint(QPainter *painter, 
+             const QStyleOptionGraphicsItem *option, 
+             QWidget *widget = nullptr) override;
+};
+
 class DemandSideItem : public GridItem
 {
   public:
 
   DemandSideItem( QGraphicsItem * parent,
-                  model::Node demandInletNode, 
+                  std::vector<model::Node> demandInletNodes, 
                   model::Node demandOutletNode );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   void layout();
 
@@ -776,7 +942,7 @@ class DemandSideItem : public GridItem
 
   private:
 
-  model::Node m_demandInletNode;
+  std::vector<model::Node> m_demandInletNodes;
 
   model::Node m_demandOutletNode;
 
@@ -790,7 +956,11 @@ class DemandSideItem : public GridItem
 
   MixerItem * m_mixerItem;
 
-  TwoThreeStraightItem * m_rightElbow;
+  // A TwoFourStraightItem if single duct
+  // or a TwoFourStraightItem2 if a dual duct
+  GridItem * m_rightElbow;
+
+  DualDuctTee * m_rightElbow2;
 
   OneTwoStraightItem * m_leftElbow;
 
@@ -798,7 +968,11 @@ class DemandSideItem : public GridItem
 
   VerticalBranchItem * m_rightVertical;
 
+  VerticalBranchItem * m_rightVertical2;
+
   TwoFourNodeItem * m_inletNode;
+
+  TwoFourNodeItem * m_inletNode2;
 
   TwoFourNodeItem * m_outletNode;
 
@@ -814,7 +988,7 @@ class OASystemItem : public GridItem
   public:
 
   OASystemItem( model::AirLoopHVACOutdoorAirSystem & oaSystem,
-                QGraphicsItem * parent = 0 );
+                QGraphicsItem * parent = nullptr );
 
   protected:
 
@@ -822,7 +996,7 @@ class OASystemItem : public GridItem
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   private:
 
@@ -843,11 +1017,11 @@ class SupplySideItem : public GridItem
 
   SupplySideItem( QGraphicsItem * parent, 
                   model::Node supplyInletNode, 
-                  model::Node supplyOutletNode );
+                  std::vector<model::Node> supplyOutletNodes );
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   void layout();
 
@@ -861,7 +1035,7 @@ class SupplySideItem : public GridItem
 
   model::Node m_supplyInletNode;
 
-  model::Node m_supplyOutletNode;
+  std::vector<model::Node> m_supplyOutletNodes;
 
   HorizontalBranchItem * m_outletBranchItem;
 
@@ -869,19 +1043,23 @@ class SupplySideItem : public GridItem
 
   HorizontalBranchGroupItem * m_mainBranchGroupItem;
 
-  OASystemItem * m_oaSystemItem;
-
   TwoFourNodeItem * m_inletNodeItem;
 
   TwoFourNodeItem * m_outletNodeItem;  
 
-  ThreeFourStraightItem * m_rightElbowItem;
+  TwoFourNodeItem * m_outletNodeItem2;  
 
   OneFourStraightItem * m_leftElbowItem;
 
   VerticalBranchItem * m_leftVerticalItem;
 
+  ThreeFourStraightItem * m_rightElbowItem;
+
+  ThreeFourStraightItem * m_rightElbowItem2;
+
   VerticalBranchItem * m_rightVerticalItem;
+
+  VerticalBranchItem * m_rightVerticalItem2;
 
   SupplySplitterItem * m_splitterItem;
   
@@ -892,6 +1070,8 @@ class SupplySideItem : public GridItem
   OneThreeStraightItem * m_inletSpacer;
 
   OneThreeStraightItem * m_outletSpacer;
+
+  HorizontalBranchItem * m_dualDuctHorizontalSpace;
 };
 
 class SystemCenterItem : public GridItem
@@ -902,7 +1082,12 @@ class SystemCenterItem : public GridItem
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
+
+  private:
+
+  bool m_supplyDualDuct;
+  bool m_demandDualDuct;
 };
 
 class SystemItem : public GridItem
@@ -915,7 +1100,7 @@ class SystemItem : public GridItem
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 
   QColor plenumColor(const Handle & plenumHandle);
 
@@ -941,26 +1126,26 @@ class OneTwoFourStraightItem : public GridItem
 {
   public:
 
-  OneTwoFourStraightItem(QGraphicsItem * parent = 0);
+  OneTwoFourStraightItem(QGraphicsItem * parent = nullptr);
 
   protected:
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 class TwoThreeFourStraightItem : public GridItem
 {
   public:
 
-  TwoThreeFourStraightItem(QGraphicsItem * parent = 0);
+  TwoThreeFourStraightItem(QGraphicsItem * parent = nullptr);
 
   protected:
 
   void paint(QPainter *painter, 
              const QStyleOptionGraphicsItem *option, 
-             QWidget *widget = 0);
+             QWidget *widget = nullptr) override;
 };
 
 } // openstudio

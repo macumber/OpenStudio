@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Model.hpp"
 #include "ChillerElectricEIR.hpp"
@@ -30,7 +39,9 @@
 #include "Node_Impl.hpp"
 
 #include <utilities/idd/IddFactory.hxx>
+
 #include <utilities/idd/OS_Chiller_Electric_EIR_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 
 #include "../utilities/core/Assert.hpp"
 
@@ -677,21 +688,19 @@ namespace detail {
     return OS_Chiller_Electric_EIRFields::CondenserOutletNodeName;
   }
 
+  unsigned ChillerElectricEIR_Impl::tertiaryInletPort() const
+  {
+    return OS_Chiller_Electric_EIRFields::HeatRecoveryInletNodeName;
+  }
+
+  unsigned ChillerElectricEIR_Impl::tertiaryOutletPort() const
+  {
+    return OS_Chiller_Electric_EIRFields::HeatRecoveryOutletNodeName;
+  }
+
   ModelObject ChillerElectricEIR_Impl::clone(Model model) const
   {
     ChillerElectricEIR chiller = WaterToWaterComponent_Impl::clone(model).cast<ChillerElectricEIR>();
-
-    CurveBiquadratic biQuadCurve = this->coolingCapacityFunctionOfTemperature().clone(model).cast<CurveBiquadratic>();
-
-    chiller.setCoolingCapacityFunctionOfTemperature(biQuadCurve);
-
-    biQuadCurve = this->electricInputToCoolingOutputRatioFunctionOfTemperature().clone(model).cast<CurveBiquadratic>();
-
-    chiller.setElectricInputToCoolingOutputRatioFunctionOfTemperature(biQuadCurve);
-
-    CurveQuadratic curve = this->electricInputToCoolingOutputRatioFunctionOfPLR().clone(model).cast<CurveQuadratic>();
-
-    chiller.setElectricInputToCoolingOutputRatioFunctionOfPLR(curve);
 
     return chiller;
   }
@@ -785,6 +794,57 @@ ChillerElectricEIR::ChillerElectricEIR(const Model& model,
 
   setBasinHeaterSetpointTemperature(10.0);
 
+  resetBasinHeaterSchedule();
+}
+
+ChillerElectricEIR::ChillerElectricEIR(const Model& model)
+  : WaterToWaterComponent(ChillerElectricEIR::iddObjectType(),model)
+{
+  OS_ASSERT(getImpl<detail::ChillerElectricEIR_Impl>());
+
+  CurveBiquadratic ccFofT(model);
+  ccFofT.setCoefficient1Constant(1.0215158);
+  ccFofT.setCoefficient2x(0.037035864);
+  ccFofT.setCoefficient3xPOW2(0.0002332476);
+  ccFofT.setCoefficient4y(-0.003894048);
+  ccFofT.setCoefficient5yPOW2(-6.52536e-005);
+  ccFofT.setCoefficient6xTIMESY(-0.0002680452);
+  ccFofT.setMinimumValueofx(5.0);
+  ccFofT.setMaximumValueofx(10.0);
+  ccFofT.setMinimumValueofy(24.0);
+  ccFofT.setMaximumValueofy(35.0);
+
+  CurveBiquadratic eirToCorfOfT(model);
+  eirToCorfOfT.setCoefficient1Constant(0.70176857);
+  eirToCorfOfT.setCoefficient2x(-0.00452016);
+  eirToCorfOfT.setCoefficient3xPOW2(0.0005331096);
+  eirToCorfOfT.setCoefficient4y(-0.005498208);
+  eirToCorfOfT.setCoefficient5yPOW2(0.0005445792);
+  eirToCorfOfT.setCoefficient6xTIMESY(-0.0007290324);
+  eirToCorfOfT.setMinimumValueofx(5.0);
+  eirToCorfOfT.setMaximumValueofx(10.0);
+  eirToCorfOfT.setMinimumValueofy(24.0);
+  eirToCorfOfT.setMaximumValueofy(35.0);
+
+  CurveQuadratic eirToCorfOfPlr(model);
+  eirToCorfOfPlr.setCoefficient1Constant(0.06369119);
+  eirToCorfOfPlr.setCoefficient2x(0.58488832);
+  eirToCorfOfPlr.setCoefficient3xPOW2(0.35280274);
+  eirToCorfOfPlr.setMinimumValueofx(0.0);
+  eirToCorfOfPlr.setMaximumValueofx(1.0);
+
+  setCoolingCapacityFunctionOfTemperature(ccFofT);
+  setElectricInputToCoolingOutputRatioFunctionOfTemperature(eirToCorfOfT);
+  setElectricInputToCoolingOutputRatioFunctionOfPLR(eirToCorfOfPlr);
+
+  autosizeReferenceCapacity();
+  OS_ASSERT(setReferenceCOP(5.5f));
+  setDesignHeatRecoveryWaterFlowRate(0.0);
+  resetHeatRecoveryInletNodeName();
+  resetHeatRecoveryOutletNodeName();
+  setSizingFactor(1.0);
+  setBasinHeaterCapacity(0.0);
+  setBasinHeaterSetpointTemperature(10.0);
   resetBasinHeaterSchedule();
 }
 

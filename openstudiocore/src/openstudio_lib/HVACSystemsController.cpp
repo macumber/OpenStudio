@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "HVACSystemsController.hpp"
 #include "RefrigerationController.hpp"
@@ -96,14 +105,20 @@
 #include "../model/ThermalZone.hpp"
 #include "../model/ThermalZone_Impl.hpp"
 #include "../model/HVACTemplates.hpp"
-
+#include "../model/Component.hpp"
+#include "../model/Component_Impl.hpp"
+#include "../model/ComponentData.hpp"
+#include "../model/ComponentData_Impl.hpp"
 #include "../utilities/core/Assert.hpp"
+#include "../utilities/core/Compare.hpp"
+#include <utilities/idd/OS_ComponentData_FieldEnums.hxx>
 
 #include <QMessageBox>
 #include <QTimer>
 #include <QPushButton>
 #include <QLabel>
 #include <QLayout>
+#include <QMutex>
 
 namespace openstudio {
 
@@ -122,15 +137,11 @@ HVACSystemsController::HVACSystemsController(bool isIP, const model::Model & mod
 
   m_hvacControlsController = std::shared_ptr<HVACControlsController>(new HVACControlsController(this));
 
-  connect(m_model.getImpl<model::detail::Model_Impl>().get(),
-    static_cast<void (model::detail::Model_Impl::*)(const WorkspaceObject &, const IddObjectType &, const UUID &) const>(&model::detail::Model_Impl::addWorkspaceObject),
-    this,
-    &HVACSystemsController::onObjectAdded);
+  m_model.getImpl<model::detail::Model_Impl>().get()->addWorkspaceObject.connect<HVACSystemsController, &HVACSystemsController::onObjectAdded>(this);
+  //connect(OSAppBase::instance(), &OSAppBase::workspaceObjectAdded, this, &HVACSystemsController::onObjectAdded, Qt::QueuedConnection);
 
-  connect(m_model.getImpl<model::detail::Model_Impl>().get(),
-    static_cast<void (model::detail::Model_Impl::*)(const WorkspaceObject &, const IddObjectType &, const UUID &) const>(&model::detail::Model_Impl::removeWorkspaceObject),
-    this,
-    &HVACSystemsController::onObjectRemoved);
+  m_model.getImpl<model::detail::Model_Impl>().get()->removeWorkspaceObject.connect<HVACSystemsController, &HVACSystemsController::onObjectRemoved>(this);
+  //connect(OSAppBase::instance(), &OSAppBase::workspaceObjectRemoved, this, &HVACSystemsController::onObjectRemoved, Qt::QueuedConnection);
 
   connect(m_hvacSystemsView->hvacToolbarView->addButton, &QPushButton::clicked, this, &HVACSystemsController::onAddSystemClicked);
 
@@ -144,12 +155,16 @@ HVACSystemsController::HVACSystemsController(bool isIP, const model::Model & mod
 
   connect(m_hvacSystemsView->hvacToolbarView->gridViewButton, &QPushButton::clicked, this, &HVACSystemsController::onShowGridClicked);
 
+  m_updateMutex = new QMutex();
+
   updateLater();
 }
 
 HVACSystemsController::~HVACSystemsController()
 {
   if( m_hvacSystemsView ) { delete m_hvacSystemsView; }
+
+  delete m_updateMutex;
 }
 
 void HVACSystemsController::clearSceneSelection()
@@ -167,7 +182,7 @@ QString HVACSystemsController::currentHandle() const
 
 void HVACSystemsController::setCurrentHandle(const QString & handle)
 {
-  m_currentHandle = handle; 
+  m_currentHandle = handle;
 
   updateLater();
 }
@@ -179,13 +194,17 @@ model::Model HVACSystemsController::model() const
 
 void HVACSystemsController::update()
 {
+  if( ! m_updateMutex->tryLock() ) {
+    return;
+  }
+
   if( m_dirty )
   {
-    m_hvacSystemsView->setUpdatesEnabled(false); 
+    m_hvacSystemsView->setUpdatesEnabled(false);
 
     model::OptionalModelObject mo;
     OSAppBase::instance()->currentDocument()->mainRightColumnController()->inspectModelObject(mo,false);
-    
+
     // Remove old stuff
 
     QComboBox * systemComboBox = m_hvacSystemsView->hvacToolbarView->systemComboBox;
@@ -195,13 +214,16 @@ void HVACSystemsController::update()
     systemComboBox->clear();
 
     // Populate system combo box
-    std::vector<model::Loop> loops = m_model.getModelObjects<model::Loop>();
+    auto airloops = m_model.getModelObjects<model::AirLoopHVAC>();
+    std::sort(airloops.begin(),airloops.end(),WorkspaceObjectNameLess());
+    for( auto it = airloops.begin(); it != airloops.end(); ++it ) {
+      systemComboBox->addItem(QString::fromStdString(it->name().get()), toQString(it->handle()));
+    }
 
-    for( std::vector<model::Loop>::iterator it = loops.begin();
-         it != loops.end();
-         ++it )
-    {
-      systemComboBox->addItem(QString::fromStdString(it->name().get()),it->handle().toString());
+    auto plantloops = m_model.getModelObjects<model::PlantLoop>();
+    std::sort(plantloops.begin(),plantloops.end(),WorkspaceObjectNameLess());
+    for( auto it = plantloops.begin(); it != plantloops.end(); ++it ) {
+      systemComboBox->addItem(QString::fromStdString(it->name().get()), toQString(it->handle()));
     }
 
     systemComboBox->addItem("Service Hot Water",SHW);
@@ -210,30 +232,30 @@ void HVACSystemsController::update()
 
     // Set system combo box current index
     QString handle = currentHandle();
-    if( handle == SHW  || 
-        m_model.getModelObject<model::WaterUseConnections>(handle)
+    if( handle == SHW  ||
+        m_model.getModelObject<model::WaterUseConnections>(toUUID(handle))
       )
     {
       int index = systemComboBox->findData(SHW);
 
       OS_ASSERT(index >= 0);
-      
+
       systemComboBox->setCurrentIndex(index);
     }
-    else if( handle == REFRIGERATION ) 
+    else if( handle == REFRIGERATION )
     {
       int index = systemComboBox->findData(REFRIGERATION);
 
       OS_ASSERT(index >= 0);
-      
+
       systemComboBox->setCurrentIndex(index);
     }
-    else if( handle == VRF ) 
+    else if( handle == VRF )
     {
       int index = systemComboBox->findData(VRF);
 
       OS_ASSERT(index >= 0);
-      
+
       systemComboBox->setCurrentIndex(index);
     }
     else
@@ -252,7 +274,7 @@ void HVACSystemsController::update()
 
     systemComboBox->blockSignals(false);
 
-    // Show layout 
+    // Show layout
 
     m_hvacSystemsView->hvacToolbarView->zoomInButton->show();
     m_hvacSystemsView->hvacToolbarView->zoomOutButton->show();
@@ -275,14 +297,14 @@ void HVACSystemsController::update()
         m_refrigerationController = std::shared_ptr<RefrigerationController>(new RefrigerationController());
 
         m_hvacSystemsView->mainViewSwitcher->setView(m_refrigerationController->refrigerationView());
-      }  
+      }
       else if( m_hvacSystemsView->hvacToolbarView->gridViewButton->isChecked() )
       {
         // TODO
 
         m_hvacSystemsView->hvacToolbarView->zoomInButton->hide();
-        m_hvacSystemsView->hvacToolbarView->zoomOutButton->hide(); 
-        
+        m_hvacSystemsView->hvacToolbarView->zoomOutButton->hide();
+
         m_hvacSystemsView->hvacToolbarView->addButton->hide();
         m_hvacSystemsView->hvacToolbarView->deleteButton->hide();
 
@@ -362,10 +384,12 @@ void HVACSystemsController::update()
       }
     }
 
-    m_hvacSystemsView->setUpdatesEnabled(true); 
+    m_hvacSystemsView->setUpdatesEnabled(true);
 
     m_dirty = false;
   }
+
+  m_updateMutex->unlock();
 }
 
 void HVACSystemsController::updateLater()
@@ -400,7 +424,7 @@ std::vector<IddObjectType> HVACSystemsController::systemComboBoxTypes() const
   return types;
 }
 
-void HVACSystemsController::onObjectAdded(const WorkspaceObject & workspaceObject)
+void HVACSystemsController::onObjectAdded(const WorkspaceObject& workspaceObject, const openstudio::IddObjectType& type, const openstudio::UUID& uuid)
 {
   std::vector<IddObjectType> types = systemComboBoxTypes();
 
@@ -410,7 +434,7 @@ void HVACSystemsController::onObjectAdded(const WorkspaceObject & workspaceObjec
   }
 }
 
-void HVACSystemsController::onObjectRemoved(const WorkspaceObject & workspaceObject)
+void HVACSystemsController::onObjectRemoved(const WorkspaceObject& workspaceObject, const openstudio::IddObjectType& type, const openstudio::UUID& uuid)
 {
   std::vector<IddObjectType> types = systemComboBoxTypes();
 
@@ -435,7 +459,7 @@ void HVACLayoutController::addLibraryObjectToTopLevel(OSItemId itemid)
 
   if( object )
   {
-    if( OSAppBase::instance()->currentDocument()->fromComponentLibrary(itemid) ) 
+    if( OSAppBase::instance()->currentDocument()->fromComponentLibrary(itemid) )
     {
       if( boost::optional<model::WaterUseConnections> waterUseConnections = object->optionalCast<model::WaterUseConnections>() )
       {
@@ -447,7 +471,7 @@ void HVACLayoutController::addLibraryObjectToTopLevel(OSItemId itemid)
   }
 
   QMessageBox message(m_hvacSystemsController->hvacSystemsView());
-  
+
   message.setText("The selected component is not allowed at this location.");
 
   message.exec();
@@ -456,22 +480,29 @@ void HVACLayoutController::addLibraryObjectToTopLevel(OSItemId itemid)
 
 void HVACLayoutController::addLibraryObjectToModelNode(OSItemId itemid, model::HVACComponent & comp)
 {
-  model::OptionalModelObject object = OSAppBase::instance()->currentDocument()->getModelObject(itemid);
+  model::OptionalModelObject object;
+  bool remove = false;
+  bool added = false;
+  auto doc = OSAppBase::instance()->currentDocument();
 
-  if( object )
-  {
-    bool remove = false;
-
-    if( ! OSAppBase::instance()->currentDocument()->fromModel(itemid) ) 
-    {
+  object = doc->getModelObject(itemid);
+  if( object ) {
+    if( ! doc->fromModel(itemid) ) {
       object = object->clone(comp.model());
       remove = true;
     }
+  }
 
-    OS_ASSERT(object);
+  if( auto component = doc->getComponent(itemid) ) {
+    // Ugly hack to avoid the component being treated as a resource.
+    component->componentData().setString(OS_ComponentDataFields::UUID, toString(createUUID()));
+    if( auto componentData = comp.model().insertComponent(component.get()) ) {
+      object = componentData->primaryComponentObject();
+      remove = true;
+    }
+  }
 
-    bool added = false;
-
+  if( object ) {
     if( boost::optional<model::HVACComponent> hvacComponent = object->optionalCast<model::HVACComponent>() )
     {
       if( boost::optional<model::Node> node = comp.optionalCast<model::Node>() )
@@ -489,7 +520,7 @@ void HVACLayoutController::addLibraryObjectToModelNode(OSItemId itemid, model::H
           else if( plant->demandComponent(splitter->handle()) )
           {
             added = plant->addDemandBranchForComponent(hvacComponent.get());
-          } 
+          }
         }
         else if( boost::optional<model::AirLoopHVAC> airLoop = splitter->airLoopHVAC() )
         {
@@ -507,7 +538,7 @@ void HVACLayoutController::addLibraryObjectToModelNode(OSItemId itemid, model::H
         added = waterUseConnections->addWaterUseEquipment(waterUseEquipment.get());
       }
     }
-    else if( boost::optional<model::WaterUseEquipmentDefinition> waterUseEquipmentDefinition = 
+    else if( boost::optional<model::WaterUseEquipmentDefinition> waterUseEquipmentDefinition =
              object->optionalCast<model::WaterUseEquipmentDefinition>() )
     {
       if( boost::optional<model::WaterUseConnections> waterUseConnections = comp.optionalCast<model::WaterUseConnections>() )
@@ -527,7 +558,7 @@ void HVACLayoutController::addLibraryObjectToModelNode(OSItemId itemid, model::H
       }
 
       QMessageBox message(m_hvacSystemsController->hvacSystemsView());
-      
+
       message.setText("The selected component is not allowed at this location.");
 
       message.exec();
@@ -537,12 +568,12 @@ void HVACLayoutController::addLibraryObjectToModelNode(OSItemId itemid, model::H
 
 boost::optional<model::Loop> HVACSystemsController::currentLoop() const
 {
-  return m_model.getModelObject<model::Loop>(m_currentHandle);
+  return m_model.getModelObject<model::Loop>(toUUID(m_currentHandle));
 }
 
 void HVACLayoutController::removeModelObject(model::ModelObject & modelObject)
 {
-  if( modelObject.handle() == NULL ) return;
+  if( modelObject.handle().isNull() ) return;
 
   model::OptionalModelObject mo;
 
@@ -552,7 +583,7 @@ void HVACLayoutController::removeModelObject(model::ModelObject & modelObject)
 
   if( loop )
   {
-    if( boost::optional<model::WaterToWaterComponent> comp = 
+    if( boost::optional<model::WaterToWaterComponent> comp =
           modelObject.optionalCast<model::WaterToWaterComponent>() )
     {
       boost::optional<model::PlantLoop> plant = comp->plantLoop();
@@ -574,7 +605,7 @@ void HVACLayoutController::removeModelObject(model::ModelObject & modelObject)
         }
       }
     }
-    else if( boost::optional<model::WaterToAirComponent> comp = 
+    else if( boost::optional<model::WaterToAirComponent> comp =
           modelObject.optionalCast<model::WaterToAirComponent>() )
     {
       boost::optional<model::PlantLoop> plant = comp->plantLoop();
@@ -596,7 +627,7 @@ void HVACLayoutController::removeModelObject(model::ModelObject & modelObject)
         }
       }
     }
-    else if( boost::optional<model::ThermalZone> comp = 
+    else if( boost::optional<model::ThermalZone> comp =
           modelObject.optionalCast<model::ThermalZone>() )
     {
       boost::optional<model::AirLoopHVAC> airLoop = comp->airLoopHVAC();
@@ -629,7 +660,7 @@ void HVACLayoutController::goToOtherLoop( model::ModelObject & modelObject )
 
   if( boost::optional<model::Loop> loop = modelObject.optionalCast<model::Loop>() )
   {
-    m_hvacSystemsController->setCurrentHandle(loop->handle().toString());
+    m_hvacSystemsController->setCurrentHandle(toQString(loop->handle()));
 
     return;
   }
@@ -644,7 +675,7 @@ void HVACLayoutController::goToOtherLoop( model::ModelObject & modelObject )
       {
         if( boost::optional<model::PlantLoop> plantLoop = comp->plantLoop() )
         {
-          m_hvacSystemsController->setCurrentHandle(plantLoop->handle().toString());
+          m_hvacSystemsController->setCurrentHandle(toQString(plantLoop->handle()));
         }
 
         return;
@@ -653,7 +684,7 @@ void HVACLayoutController::goToOtherLoop( model::ModelObject & modelObject )
       {
         if( boost::optional<model::AirLoopHVAC> airLoopHVAC = comp->airLoopHVAC() )
         {
-          m_hvacSystemsController->setCurrentHandle(airLoopHVAC->handle().toString());
+          m_hvacSystemsController->setCurrentHandle(toQString(airLoopHVAC->handle()));
         }
 
         return;
@@ -668,7 +699,7 @@ void HVACLayoutController::goToOtherLoop( model::ModelObject & modelObject )
         {
           if( boost::optional<model::PlantLoop> secondaryPlantLoop = comp->secondaryPlantLoop() )
           {
-            m_hvacSystemsController->setCurrentHandle(secondaryPlantLoop->handle().toString());
+            m_hvacSystemsController->setCurrentHandle(toQString(secondaryPlantLoop->handle()));
 
             return;
           }
@@ -681,7 +712,7 @@ void HVACLayoutController::goToOtherLoop( model::ModelObject & modelObject )
         {
           if( boost::optional<model::PlantLoop> plantLoop = comp->plantLoop() )
           {
-            m_hvacSystemsController->setCurrentHandle(plantLoop->handle().toString());
+            m_hvacSystemsController->setCurrentHandle(toQString(plantLoop->handle()));
 
             return;
           }
@@ -700,6 +731,14 @@ void HVACSystemsController::addToModel(AddToModelEnum addToModelEnum)
     case ADDTOMODEL_AIRLOOPHVAC:
     {
       model::AirLoopHVAC airLoopHVAC(m_model);
+
+      loop = airLoopHVAC;
+
+      break;
+    }
+    case ADDTOMODEL_DUAL_AIRLOOPHVAC:
+    {
+      model::AirLoopHVAC airLoopHVAC(m_model,true);
 
       loop = airLoopHVAC;
 
@@ -759,7 +798,7 @@ void HVACSystemsController::addToModel(AddToModelEnum addToModelEnum)
 
   if( loop )
   {
-    m_currentHandle = loop->handle().toString();
+    m_currentHandle = toQString(loop->handle());
   }
 }
 
@@ -786,7 +825,7 @@ void HVACSystemsController::onAddSystemClicked()
 
   if( loopLibraryDialog.result() == QDialog::Accepted )
   {
-    addToModel(loopLibraryDialog.addToModelEnum().get());    
+    addToModel(loopLibraryDialog.addToModelEnum().get());
   }
 
   // Temporary hack to test refrigeration grid view
@@ -808,15 +847,15 @@ void HVACSystemsController::onRemoveLoopClicked()
 
     QComboBox * chooser = m_hvacSystemsView->hvacToolbarView->systemComboBox;
 
-    int i = chooser->findData(loop->handle().toString());
+    int i = chooser->findData(toQString(loop->handle()));
 
     if( i == 0 )
     {
-      setCurrentHandle(QUuid(chooser->itemData(i + 1).toString()).toString());
+      setCurrentHandle(chooser->itemData(i + 1).toString());
     }
     else
     {
-      setCurrentHandle(QUuid(chooser->itemData(i - 1).toString()).toString());
+      setCurrentHandle(chooser->itemData(i - 1).toString());
     }
 
     loop->remove();
@@ -829,7 +868,7 @@ void HVACLayoutController::onModelObjectSelected(model::OptionalModelObject & mo
   {
     if( boost::optional<model::WaterUseConnections> waterUseConnections = modelObject->optionalCast<model::WaterUseConnections>() )
     {
-      m_hvacSystemsController->setCurrentHandle(waterUseConnections->handle().toString());
+      m_hvacSystemsController->setCurrentHandle(toQString(waterUseConnections->handle()));
     }
     else
     {
@@ -903,7 +942,7 @@ void HVACControlsController::update()
 {
   if( m_dirty )
   {
-    m_hvacControlsView->setUpdatesEnabled(false); 
+    m_hvacControlsView->setUpdatesEnabled(false);
 
     if( m_mechanicalVentilationView ) { delete m_mechanicalVentilationView; }
     if( m_singleZoneReheatSPMView ) { delete m_singleZoneReheatSPMView; }
@@ -923,23 +962,23 @@ void HVACControlsController::update()
       QString title;
       title.append(QString::fromStdString(t_airLoopHVAC->name().get()));
       m_hvacControlsView->systemNameLabel->setText(title);
-      
+
       // Cooling Type
-      
+
       m_hvacControlsView->coolingTypeLabel->setText("Unclassified Cooling Type");
-      
+
       std::vector<model::ModelObject> modelObjects = t_airLoopHVAC->supplyComponents(model::CoilCoolingDXSingleSpeed::iddObjectType());
       if( modelObjects.size() > 0 )
       {
         m_hvacControlsView->coolingTypeLabel->setText("DX Cooling");
       }
-      
+
       modelObjects = t_airLoopHVAC->supplyComponents(model::CoilCoolingDXTwoSpeed::iddObjectType());
       if( modelObjects.size() > 0 )
       {
         m_hvacControlsView->coolingTypeLabel->setText("DX Cooling");
       }
-      
+
       modelObjects = t_airLoopHVAC->supplyComponents(model::CoilCoolingWater::iddObjectType());
       if( modelObjects.size() > 0 )
       {
@@ -951,23 +990,23 @@ void HVACControlsController::update()
       {
         m_hvacControlsView->coolingTypeLabel->setText("DX Cooling");
       }
-      
+
       // Heating Type
-      
+
       m_hvacControlsView->heatingTypeLabel->setText("Unclassified Heating Type");
-      
+
       modelObjects = t_airLoopHVAC->supplyComponents(model::CoilHeatingGas::iddObjectType());
       if( modelObjects.size() > 0 )
       {
-        m_hvacControlsView->heatingTypeLabel->setText("Gas Heating"); 
+        m_hvacControlsView->heatingTypeLabel->setText("Gas Heating");
       }
-      
+
       modelObjects = t_airLoopHVAC->supplyComponents(model::CoilHeatingElectric::iddObjectType());
       if( modelObjects.size() > 0 )
       {
-        m_hvacControlsView->heatingTypeLabel->setText("Electric Heating"); 
+        m_hvacControlsView->heatingTypeLabel->setText("Electric Heating");
       }
-      
+
       modelObjects = t_airLoopHVAC->supplyComponents(model::CoilHeatingWater::iddObjectType());
       if( modelObjects.size() > 0 )
       {
@@ -982,7 +1021,7 @@ void HVACControlsController::update()
 
       // HVAC Operation Schedule
 
-      SystemAvailabilityVectorController * systemAvailabilityVectorController = new SystemAvailabilityVectorController();
+      auto systemAvailabilityVectorController = new SystemAvailabilityVectorController();
       systemAvailabilityVectorController->attach(t_airLoopHVAC.get());
       m_systemAvailabilityDropZone = new OSDropZone(systemAvailabilityVectorController);
       m_systemAvailabilityDropZone->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
@@ -995,13 +1034,13 @@ void HVACControlsController::update()
       m_hvacControlsView->hvacOperationViewSwitcher->setView(m_systemAvailabilityDropZone);
 
       // Night Cycle Control
-      
+
       m_hvacControlsView->nightCycleComboBox->setEnabled(true);
-      
+
       std::string nightCycleControlType = t_airLoopHVAC->nightCycleControlType();
-      
+
       int nightCycleSelectorIndex = m_hvacControlsView->nightCycleComboBox->findData(QString::fromStdString(nightCycleControlType));
-      
+
       m_hvacControlsView->nightCycleComboBox->setCurrentIndex(nightCycleSelectorIndex);
 
       connect(m_hvacControlsView->nightCycleComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
@@ -1020,30 +1059,37 @@ void HVACControlsController::update()
         m_hvacControlsView->ventilationViewSwitcher->setView(m_mechanicalVentilationView);
 
         // Economizer Control Type
-        
+
         connect(m_mechanicalVentilationView->economizerComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
           this, &HVACControlsController::onEconomizerComboBoxIndexChanged);
-        
+
         std::string economizerControlType = controllerOutdoorAir.getEconomizerControlType();
-        
+
         int economizerIndex = m_mechanicalVentilationView->economizerComboBox->findData(QString::fromStdString(economizerControlType));
-        
+
         m_mechanicalVentilationView->economizerComboBox->setCurrentIndex(economizerIndex);
 
         // Ventilation Calculation Method
-        
+
         connect(m_mechanicalVentilationView->ventilationCalcMethodComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
           this, &HVACControlsController::onVentilationCalcMethodComboBoxIndexChanged);
-        
+
         std::string ventilationMethod = controllerMechanicalVentilation.systemOutdoorAirMethod();
-        
+
         int ventilationMethodIndex = m_mechanicalVentilationView->ventilationCalcMethodComboBox->findData(QString::fromStdString(ventilationMethod));
-        
+
         m_mechanicalVentilationView->ventilationCalcMethodComboBox->setCurrentIndex(ventilationMethodIndex);
-        
+
         // Demand Controlled Ventilation
-        
-        m_mechanicalVentilationView->dcvButton->bind(controllerMechanicalVentilation,"demandControlledVentilation");
+
+        // m_mechanicalVentilationView->dcvButton->bind(controllerMechanicalVentilation,"demandControlledVentilation");
+        m_mechanicalVentilationView->dcvButton->bind(
+          controllerMechanicalVentilation,
+          std::bind(&model::ControllerMechanicalVentilation::demandControlledVentilation, controllerMechanicalVentilation),
+          boost::optional<BoolSetter>(std::bind(&model::ControllerMechanicalVentilation::setDemandControlledVentilation, controllerMechanicalVentilation, std::placeholders::_1)),
+          boost::optional<NoFailAction>(std::bind(&model::ControllerMechanicalVentilation::resetDemandControlledVentilation, controllerMechanicalVentilation)),
+          boost::optional<BasicQuery>(std::bind(&model::ControllerMechanicalVentilation::isDemandControlledVentilationDefaulted, controllerMechanicalVentilation))
+        );
       }
       else
       {
@@ -1055,18 +1101,23 @@ void HVACControlsController::update()
       // Supply Air Temperature
       boost::optional<model::SetpointManager> _spm;
       std::vector<model::SetpointManager> _setpointManagers = t_airLoopHVAC->supplyOutletNode().setpointManagers();
-      for(std::vector<model::SetpointManager>::iterator it = _setpointManagers.begin();
+      for(auto it = _setpointManagers.begin();
           it != _setpointManagers.end();
           ++it)
       {
-        if( istringEqual("Temperature", it->controlVariable()) ) 
+        if( istringEqual("Temperature", it->controlVariable()) )
         {
           _spm = *it;
           break;
         }
       }
 
-      if( boost::optional<model::SetpointManagerSingleZoneReheat> spm = _spm->optionalCast<model::SetpointManagerSingleZoneReheat>() )
+      boost::optional<model::SetpointManagerSingleZoneReheat> spmSZR;
+      boost::optional<model::SetpointManagerScheduled> spmS;
+      boost::optional<model::SetpointManagerFollowOutdoorAirTemperature> spmFOAT;
+      boost::optional<model::SetpointManagerOutdoorAirReset> spmOAR;
+
+      if( _spm && ( spmSZR = _spm->optionalCast<model::SetpointManagerSingleZoneReheat>() ) )
       {
         m_singleZoneReheatSPMView = new SingleZoneReheatSPMView();
 
@@ -1078,14 +1129,14 @@ void HVACControlsController::update()
              it != thermalZones.end();
              ++it )
         {
-          m_singleZoneReheatSPMView->controlZoneComboBox->addItem(QString::fromStdString(it->name().get()),it->handle().toString());
+          m_singleZoneReheatSPMView->controlZoneComboBox->addItem(QString::fromStdString(it->name().get()), toQString(it->handle()));
         }
 
-        m_singleZoneReheatSPMView->controlZoneComboBox->addItem("",QUuid().toString());
+        m_singleZoneReheatSPMView->controlZoneComboBox->addItem("",toQString(UUID()));
 
-        if( boost::optional<model::ThermalZone> tz = spm->controlZone() )
+        if( boost::optional<model::ThermalZone> tz = spmSZR->controlZone() )
         {
-          int index = m_singleZoneReheatSPMView->controlZoneComboBox->findData(tz->handle().toString());
+          int index = m_singleZoneReheatSPMView->controlZoneComboBox->findData(toQString(tz->handle()));
 
           if( index > -1 )
           {
@@ -1093,7 +1144,7 @@ void HVACControlsController::update()
           }
           else
           {
-            m_singleZoneReheatSPMView->controlZoneComboBox->addItem(QString::fromStdString(tz->name().get()),tz->handle().toString());
+            m_singleZoneReheatSPMView->controlZoneComboBox->addItem(QString::fromStdString(tz->name().get()), toQString(tz->handle()));
 
             int i = m_singleZoneReheatSPMView->controlZoneComboBox->count() - 1;
 
@@ -1102,24 +1153,24 @@ void HVACControlsController::update()
         }
         else
         {
-          int index = m_singleZoneReheatSPMView->controlZoneComboBox->findData(QUuid().toString());
+          int index = m_singleZoneReheatSPMView->controlZoneComboBox->findData(toQString(UUID()));
 
           OS_ASSERT( index > -1 );
 
           m_singleZoneReheatSPMView->controlZoneComboBox->setCurrentIndex(index);
         }
-        
+
         connect(m_singleZoneReheatSPMView->controlZoneComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
           this, &HVACControlsController::onControlZoneComboBoxChanged);
       }
-      else if( boost::optional<model::SetpointManagerScheduled> spm = _spm->optionalCast<model::SetpointManagerScheduled>() )
+      else if( _spm && ( spmS = _spm->optionalCast<model::SetpointManagerScheduled>() ) )
       {
         m_scheduledSPMView = new ScheduledSPMView();
 
         m_hvacControlsView->supplyAirTemperatureViewSwitcher->setView(m_scheduledSPMView);
 
-        SupplyAirTempScheduleVectorController * supplyAirTempScheduleVectorController = new SupplyAirTempScheduleVectorController();
-        supplyAirTempScheduleVectorController->attach(spm.get());
+        auto supplyAirTempScheduleVectorController = new SupplyAirTempScheduleVectorController();
+        supplyAirTempScheduleVectorController->attach(spmS.get());
         m_supplyAirTempScheduleDropZone = new OSDropZone(supplyAirTempScheduleVectorController);
         m_supplyAirTempScheduleDropZone->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
         m_supplyAirTempScheduleDropZone->setMinItems(1);
@@ -1130,13 +1181,13 @@ void HVACControlsController::update()
         m_supplyAirTempScheduleDropZone->setEnabled(true);
         m_scheduledSPMView->supplyAirTemperatureViewSwitcher->setView(m_supplyAirTempScheduleDropZone);
       }
-      else if( boost::optional<model::SetpointManagerFollowOutdoorAirTemperature> spm = _spm->optionalCast<model::SetpointManagerFollowOutdoorAirTemperature>() )
+      else if( _spm && ( spmFOAT = _spm->optionalCast<model::SetpointManagerFollowOutdoorAirTemperature>() ) )
       {
         m_followOATempSPMView = new FollowOATempSPMView();
 
         m_hvacControlsView->supplyAirTemperatureViewSwitcher->setView(m_followOATempSPMView);
       }
-      else if( boost::optional<model::SetpointManagerOutdoorAirReset> spm = _spm->optionalCast<model::SetpointManagerOutdoorAirReset>() )
+      else if( _spm && ( spmOAR = _spm->optionalCast<model::SetpointManagerOutdoorAirReset>() ) )
       {
         m_oaResetSPMView = new OAResetSPMView();
 
@@ -1158,14 +1209,14 @@ void HVACControlsController::update()
              it != thermalZones.end();
              ++it )
         {
-          m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->addItem(QString::fromStdString(it->name().get()),it->handle().toString());
+          m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->addItem(QString::fromStdString(it->name().get()), toQString(it->handle()));
         }
 
-        m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->addItem("",QUuid().toString());
+        m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->addItem("",toQString(UUID()));
 
         if( boost::optional<model::ThermalZone> tz = hp.controllingZone() )
         {
-          int index = m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->findData(tz->handle().toString());
+          int index = m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->findData(toQString(tz->handle()));
 
           if( index > -1 )
           {
@@ -1173,7 +1224,7 @@ void HVACControlsController::update()
           }
           else
           {
-            m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->addItem(QString::fromStdString(tz->name().get()),tz->handle().toString());
+            m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->addItem(QString::fromStdString(tz->name().get()),toQString(tz->handle()));
 
             int i = m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->count() - 1;
 
@@ -1182,13 +1233,13 @@ void HVACControlsController::update()
         }
         else
         {
-          int index = m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->findData(QUuid().toString());
+          int index = m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->findData(toQString(UUID()));
 
           OS_ASSERT( index > -1 );
 
           m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->setCurrentIndex(index);
         }
-        
+
         connect(m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
           this, &HVACControlsController::onUnitaryHeatPumpControlZoneChanged);
       }
@@ -1200,7 +1251,7 @@ void HVACControlsController::update()
       }
     }
 
-    m_hvacControlsView->setUpdatesEnabled(true); 
+    m_hvacControlsView->setUpdatesEnabled(true);
 
     m_dirty = false;
   }
@@ -1215,13 +1266,13 @@ void HVACControlsController::onEconomizerComboBoxIndexChanged(int index)
   boost::optional<model::AirLoopHVACOutdoorAirSystem> oaSystem = t_airLoopHVAC->airLoopHVACOutdoorAirSystem();
 
   OS_ASSERT(oaSystem);
-  
+
   model::ControllerOutdoorAir controllerOutdoorAir = oaSystem->getControllerOutdoorAir();
 
   OS_ASSERT(m_mechanicalVentilationView);
 
   QString data = m_mechanicalVentilationView->economizerComboBox->itemData(index).toString();
-  
+
   controllerOutdoorAir.setEconomizerControlType(data.toStdString());
 }
 
@@ -1234,7 +1285,7 @@ void HVACControlsController::onVentilationCalcMethodComboBoxIndexChanged(int ind
   boost::optional<model::AirLoopHVACOutdoorAirSystem> oaSystem = t_airLoopHVAC->airLoopHVACOutdoorAirSystem();
 
   OS_ASSERT(oaSystem);
-  
+
   model::ControllerOutdoorAir controllerOutdoorAir = oaSystem->getControllerOutdoorAir();
 
   model::ControllerMechanicalVentilation controllerMechanicalVentilation = controllerOutdoorAir.controllerMechanicalVentilation();
@@ -1254,14 +1305,14 @@ void HVACControlsController::onNightCycleComboBoxIndexChanged(int index)
 
   QString data = m_hvacControlsView->nightCycleComboBox->itemData(index).toString();
 
-  t_airLoopHVAC->setNightCycleControlType(data.toStdString()); 
+  t_airLoopHVAC->setNightCycleControlType(data.toStdString());
 }
 
 void HVACControlsController::onControlZoneComboBoxChanged(int index)
 {
   QString stringHandle = m_singleZoneReheatSPMView->controlZoneComboBox->itemData(index).toString();
 
-  QUuid handle(stringHandle);
+  UUID handle(toUUID(stringHandle));
 
   model::Model t_model = m_hvacSystemsController->model();
 
@@ -1286,7 +1337,7 @@ void HVACControlsController::onUnitaryHeatPumpControlZoneChanged(int index)
 {
   QString stringHandle = m_airLoopHVACUnitaryHeatPumpAirToAirControlView->controlZoneComboBox->itemData(index).toString();
 
-  QUuid handle(stringHandle);
+  UUID handle(toUUID(stringHandle));
 
   model::Model t_model = m_hvacSystemsController->model();
 
@@ -1327,9 +1378,9 @@ HVACLayoutController::HVACLayoutController(HVACSystemsController * hvacSystemsCo
 
   //m_refrigerationController = std::shared_ptr<RefrigerationController>(new RefrigerationController());
 
-  connect(m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->zoomOutButton, &QPushButton::clicked, m_hvacGraphicsView, &HVACGraphicsView::zoomOut);
+  connect(m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->zoomOutButton, &QPushButton::clicked, m_hvacGraphicsView.data(), &HVACGraphicsView::zoomOut);
 
-  connect(m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->zoomInButton, &QPushButton::clicked, m_hvacGraphicsView, &HVACGraphicsView::zoomIn);
+  connect(m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->zoomInButton, &QPushButton::clicked, m_hvacGraphicsView.data(), &HVACGraphicsView::zoomIn);
 
   updateLater();
 }
@@ -1354,9 +1405,9 @@ HVACGraphicsView * HVACLayoutController::hvacGraphicsView() const
 
 void HVACLayoutController::goToServiceWaterScene()
 {
-  // A null QUuid signals the service water scene
+  // A null UUID signals the service water scene
 
-  m_hvacSystemsController->setCurrentHandle(QUuid().toString());
+  m_hvacSystemsController->setCurrentHandle(toQString(UUID()));
 }
 
 void HVACLayoutController::clearSceneSelection()
@@ -1381,7 +1432,7 @@ void HVACLayoutController::update()
 
     QString handle = m_hvacSystemsController->currentHandle();
 
-    boost::optional<model::ModelObject> mo = t_model.getModelObject<model::ModelObject>(handle);
+    boost::optional<model::ModelObject> mo = t_model.getModelObject<model::ModelObject>(toUUID(handle));
 
     if( mo )
     {
@@ -1390,16 +1441,16 @@ void HVACLayoutController::update()
         m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->showControls(true);
 
         LoopScene * loopScene = new LoopScene(loop.get());
-        
+
         m_hvacGraphicsView->setScene(loopScene);
 
-        
+
         connect(loopScene, &LoopScene::modelObjectSelected, this, &HVACLayoutController::onModelObjectSelected);
-        
+
         connect(loopScene, &LoopScene::removeModelObjectClicked, this, &HVACLayoutController::removeModelObject);
-        
+
         connect(loopScene, &LoopScene::innerNodeClicked, this, &HVACLayoutController::goToOtherLoop);
-        
+
         connect(loopScene, static_cast<void (LoopScene::*)(OSItemId, model::HVACComponent &)>(&LoopScene::hvacComponentDropped), this, &HVACLayoutController::addLibraryObjectToModelNode);
       }
       else if( boost::optional<model::WaterUseConnections> waterUseConnections = mo->optionalCast<model::WaterUseConnections>() )
@@ -1408,7 +1459,7 @@ void HVACLayoutController::update()
 
         m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->label->setText(QString::fromStdString(waterUseConnections->name().get()));
 
-        WaterUseConnectionsDetailScene * waterUseConnectionsScene = new WaterUseConnectionsDetailScene(waterUseConnections.get());
+        auto waterUseConnectionsScene = new WaterUseConnectionsDetailScene(waterUseConnections.get());
 
         m_hvacGraphicsView->setScene(waterUseConnectionsScene);
 
@@ -1430,10 +1481,10 @@ void HVACLayoutController::update()
     //  //m_hvacGraphicsView->setScene(m_refrigerationController->refrigerationScene().data());
     //}
     else
-    { 
+    {
       m_hvacSystemsController->hvacSystemsView()->hvacToolbarView->showControls(true);
 
-      ServiceWaterScene * serviceWaterScene = new ServiceWaterScene(t_model);
+      auto serviceWaterScene = new ServiceWaterScene(t_model);
 
       m_hvacGraphicsView->setScene(serviceWaterScene);
 
@@ -1455,6 +1506,12 @@ void HVACLayoutController::updateLater()
   QTimer::singleShot(0,this,SLOT(update()));
 }
 
+SystemAvailabilityVectorController::SystemAvailabilityVectorController() 
+  : ModelObjectVectorController()
+{
+  m_reportItemsMutex = new QMutex();
+}
+
 void SystemAvailabilityVectorController::attach(const model::ModelObject& modelObject)
 {
   detach();
@@ -1465,7 +1522,7 @@ void SystemAvailabilityVectorController::attach(const model::ModelObject& modelO
   {
     m_model = m_modelObject->model();
 
-    connect(m_model->getImpl<model::detail::Model_Impl>().get(), &model::detail::Model_Impl::onChange, this, &SystemAvailabilityVectorController::reportItemsLater);
+    m_model->getImpl<model::detail::Model_Impl>().get()->onChange.connect<SystemAvailabilityVectorController, &SystemAvailabilityVectorController::reportItemsLater>(this);
   }
 
   reportItemsLater();
@@ -1480,8 +1537,7 @@ void SystemAvailabilityVectorController::detach()
 
   if( m_model )
   {
-    disconnect(m_model->getImpl<model::detail::Model_Impl>().get(), &model::detail::Model_Impl::onChange,
-      this, &SystemAvailabilityVectorController::reportItemsLater);
+    m_model->getImpl<model::detail::Model_Impl>().get()->onChange.disconnect<SystemAvailabilityVectorController, &SystemAvailabilityVectorController::reportItemsLater>(this);
 
     m_model.reset();
   }
@@ -1498,15 +1554,21 @@ void SystemAvailabilityVectorController::reportItemsLater()
 
 void SystemAvailabilityVectorController::reportItems()
 {
+  if( ! m_reportItemsMutex->tryLock() ) {
+    return;
+  }
+
   if( m_reportScheduled )
   {
     m_reportScheduled = false;
 
     ModelObjectVectorController::reportItems();
   }
+
+  m_reportItemsMutex->unlock();
 }
 
-boost::optional<model::AirLoopHVAC> 
+boost::optional<model::AirLoopHVAC>
   SystemAvailabilityVectorController::airLoopHVAC()
 {
   if( m_modelObject && ! m_modelObject->handle().isNull() )
@@ -1558,6 +1620,12 @@ void SystemAvailabilityVectorController::onReplaceItem(OSItem * currentItem, con
   onDrop(replacementItemId);
 }
 
+SupplyAirTempScheduleVectorController::SupplyAirTempScheduleVectorController()
+  : ModelObjectVectorController()
+{
+  m_reportItemsMutex = new QMutex();
+}
+
 void SupplyAirTempScheduleVectorController::attach(const model::ModelObject& modelObject)
 {
   detach();
@@ -1568,7 +1636,7 @@ void SupplyAirTempScheduleVectorController::attach(const model::ModelObject& mod
   {
     m_model = m_modelObject->model();
 
-    connect(m_model->getImpl<model::detail::Model_Impl>().get(), &model::detail::Model_Impl::onChange, this, &SupplyAirTempScheduleVectorController::reportItemsLater);
+    m_model->getImpl<model::detail::Model_Impl>().get()->onChange.connect<SupplyAirTempScheduleVectorController, &SupplyAirTempScheduleVectorController::reportItemsLater>(this);
   }
 
   reportItemsLater();
@@ -1583,8 +1651,7 @@ void SupplyAirTempScheduleVectorController::detach()
 
   if( m_model )
   {
-    disconnect(m_model->getImpl<model::detail::Model_Impl>().get(), &model::detail::Model_Impl::onChange,
-               this, &SupplyAirTempScheduleVectorController::reportItemsLater);
+    m_model->getImpl<model::detail::Model_Impl>().get()->onChange.disconnect<SupplyAirTempScheduleVectorController, &SupplyAirTempScheduleVectorController::reportItemsLater>(this);
 
     m_model.reset();
   }
@@ -1601,15 +1668,21 @@ void SupplyAirTempScheduleVectorController::reportItemsLater()
 
 void SupplyAirTempScheduleVectorController::reportItems()
 {
+  if( ! m_reportItemsMutex->tryLock() ) {
+    return;
+  }
+
   if( m_reportScheduled )
   {
     m_reportScheduled = false;
 
     ModelObjectVectorController::reportItems();
   }
+
+  m_reportItemsMutex->unlock();
 }
 
-boost::optional<model::SetpointManagerScheduled> 
+boost::optional<model::SetpointManagerScheduled>
   SupplyAirTempScheduleVectorController::setpointManagerScheduled()
 {
   if( m_modelObject && ! m_modelObject->handle().isNull() )
@@ -1665,4 +1738,3 @@ void SupplyAirTempScheduleVectorController::onReplaceItem(OSItem * currentItem, 
 }
 
 } // openstudio
-

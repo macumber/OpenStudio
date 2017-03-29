@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Building.hpp"
 #include "Building_Impl.hpp"
@@ -40,13 +49,15 @@
 #include "ShadingSurface_Impl.hpp"
 #include "ShadingSurfaceGroup.hpp"
 #include "ShadingSurfaceGroup_Impl.hpp"
-#include "Meter.hpp"
-#include "Meter_Impl.hpp"
+#include "OutputMeter.hpp"
+#include "OutputMeter_Impl.hpp"
 #include "Surface.hpp"
 #include "Surface_Impl.hpp"
 
 #include <utilities/idd/IddFactory.hxx>
+
 #include <utilities/idd/OS_Building_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 #include <utilities/idd/OS_ThermalZone_FieldEnums.hxx>
 
 #include "../utilities/math/FloatCompare.hpp"
@@ -95,7 +106,7 @@ namespace detail {
     std::vector<ModelObject> result;
 
     // meters
-    MeterVector meters = this->meters();
+    OutputMeterVector meters = this->meters();
     result.insert(result.end(),meters.begin(),meters.end());
 
     // building stories
@@ -115,6 +126,92 @@ namespace detail {
     result.insert(result.end(), spaces.begin(), spaces.end());
 
     return result;
+  }
+
+  ModelObject Building_Impl::clone(Model t_model) const
+  {
+    boost::optional<Building> result;
+
+    if( t_model == model() ) {
+      // Clone attempted into same Model - return the existing instance
+      result = getObject<ModelObject>().cast<Building>();
+    } else {
+
+      auto otherBuilding = t_model.building();
+      if (otherBuilding){
+        otherBuilding->remove();
+      }
+
+      //auto buildings = t_model.getModelObjects<Building>();
+      //if( ! buildings.empty() ) {
+      //  // If Destination model already has a building then first remove it
+      //  buildings.front().remove();
+      //}
+
+      // Clone Building and child objects.
+
+      // This call clones only the building and it's resources
+      result = ModelObject_Impl::clone(t_model).cast<Building>();
+
+      // DLM: why did the ParentObject::clone not work?
+      // DLM: ParentObject::clone only preserves links between child and parent objects, it does not preserve links between levels of the hierarchy
+      // we could potentially add ThermalZone as a resource of Space (or vice versa or both) but I am not sure what the implications of that are
+
+      // Clone children since we are not relying on the implementation provided by ParentObject::clone
+
+      // Meter instances
+      auto t_meters = meters();
+      for( const auto & meter : t_meters ) {
+        meter.clone(t_model);
+      }
+
+      // BuildingStory instances
+      auto t_stories = model().getConcreteModelObjects<BuildingStory>();
+      // Map of the source model story handle to the target model story "cloned" ModelObject
+      std::map<Handle,BuildingStory> m_storyMap;
+
+      for( const auto & story : t_stories ) {
+        auto clone = story.clone(t_model).cast<BuildingStory>();
+        m_storyMap.insert(std::pair<Handle,BuildingStory>(story.handle(),clone));
+      }
+
+      // ShadingSurfaceGroup
+      auto t_shadingSurfaceGroups = shadingSurfaceGroups();
+      for( const auto & surfaceGroup : t_shadingSurfaceGroups ) {
+        surfaceGroup.clone(t_model);
+      }
+
+      // ThermalZone instances
+      auto t_zones = thermalZones();
+      // Map of the source model zone handle to the target model zone "cloned" ModelObject
+      std::map<Handle,ThermalZone> m_zoneMap;
+
+      for( const auto & zone : t_zones ) {
+        auto clone = zone.clone(t_model).cast<ThermalZone>();
+        m_zoneMap.insert(std::pair<Handle,ThermalZone>(zone.handle(),clone));
+      }
+
+      // Space Instances
+      auto t_spaces = spaces();
+
+      for( const auto & space : t_spaces ) {
+        auto clone = space.clone(t_model).cast<Space>();
+
+        if( auto zone = space.thermalZone() ) {
+          auto zoneClone = m_zoneMap.at(zone->handle());
+          clone.setThermalZone(zoneClone);
+        }
+
+        if( auto story = space.buildingStory() ) {
+          auto storyClone = m_storyMap.at(story->handle());
+          clone.setBuildingStory(storyClone);
+        }
+      }
+
+    }
+
+    OS_ASSERT(result);
+    return result.get();
   }
 
   bool Building_Impl::setParent(ParentObject& newParent)
@@ -156,15 +253,11 @@ namespace detail {
     return isEmpty(OS_BuildingFields::NorthAxis);
   }
 
-  double Building_Impl::nominalFloortoFloorHeight() const {
+  boost::optional<double> Building_Impl::nominalFloortoFloorHeight() const {
     boost::optional<double> value = getDouble(OS_BuildingFields::NominalFloortoFloorHeight,true);
-    OS_ASSERT(value);
-    return value.get();
+    return value;
   }
 
-  bool Building_Impl::isNominalFloortoFloorHeightDefaulted() const {
-    return isEmpty(OS_BuildingFields::NominalFloortoFloorHeight);
-  }
 
   boost::optional<int> Building_Impl::standardsNumberOfStories() const
   {
@@ -178,6 +271,17 @@ namespace detail {
     return value;
   }
 
+  boost::optional<int> Building_Impl::standardsNumberOfLivingUnits() const
+  {
+    boost::optional<int> value = getInt(OS_BuildingFields::StandardsNumberofLivingUnits, false);
+    return value;
+  }
+
+  boost::optional<double> Building_Impl::nominalFloortoCeilingHeight() const {
+    boost::optional<double> value = getDouble(OS_BuildingFields::NominalFloortoCeilingHeight, true);
+    return value;
+  }
+
   boost::optional<std::string> Building_Impl::standardsBuildingType() const
   {
     return getString(OS_BuildingFields::StandardsBuildingType, false, true);
@@ -186,7 +290,7 @@ namespace detail {
   std::vector<std::string> Building_Impl::suggestedStandardsBuildingTypes() const
   {
     std::vector<std::string> result;
-  
+
     boost::optional<std::string> standardsBuildingType = this->standardsBuildingType();
 
     // DLM: temp code, eventually get from StandardsLibrary
@@ -210,16 +314,16 @@ namespace detail {
     if (standardsBuildingType){
       finder.addTarget(*standardsBuildingType);
     }
-    auto it = std::remove_if(result.begin(), result.end(), finder); 
-    result.resize( std::distance(result.begin(),it) ); 
+    auto it = std::remove_if(result.begin(), result.end(), finder);
+    result.resize( std::distance(result.begin(),it) );
 
     // sort
     std::sort(result.begin(), result.end(), IstringCompare());
 
     // make unique
     // DLM: have to sort before calling unique, unique only works on consecutive elements
-    it = std::unique(result.begin(), result.end(), IstringEqual()); 
-    result.resize( std::distance(result.begin(),it) ); 
+    it = std::unique(result.begin(), result.end(), IstringEqual());
+    result.resize( std::distance(result.begin(),it) );
 
     // add current to front
     if (standardsBuildingType){
@@ -227,6 +331,17 @@ namespace detail {
     }
 
     return result;
+  }
+
+  bool Building_Impl::relocatable() const
+  {
+    boost::optional<std::string> value = getString(OS_BuildingFields::Relocatable, true, true);
+    OS_ASSERT(value);
+    return openstudio::istringEqual(value.get(), "True");
+  }
+
+  bool Building_Impl::isRelocatableDefaulted() const {
+    return isEmpty(OS_BuildingFields::Relocatable);
   }
 
   void Building_Impl::setNorthAxis(double northAxis) {
@@ -273,6 +388,28 @@ namespace detail {
     OS_ASSERT(test);
   }
 
+  bool Building_Impl::setStandardsNumberOfLivingUnits(int value)
+  {
+    bool test = setInt(OS_BuildingFields::StandardsNumberofLivingUnits, value);
+    return test;
+  }
+
+  void Building_Impl::resetStandardsNumberOfLivingUnits()
+  {
+    bool test = setString(OS_BuildingFields::StandardsNumberofLivingUnits, "");
+    OS_ASSERT(test);
+  }
+
+  bool Building_Impl::setNominalFloortoCeilingHeight(double nominalFloortoCeilingHeight) {
+    bool result = setDouble(OS_BuildingFields::NominalFloortoCeilingHeight, nominalFloortoCeilingHeight);
+    return result;
+  }
+
+  void Building_Impl::resetNominalFloortoCeilingHeight() {
+    bool result = setString(OS_BuildingFields::NominalFloortoCeilingHeight, "");
+    OS_ASSERT(result);
+  }
+
   bool Building_Impl::setStandardsBuildingType(const std::string& standardsBuildingType)
   {
     bool result = setString(OS_BuildingFields::StandardsBuildingType, standardsBuildingType);
@@ -284,6 +421,25 @@ namespace detail {
   {
     bool test = setString(OS_BuildingFields::StandardsBuildingType, "");
     OS_ASSERT(test);
+  }
+
+  bool Building_Impl::setRelocatable(bool relocatable)
+  {
+    bool result = false;
+    if (relocatable) {
+      result = setString(OS_BuildingFields::Relocatable, "True");
+    }
+    else {
+      result = setString(OS_BuildingFields::Relocatable, "False");
+    }
+    OS_ASSERT(result);
+    return result;
+  }
+
+  void Building_Impl::resetRelocatable()
+  {
+    bool result = setString(OS_BuildingFields::Relocatable, "");
+    OS_ASSERT(result);
   }
 
   boost::optional<SpaceType> Building_Impl::spaceType() const
@@ -332,11 +488,11 @@ namespace detail {
     setString(OS_BuildingFields::DefaultScheduleSetName, "");
   }
 
-  MeterVector Building_Impl::meters() const
+  OutputMeterVector Building_Impl::meters() const
   {
-    MeterVector result;
-    MeterVector meters = this->model().getConcreteModelObjects<Meter>();
-    for (const Meter& meter : meters){
+    OutputMeterVector result;
+    OutputMeterVector meters = this->model().getConcreteModelObjects<OutputMeter>();
+    for (const OutputMeter& meter : meters){
       if (meter.installLocationType() && (InstallLocationType::Building == meter.installLocationType().get().value())){
         result.push_back(meter);
       }
@@ -439,7 +595,7 @@ namespace detail {
 
   double Building_Impl::exteriorSurfaceArea() const {
     double result(0.0);
-    for (const Surface& surface : model().getModelObjects<Surface>()) {
+    for (const Surface& surface : model().getConcreteModelObjects<Surface>()) {
       OptionalSpace space = surface.space();
       std::string outsideBoundaryCondition = surface.outsideBoundaryCondition();
       if (space && openstudio::istringEqual(outsideBoundaryCondition, "Outdoors")) {
@@ -498,7 +654,7 @@ namespace detail {
     }
     return area / np;
   }
-  
+
   double Building_Impl::lightingPower() const {
     double result(0.0);
     for (const Space& space : spaces()){
@@ -861,12 +1017,8 @@ bool Building::isNorthAxisDefaulted() const {
   return getImpl<detail::Building_Impl>()->isNorthAxisDefaulted();
 }
 
-double Building::nominalFloortoFloorHeight() const {
+boost::optional<double> Building::nominalFloortoFloorHeight() const {
   return getImpl<detail::Building_Impl>()->nominalFloortoFloorHeight();
-}
-
-bool Building::isNominalFloortoFloorHeightDefaulted() const {
-  return getImpl<detail::Building_Impl>()->isNominalFloortoFloorHeightDefaulted();
 }
 
 boost::optional<int> Building::standardsNumberOfStories() const{
@@ -877,12 +1029,28 @@ boost::optional<int> Building::standardsNumberOfAboveGroundStories() const{
   return getImpl<detail::Building_Impl>()->standardsNumberOfAboveGroundStories();
 }
 
+boost::optional<int> Building::standardsNumberOfLivingUnits() const{
+  return getImpl<detail::Building_Impl>()->standardsNumberOfLivingUnits();
+}
+
+boost::optional<double> Building::nominalFloortoCeilingHeight() const {
+  return getImpl<detail::Building_Impl>()->nominalFloortoCeilingHeight();
+}
+
 boost::optional<std::string> Building::standardsBuildingType() const{
   return getImpl<detail::Building_Impl>()->standardsBuildingType();
 }
 
 std::vector<std::string> Building::suggestedStandardsBuildingTypes() const{
   return getImpl<detail::Building_Impl>()->suggestedStandardsBuildingTypes();
+}
+
+bool Building::relocatable() const{
+  return getImpl<detail::Building_Impl>()->relocatable();
+}
+
+bool Building::isRelocatableDefaulted() const {
+  return getImpl<detail::Building_Impl>()->isRelocatableDefaulted();
 }
 
 void Building::setNorthAxis(double northAxis) {
@@ -917,12 +1085,36 @@ void Building::resetStandardsNumberOfAboveGroundStories(){
   getImpl<detail::Building_Impl>()->resetStandardsNumberOfAboveGroundStories();
 }
 
+bool Building::setStandardsNumberOfLivingUnits(int value){
+  return getImpl<detail::Building_Impl>()->setStandardsNumberOfLivingUnits(value);
+}
+
+void Building::resetStandardsNumberOfLivingUnits(){
+  getImpl<detail::Building_Impl>()->resetStandardsNumberOfLivingUnits();
+}
+
+bool Building::setNominalFloortoCeilingHeight(double nominalFloortoCeilingHeight) {
+  return getImpl<detail::Building_Impl>()->setNominalFloortoCeilingHeight(nominalFloortoCeilingHeight);
+}
+
+void Building::resetNominalFloortoCeilingHeight() {
+  getImpl<detail::Building_Impl>()->resetNominalFloortoCeilingHeight();
+}
+
 bool Building::setStandardsBuildingType(const std::string& standardsBuildingType){
   return getImpl<detail::Building_Impl>()->setStandardsBuildingType(standardsBuildingType);
 }
 
 void Building::resetStandardsBuildingType(){
   getImpl<detail::Building_Impl>()->resetStandardsBuildingType();
+}
+
+void Building::setRelocatable(bool isRelocatable){
+  getImpl<detail::Building_Impl>()->setRelocatable(isRelocatable);
+}
+
+void Building::resetRelocatable(){
+  getImpl<detail::Building_Impl>()->resetRelocatable();
 }
 
 boost::optional<SpaceType> Building::spaceType() const
@@ -970,7 +1162,7 @@ void Building::resetDefaultScheduleSet()
   getImpl<detail::Building_Impl>()->resetDefaultScheduleSet();
 }
 
-MeterVector Building::meters() const
+OutputMeterVector Building::meters() const
 {
   return getImpl<detail::Building_Impl>()->meters();
 }
@@ -1113,7 +1305,6 @@ Building::Building(Model& model)
 {}
 
 /// @endcond
-
 
 } // model
 } // openstudio

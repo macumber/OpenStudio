@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "SubSurface.hpp"
 #include "SubSurface_Impl.hpp"
@@ -38,9 +47,20 @@
 #include "Construction_Impl.hpp"
 #include "DaylightingDeviceShelf.hpp"
 #include "DaylightingDeviceShelf_Impl.hpp"
+#include "WindowPropertyFrameAndDivider.hpp"
+#include "WindowPropertyFrameAndDivider_Impl.hpp"
+#include "SurfacePropertyConvectionCoefficients.hpp"
+#include "SurfacePropertyOtherSideCoefficients.hpp"
+#include "SurfacePropertyOtherSideCoefficients_Impl.hpp"
+#include "SurfacePropertyOtherSideConditionsModel.hpp"
+#include "SurfacePropertyOtherSideConditionsModel_Impl.hpp"
+#include "SurfacePropertyConvectionCoefficients.hpp"
+#include "SurfacePropertyConvectionCoefficients_Impl.hpp"
 
 #include <utilities/idd/IddFactory.hxx>
+
 #include <utilities/idd/OS_SubSurface_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 
 #include "../utilities/sql/SqlFile.hpp"
 
@@ -442,6 +462,26 @@ namespace detail {
     return getObject<SubSurface>().getModelObjectTarget<ShadingControl>(OS_SubSurfaceFields::ShadingControlName);
   }
 
+  bool SubSurface_Impl::allowWindowPropertyFrameAndDivider() const
+  {
+    bool result = false;
+
+    std::string subSurfaceType = this->subSurfaceType();
+    if (istringEqual("FixedWindow", subSurfaceType) ||
+        istringEqual("OperableWindow", subSurfaceType) ||
+        istringEqual("GlassDoor", subSurfaceType))
+    {
+      result = true;
+    }
+
+    return result;
+  }
+
+  boost::optional<WindowPropertyFrameAndDivider> SubSurface_Impl::windowPropertyFrameAndDivider() const
+  {
+    return getObject<SubSurface>().getModelObjectTarget<WindowPropertyFrameAndDivider>(OS_SubSurfaceFields::FrameandDividerName);
+  }
+
   double SubSurface_Impl::multiplier() const {
     boost::optional<double> value = getDouble(OS_SubSurfaceFields::Multiplier,true);
     OS_ASSERT(value);
@@ -475,6 +515,10 @@ namespace detail {
 
       if (!allowShadingControl()){
         this->resetShadingControl();
+      }
+
+      if (!allowWindowPropertyFrameAndDivider()){
+        this->resetWindowPropertyFrameAndDivider();
       }
 
       if (!allowDaylightingDeviceShelf()){
@@ -531,6 +575,21 @@ namespace detail {
   {
     bool result = setString(OS_SubSurfaceFields::ShadingControlName, "");
     OS_ASSERT(result);  
+  }
+
+  bool SubSurface_Impl::setWindowPropertyFrameAndDivider(const WindowPropertyFrameAndDivider& windowPropertyFrameAndDivider)
+  {
+    bool result = false;
+    if (allowWindowPropertyFrameAndDivider()){
+      result = setPointer(OS_SubSurfaceFields::FrameandDividerName, windowPropertyFrameAndDivider.handle());
+    }
+    return result;
+  }
+
+  void SubSurface_Impl::resetWindowPropertyFrameAndDivider()
+  {
+    bool result = setString(OS_SubSurfaceFields::FrameandDividerName, "");
+    OS_ASSERT(result);
   }
 
   bool SubSurface_Impl::setMultiplier(double multiplier) {
@@ -679,6 +738,83 @@ namespace detail {
     }
   }
 
+  boost::optional<SurfacePropertyConvectionCoefficients> SubSurface_Impl::surfacePropertyConvectionCoefficients() const {
+    std::vector<SurfacePropertyConvectionCoefficients> allspccs(model().getConcreteModelObjects<SurfacePropertyConvectionCoefficients>());
+    std::vector<SurfacePropertyConvectionCoefficients> spccs;
+    for (auto& spcc : allspccs) {
+        OptionalSubSurface surface = spcc.surfaceAsSubSurface();
+        if (surface) {
+            if (surface->handle() == handle()) {
+                spccs.push_back(spcc);
+            }
+        }
+    }
+    if (spccs.empty()) {
+      return boost::none;
+    } else if (spccs.size() == 1) {
+      return spccs.at(0);
+    } else {
+      LOG(Error, "More than one SurfacePropertyConvectionCoefficients points to this SubSurface");
+      return boost::none;
+    }
+  }
+
+  boost::optional<SurfacePropertyOtherSideCoefficients> SubSurface_Impl::surfacePropertyOtherSideCoefficients() const
+  {
+    return getObject<SubSurface>().getModelObjectTarget<SurfacePropertyOtherSideCoefficients>(OS_SubSurfaceFields::OutsideBoundaryConditionObject);
+  }
+
+  bool SubSurface_Impl::setSurfacePropertyOtherSideCoefficients(SurfacePropertyOtherSideCoefficients& otherSideCoefficients)
+  {
+    boost::optional<SubSurface> adjacentSubSurface = this->adjacentSubSurface();
+    if (adjacentSubSurface){
+      resetAdjacentSubSurface();
+    }
+
+    // this is basically testing if otherSideCoefficients is in same model as this
+    bool test = this->setPointer(OS_SubSurfaceFields::OutsideBoundaryConditionObject, otherSideCoefficients.handle());
+    if (!test){
+      if (adjacentSubSurface){
+        setAdjacentSubSurface(*adjacentSubSurface);
+      }
+    }
+    return test;
+  }
+
+  void SubSurface_Impl::resetSurfacePropertyOtherSideCoefficients()
+  {
+    bool test = setString(OS_SubSurfaceFields::OutsideBoundaryConditionObject, "");
+    OS_ASSERT(test);
+  }
+
+  boost::optional<SurfacePropertyOtherSideConditionsModel> SubSurface_Impl::surfacePropertyOtherSideConditionsModel() const
+  {
+    return getObject<SubSurface>().getModelObjectTarget<SurfacePropertyOtherSideConditionsModel>(OS_SubSurfaceFields::OutsideBoundaryConditionObject);
+  }
+
+  bool SubSurface_Impl::setSurfacePropertyOtherSideConditionsModel(SurfacePropertyOtherSideConditionsModel& otherSideModel)
+  {
+    boost::optional<SubSurface> adjacentSubSurface = this->adjacentSubSurface();
+    if (adjacentSubSurface){
+      resetAdjacentSubSurface();
+    }
+
+    // this is basically testing if otherSideModel is in same model as this
+    bool test = this->setPointer(OS_SubSurfaceFields::OutsideBoundaryConditionObject, otherSideModel.handle());
+    if (!test){
+      if (adjacentSubSurface){
+        setAdjacentSubSurface(*adjacentSubSurface);
+      }
+    }
+    return test;
+  }
+
+  void SubSurface_Impl::resetSurfacePropertyOtherSideConditionsModel()
+  {
+    bool test = setString(OS_SubSurfaceFields::OutsideBoundaryConditionObject, "");
+    OS_ASSERT(test);
+  }
+
   std::string SubSurface_Impl::defaultSubSurfaceType() const
   {
     std::string result;
@@ -709,7 +845,26 @@ namespace detail {
         }
 
         if (thisMinZ <= surfaceMinZ){
-          result = "Door";
+          bool isGlassDoor = false;
+
+          // DLM: this surface could have been initialized to FixedWindow and get its construction
+          // from the default construction set, this was the source of #1924
+          boost::optional<ConstructionBase> construction = this->construction();
+          if (!this->isConstructionDefaulted() && construction && construction->isFenestration()){
+            isGlassDoor = true;
+          }
+
+          boost::optional<std::string> value = getString(OS_SubSurfaceFields::SubSurfaceType);
+          if (value && istringEqual("GlassDoor", *value)){
+            isGlassDoor = true;
+          }
+
+
+          if (isGlassDoor){
+            result = "GlassDoor";
+          }else{
+            result = "Door";
+          }
         }else{
           result = "FixedWindow";
         }
@@ -982,6 +1137,16 @@ boost::optional<ShadingControl> SubSurface::shadingControl() const
   return getImpl<detail::SubSurface_Impl>()->shadingControl();
 }
 
+bool SubSurface::allowWindowPropertyFrameAndDivider() const
+{
+  return getImpl<detail::SubSurface_Impl>()->allowWindowPropertyFrameAndDivider();
+}
+
+boost::optional<WindowPropertyFrameAndDivider> SubSurface::windowPropertyFrameAndDivider() const
+{
+  return getImpl<detail::SubSurface_Impl>()->windowPropertyFrameAndDivider();
+}
+
 double SubSurface::multiplier() const {
   return getImpl<detail::SubSurface_Impl>()->multiplier();
 }
@@ -1054,6 +1219,16 @@ void SubSurface::resetShadingControl() {
   getImpl<detail::SubSurface_Impl>()->resetShadingControl();
 }
 
+bool SubSurface::setWindowPropertyFrameAndDivider(const WindowPropertyFrameAndDivider& windowPropertyFrameAndDivider)
+{
+  return getImpl<detail::SubSurface_Impl>()->setWindowPropertyFrameAndDivider(windowPropertyFrameAndDivider);
+}
+
+void SubSurface::resetWindowPropertyFrameAndDivider()
+{
+  getImpl<detail::SubSurface_Impl>()->resetWindowPropertyFrameAndDivider();
+}
+
 boost::optional<Surface> SubSurface::surface() const {
   return getImpl<detail::SubSurface_Impl>()->surface();
 }
@@ -1075,6 +1250,34 @@ bool SubSurface::setAdjacentSubSurface(SubSurface& subSurface)
 void SubSurface::resetAdjacentSubSurface()
 {
   getImpl<detail::SubSurface_Impl>()->resetAdjacentSubSurface();
+}
+
+boost::optional<SurfacePropertyConvectionCoefficients> SubSurface::surfacePropertyConvectionCoefficients() const {
+  return getImpl<detail::SubSurface_Impl>()->surfacePropertyConvectionCoefficients();
+}
+
+boost::optional<SurfacePropertyOtherSideCoefficients> SubSurface::surfacePropertyOtherSideCoefficients() const {
+  return getImpl<detail::SubSurface_Impl>()->surfacePropertyOtherSideCoefficients();
+}
+
+bool SubSurface::setSurfacePropertyOtherSideCoefficients(SurfacePropertyOtherSideCoefficients& otherSideCoefficients) {
+  return getImpl<detail::SubSurface_Impl>()->setSurfacePropertyOtherSideCoefficients(otherSideCoefficients);
+}
+
+void SubSurface::resetSurfacePropertyOtherSideCoefficients() {
+  return getImpl<detail::SubSurface_Impl>()->resetSurfacePropertyOtherSideCoefficients();
+}
+
+boost::optional<SurfacePropertyOtherSideConditionsModel> SubSurface::surfacePropertyOtherSideConditionsModel() const {
+  return getImpl<detail::SubSurface_Impl>()->surfacePropertyOtherSideConditionsModel();
+}
+
+bool SubSurface::setSurfacePropertyOtherSideConditionsModel(SurfacePropertyOtherSideConditionsModel& otherSideModel) {
+  return getImpl<detail::SubSurface_Impl>()->setSurfacePropertyOtherSideConditionsModel(otherSideModel);
+}
+
+void SubSurface::resetSurfacePropertyOtherSideConditionsModel() {
+  return getImpl<detail::SubSurface_Impl>()->resetSurfacePropertyOtherSideConditionsModel();
 }
 
 void SubSurface::assignDefaultSubSurfaceType() {

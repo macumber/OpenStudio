@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ReverseTranslator.hpp"
 
@@ -32,6 +41,8 @@
 #include "../model/ThermalZone_Impl.hpp"
 #include "../model/Space.hpp"
 #include "../model/Space_Impl.hpp"
+#include "../model/SpaceType.hpp"
+#include "../model/SpaceType_Impl.hpp"
 #include "../model/Surface.hpp"
 #include "../model/Surface_Impl.hpp"
 #include "../model/SubSurface.hpp"
@@ -42,13 +53,20 @@
 #include "../model/ShadingSurfaceGroup_Impl.hpp"
 #include "../model/ConstructionBase.hpp"
 #include "../model/ConstructionBase_Impl.hpp"
+#include "../model/Construction.hpp"
+#include "../model/Construction_Impl.hpp"
+#include "../model/AirWallMaterial.hpp"
+#include "../model/AirWallMaterial_Impl.hpp"
 
 #include "../utilities/core/Assert.hpp"
+#include "../utilities/core/FilesystemHelpers.hpp"
 #include "../utilities/units/UnitFactory.hpp"
 #include "../utilities/units/QuantityConverter.hpp"
 #include "../utilities/plot/ProgressBar.hpp"
 
-#include <QFile>
+#include <utilities/idd/IddEnums.hxx>
+
+
 #include <QDomDocument>
 #include <QDomElement>
 #include <QThread>
@@ -87,12 +105,12 @@ namespace gbxml {
 
     boost::optional<openstudio::model::Model> result;
 
-    if (boost::filesystem::exists(path)){
+    if (openstudio::filesystem::exists(path)){
 
-      QFile file(toQString(path));
-      if (file.open(QFile::ReadOnly)){
+      openstudio::filesystem::ifstream file(path, std::ios_base::binary);
+      if (file.is_open()) {
         QDomDocument doc;
-        doc.setContent(&file);
+        doc.setContent(openstudio::filesystem::read_as_QByteArray(file));
         file.close();
 
         result = this->convert(doc);
@@ -129,9 +147,14 @@ namespace gbxml {
     return result;
   }
 
-  std::string ReverseTranslator::escapeName(QString name)
+  std::string ReverseTranslator::escapeName(const QString& id, const QString& name)
   {
-    return name.replace(',', '-').replace(';', '-').toStdString();
+    QString value = id;
+    if (!name.isEmpty()){
+      value = name;
+    }
+
+    return value.replace(',', '-').replace(';', '-').toStdString();
   }
 
   boost::optional<model::Model> ReverseTranslator::convert(const QDomDocument& doc)
@@ -243,6 +266,25 @@ namespace gbxml {
         m_progressBar->setValue(m_progressBar->value() + 1);
       }
     }
+    
+    // do window type before sub surfaces
+    QDomNodeList windowTypeElements = element.elementsByTagName("WindowType");
+    if (m_progressBar){
+      m_progressBar->setWindowTitle(toString("Translating Window Types"));
+      m_progressBar->setMinimum(0);
+      m_progressBar->setMaximum(windowTypeElements.count()); 
+      m_progressBar->setValue(0);
+    }
+
+    for (int i = 0; i < windowTypeElements.count(); i++){
+      QDomElement windowTypeElement = windowTypeElements.at(i).toElement();
+      boost::optional<model::ModelObject> construction = translateWindowType(windowTypeElement, doc, model);
+      OS_ASSERT(construction); // Krishnan, what type of error handling do you want?
+      
+      if (m_progressBar){
+        m_progressBar->setValue(m_progressBar->value() + 1);
+      }
+    }
 
     // do schedules before loads
     QDomNodeList scheduleElements = element.elementsByTagName("Schedule");
@@ -332,7 +374,10 @@ namespace gbxml {
     openstudio::model::Building building = model.getUniqueModelObject<openstudio::model::Building>();
 
     QString id = element.attribute("id");
-    building.setName(escapeName(id));
+    m_idToObjectMap.insert(std::make_pair(id, building));
+
+    QString name = element.firstChildElement("Name").toElement().text();
+    building.setName(escapeName(id, name));
 
     QDomNodeList storyElements = element.elementsByTagName("BuildingStorey");
     if (m_progressBar){
@@ -376,7 +421,10 @@ namespace gbxml {
     openstudio::model::BuildingStory story(model);
 
     QString id = element.attribute("id");
-    story.setName(escapeName(id));
+    m_idToObjectMap.insert(std::make_pair(id, story));
+
+    QString name = element.firstChildElement("Name").toElement().text();
+    story.setName(escapeName(id, name));
 
     // DLM: we need to better support separate name from id in this translator
 
@@ -390,7 +438,10 @@ namespace gbxml {
     openstudio::model::ThermalZone zone(model);
 
     QString id = element.attribute("id");
-    zone.setName(escapeName(id));
+    m_idToObjectMap.insert(std::make_pair(id, zone));
+
+    QString name = element.firstChildElement("Name").toElement().text();
+    zone.setName(escapeName(id, name));
 
     // DLM: we need to better support separate name from id in this translator
 
@@ -403,24 +454,29 @@ namespace gbxml {
     openstudio::model::Space space(model);
 
     QString id = element.attribute("id");
-    space.setName(escapeName(id));
+    m_idToObjectMap.insert(std::make_pair(id, space));
+
+    QString name = element.firstChildElement("Name").toElement().text();
+    space.setName(escapeName(id, name));
 
     //DLM: we should be using a map of id to model object to get this, not relying on name
     QString storyId = element.attribute("buildingStoreyIdRef");
-    boost::optional<WorkspaceObject> story = model.getObjectByTypeAndName(openstudio::model::BuildingStory::iddObjectType(), escapeName(storyId));
-    if (story){
-      if (story->optionalCast<openstudio::model::BuildingStory>()){
-        space.setBuildingStory(story->cast<openstudio::model::BuildingStory>());
+    auto storyIt = m_idToObjectMap.find(storyId);
+    if (storyIt != m_idToObjectMap.end()){
+      boost::optional<model::BuildingStory> story = storyIt->second.optionalCast<model::BuildingStory>();
+      if (story){
+        space.setBuildingStory(*story);
       }
     }
 
     // if space doesn't have story assigned should we warn the user?
 
     QString zoneId = element.attribute("zoneIdRef");
-    boost::optional<WorkspaceObject> zone = model.getObjectByTypeAndName(openstudio::model::ThermalZone::iddObjectType(), escapeName(zoneId));
-    if (zone){
-      if (boost::optional<openstudio::model::ThermalZone> thermalZone = zone->optionalCast<openstudio::model::ThermalZone>()){
-        space.setThermalZone(thermalZone.get());
+    auto zoneIt = m_idToObjectMap.find(zoneId);
+    if (zoneIt != m_idToObjectMap.end()){
+      boost::optional<model::ThermalZone> thermalZone = zoneIt->second.optionalCast<model::ThermalZone>();
+      if (thermalZone){
+        space.setThermalZone(*thermalZone);
       }
     }
 
@@ -428,8 +484,26 @@ namespace gbxml {
       // DLM: may want to revisit this
       // create a new thermal zone if none assigned
       openstudio::model::ThermalZone thermalZone(model);
-      thermalZone.setName(escapeName(id) + " ThermalZone");
+      thermalZone.setName(escapeName(id, name) + " ThermalZone");
       space.setThermalZone(thermalZone);
+    }
+
+    // create a stub space type
+    // DLM: is this better than nothing?
+    QString spaceTypeId = element.attribute("spaceType");
+    if (!spaceTypeId.isEmpty()){
+      auto spaceTypeIt = m_idToObjectMap.find(spaceTypeId);
+
+      if (spaceTypeIt == m_idToObjectMap.end()){
+        model::SpaceType spaceType(model);
+        spaceType.setName(escapeName(spaceTypeId, spaceTypeId));
+        spaceTypeIt = m_idToObjectMap.insert(m_idToObjectMap.end(), std::make_pair(spaceTypeId, spaceType));
+      }
+
+      boost::optional<model::SpaceType> spaceType = spaceTypeIt->second.optionalCast<model::SpaceType>();
+      if (spaceType){
+        space.setSpaceType(*spaceType);
+      }
     }
 
     return space;
@@ -438,23 +512,6 @@ namespace gbxml {
   boost::optional<model::ModelObject> ReverseTranslator::translateSurface(const QDomElement& element, const QDomDocument& doc, openstudio::model::Model& model)
   {
     boost::optional<model::ModelObject> result;
-
-    QDomNodeList adjacentSpaceElements = element.elementsByTagName("AdjacentSpaceId");
-    if (adjacentSpaceElements.size() == 0){
-      LOG(Warn, "Surface has no adjacent spaces, will not be translated.");
-      return boost::none;
-    }else if (adjacentSpaceElements.size() == 2){
-      QString spaceId1 = adjacentSpaceElements.at(0).toElement().attribute("spaceIdRef");
-      QString spaceId2 = adjacentSpaceElements.at(1).toElement().attribute("spaceIdRef");
-      if (spaceId1 == spaceId2){
-        LOG(Warn, "Surface has two adjacent spaces which are the same space '" << toString(spaceId2) << "', will not be translated.");
-        return boost::none;
-      }
-    }else if (adjacentSpaceElements.size() > 2){
-      LOG(Error, "Surface has more than 2 adjacent surfaces, will not be translated.");
-      return boost::none;
-    }
-    
     std::vector<openstudio::Point3d> vertices;
 
     QDomNode planarGeometryElement = element.firstChildElement("PlanarGeometry");
@@ -489,9 +546,11 @@ namespace gbxml {
 
       openstudio::model::ShadingSurface shadingSurface(vertices, model);
 
-      QString shadingSurfaceName = element.attribute("id");
-      //std::cout << toString(shadingSurfaceName) << std::endl;
-      shadingSurface.setName(escapeName(shadingSurfaceName));
+      QString shadingSurfaceId = element.attribute("id");
+      m_idToObjectMap.insert(std::make_pair(shadingSurfaceId, shadingSurface));
+
+      QString shadingSurfaceName = element.firstChildElement("Name").toElement().text();
+      shadingSurface.setName(escapeName(shadingSurfaceId, shadingSurfaceName));
 
       openstudio::model::Building building = model.getUniqueModelObject<openstudio::model::Building>();
 
@@ -512,10 +571,29 @@ namespace gbxml {
 
     }else{
 
+      QDomNodeList adjacentSpaceElements = element.elementsByTagName("AdjacentSpaceId");
+      if (adjacentSpaceElements.size() == 0){
+        LOG(Warn, "Surface has no adjacent spaces, will not be translated.");
+        return boost::none;
+      } else if (adjacentSpaceElements.size() == 2){
+        QString spaceId1 = adjacentSpaceElements.at(0).toElement().attribute("spaceIdRef");
+        QString spaceId2 = adjacentSpaceElements.at(1).toElement().attribute("spaceIdRef");
+        if (spaceId1 == spaceId2){
+          LOG(Warn, "Surface has two adjacent spaces which are the same space '" << toString(spaceId2) << "', will not be translated.");
+          return boost::none;
+        }
+      }else if (adjacentSpaceElements.size() > 2){
+        LOG(Error, "Surface has more than 2 adjacent surfaces, will not be translated.");
+        return boost::none;
+      }
+
       openstudio::model::Surface surface(vertices, model);
 
-      QString surfaceName = element.attribute("id");
-      surface.setName(escapeName(surfaceName));
+      QString surfaceId = element.attribute("id");
+      m_idToObjectMap.insert(std::make_pair(surfaceId, surface));
+
+      QString surfaceName = element.firstChildElement("Name").toElement().text();
+      surface.setName(escapeName(surfaceId, surfaceName));
 
       QString exposedToSun = element.attribute("exposedToSun");
 
@@ -543,11 +621,10 @@ namespace gbxml {
         surface.setSurfaceType("Floor"); 
       }else if (surfaceType.contains("RaisedFloor")){
         surface.setSurfaceType("Floor"); 
-      }
-
-      // this type can be wall, roof, or floor.  just use default surface type.
-      if (surfaceType.contains("Air")){
-        // TODO: set air wall construction
+      }else if (surfaceType.contains("ExposedFloor")){
+        surface.setSurfaceType("Floor"); 
+      } else if (surfaceType.contains("Air")){
+        // this type can be wall, roof, or floor.  just use default surface type based on vertices.
       }
 
       // set boundary conditions
@@ -567,32 +644,61 @@ namespace gbxml {
 
       result = surface;
 
-      // translate construction
-      QString constructionIdRef = element.attribute("constructionIdRef");
-      if (!constructionIdRef.isEmpty()){
-        std::string constructionName = escapeName(constructionIdRef);
-        boost::optional<model::ConstructionBase> construction = model.getModelObjectByName<model::ConstructionBase>(constructionName);
-        if (construction){
-          surface.setConstruction(*construction);
+      // if air wall
+      if (surfaceType.contains("Air")){
+        boost::optional<model::Construction> airWall;
+
+        for (const auto& construction : model.getConcreteModelObjects<model::Construction>()){
+          if ((construction.numLayers() == 1) && (construction.isModelPartition())) {
+            model::MaterialVector layers = construction.layers();
+            OS_ASSERT(layers.size() == 1u);
+            if (layers[0].optionalCast<model::AirWallMaterial>()){
+              airWall = construction;
+              break;
+            }
+          }
+        }
+        if (!airWall){
+          airWall = model::Construction(model);
+          model::AirWallMaterial airWallMaterial(model);
+          airWall->setLayer(airWallMaterial);
+        }
+        surface.setConstruction(*airWall);
+
+        // don't translate subsurfaces of air walls?
+
+      } else{
+        // not air wall
+
+        // translate construction
+        QString constructionIdRef = element.attribute("constructionIdRef");
+        auto constructionIt = m_idToObjectMap.find(constructionIdRef);
+        if (constructionIt != m_idToObjectMap.end()){
+          boost::optional<model::ConstructionBase> construction = constructionIt->second.optionalCast<model::ConstructionBase>();
+          if (construction){
+            surface.setConstruction(*construction);
+          }
+        }
+
+        // translate subSurfaces
+        QDomNodeList subSurfaceElements = element.elementsByTagName("Opening");
+        for (int i = 0; i < subSurfaceElements.count(); ++i){
+          try {
+            boost::optional<model::ModelObject> subSurface = translateSubSurface(subSurfaceElements.at(i).toElement(), doc, surface);
+          } catch (const std::exception&){
+            LOG(Error, "Could not translate sub surface " << subSurfaceElements.at(i).toElement());
+          }
         }
       }
 
-      // translate subSurfaces
-      QDomNodeList subSurfaceElements = element.elementsByTagName("Opening");
-      for (int i = 0; i < subSurfaceElements.count(); ++i){
-        try {
-          boost::optional<model::ModelObject> subSurface = translateSubSurface(subSurfaceElements.at(i).toElement(), doc, surface);
-        }catch(const std::exception&){
-          LOG(Error, "Could not translate sub surface " << subSurfaceElements.at(i).toElement());
-        }
-      }
-
+      // adjacent surfaces
       QString spaceId = adjacentSpaceElements.at(0).toElement().attribute("spaceIdRef");
-      std::string spaceName = toString(spaceId);
-
-      boost::optional<openstudio::WorkspaceObject> workspaceObject = model.getObjectByTypeAndName(IddObjectType::OS_Space, spaceName);
-      if (workspaceObject && workspaceObject->optionalCast<openstudio::model::Space>()){
-        surface.setSpace(workspaceObject->cast<openstudio::model::Space>());
+      auto spaceIt = m_idToObjectMap.find(spaceId);
+      if (spaceIt != m_idToObjectMap.end()){
+        boost::optional<model::Space> space = spaceIt->second.optionalCast<openstudio::model::Space>();
+        if (space){
+          surface.setSpace(*space);
+        }
       }
 
       boost::optional<openstudio::model::Space> space = surface.space();
@@ -602,25 +708,24 @@ namespace gbxml {
 
       if (space && adjacentSpaceElements.size() == 2){
 
-        QString spaceId = adjacentSpaceElements.at(1).toElement().attribute("spaceIdRef");
-        std::string spaceName = toString(spaceId);
+        QString adjacentSpaceId = adjacentSpaceElements.at(1).toElement().attribute("spaceIdRef");
+        auto adjacentSpaceIt = m_idToObjectMap.find(adjacentSpaceId);
+        if (adjacentSpaceIt != m_idToObjectMap.end()){
+          boost::optional<model::Space> adjacentSpace = adjacentSpaceIt->second.optionalCast<openstudio::model::Space>();
+          if (adjacentSpace){
+            // DLM: we have issues if interior ceilings/floors are mislabeled, override surface type for adjacent surfaces 
+            // http://code.google.com/p/cbecc/issues/detail?id=471
+            std::string currentSurfaceType = surface.surfaceType();
+            surface.assignDefaultSurfaceType();
+            if (currentSurfaceType != surface.surfaceType()){
+              LOG(Warn, "Changing surface type from '" << currentSurfaceType << "' to '" << surface.surfaceType() << "' for surface '" << surface.name().get() << "'");
+            }
 
-        boost::optional<openstudio::WorkspaceObject> workspaceObject = model.getObjectByTypeAndName(IddObjectType::OS_Space, spaceName);
-        if (workspaceObject && workspaceObject->optionalCast<openstudio::model::Space>()){
-
-          // DLM: we have issues if interior ceilings/floors are mislabeled, override surface type for adjacent surfaces 
-          // http://code.google.com/p/cbecc/issues/detail?id=471
-          std::string currentSurfaceType = surface.surfaceType();
-          surface.assignDefaultSurfaceType();
-          if (currentSurfaceType != surface.surfaceType()){
-            LOG(Warn, "Changing surface type from '" << currentSurfaceType << "' to '" << surface.surfaceType() << "' for surface '" << escapeName(surfaceName) << "'");
-          }
-
-          // clone the surface and sub surfaces and reverse vertices
-          model::Space adjacentSpace = workspaceObject->cast<openstudio::model::Space>();
-          boost::optional<openstudio::model::Surface> otherSurface = surface.createAdjacentSurface(adjacentSpace);
-          if(!otherSurface){
-            LOG(Error, "Could not create adjacent surface in adjacent space '" << adjacentSpace.name().get() << "' for surface '" << surface.name().get() << "' in space '" << space->name().get() << "'");
+            // clone the surface and sub surfaces and reverse vertices
+            boost::optional<openstudio::model::Surface> otherSurface = surface.createAdjacentSurface(*adjacentSpace);
+            if (!otherSurface){
+              LOG(Error, "Could not create adjacent surface in adjacent space '" << adjacentSpace->name().get() << "' for surface '" << surface.name().get() << "' in space '" << space->name().get() << "'");
+            }
           }
         }
       }
@@ -668,21 +773,70 @@ namespace gbxml {
     subSurface.setSurface(surface);
 
     QString id = element.attribute("id");
-    subSurface.setName(escapeName(id));
+    m_idToObjectMap.insert(std::make_pair(id, subSurface));
+
+    QString name = element.firstChildElement("Name").toElement().text();
+    subSurface.setName(escapeName(id, name));
 
     result = subSurface;
 
-    // translate construction
-    QString constructionIdRef = element.attribute("constructionIdRef");
-    if (!constructionIdRef.isEmpty()){
-      std::string constructionName = escapeName(constructionIdRef);
-      boost::optional<model::ConstructionBase> construction = model.getModelObjectByName<model::ConstructionBase>(constructionName);
-      if (construction){
-        surface.setConstruction(*construction);
+    // translate openingType
+    QString openingType = element.attribute("openingType");
+    if (openingType.contains("FixedWindow")){
+      subSurface.setSubSurfaceType("FixedWindow"); 
+    }else if (openingType.contains("OperableWindow")){
+      subSurface.setSubSurfaceType("OperableWindow"); 
+    }else if (openingType.contains("FixedSkylight")){
+      subSurface.setSubSurfaceType("Skylight"); 
+    }else if (openingType.contains("OperableSkylight")){
+      subSurface.setSubSurfaceType("Skylight"); 
+    }else if (openingType.contains("SlidingDoor")){
+      subSurface.setSubSurfaceType("GlassDoor"); 
+    }else if (openingType.contains("NonSlidingDoor")){
+      subSurface.setSubSurfaceType("Door"); 
+    } else if (openingType.contains("Air")){
+      // use default sub surface type?
+    }
+
+    // if air wall
+    if (openingType.contains("Air")){
+      boost::optional<model::Construction> airWall;
+
+      for (const auto& construction : model.getConcreteModelObjects<model::Construction>()){
+        if ((construction.numLayers() == 1) && (construction.isModelPartition())) {
+          model::MaterialVector layers = construction.layers();
+          OS_ASSERT(layers.size() == 1u);
+          if (layers[0].optionalCast<model::AirWallMaterial>()){
+            airWall = construction;
+            break;
+          }
+        }
+      }
+      if (!airWall){
+        airWall = model::Construction(model);
+        model::AirWallMaterial airWallMaterial(model);
+        airWall->setLayer(airWallMaterial);
+      }
+      subSurface.setConstruction(*airWall);
+      
+    } else{
+
+      // translate construction
+      QString constructionIdRef = element.attribute("constructionIdRef");
+      if (constructionIdRef.isEmpty()){
+        constructionIdRef = element.attribute("windowTypeIdRef");
+      }
+      auto constructionIt = m_idToObjectMap.find(constructionIdRef);
+      if (constructionIt != m_idToObjectMap.end()){
+        boost::optional<model::ConstructionBase> construction = constructionIt->second.optionalCast<model::ConstructionBase>();
+        if (construction){
+          subSurface.setConstruction(*construction);
+        }
       }
     }
 
-    // todo: translate "interiorShadeType", "exteriorShadeType", "windowTypeIdRef", and other properties of the opening
+    // todo: translate "interiorShadeType", "exteriorShadeType", and other properties of the opening
+
 
     return result;
   }

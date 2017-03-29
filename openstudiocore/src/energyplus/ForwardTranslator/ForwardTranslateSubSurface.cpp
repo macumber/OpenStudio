@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "../ForwardTranslator.hpp"
 
@@ -28,13 +37,21 @@
 #include "../../model/ConstructionBase_Impl.hpp"
 #include "../../model/ShadingControl.hpp"
 #include "../../model/ShadingControl_Impl.hpp"
+#include "../../model/WindowPropertyFrameAndDivider.hpp"
+#include "../../model/WindowPropertyFrameAndDivider_Impl.hpp"
+#include "../../model/SurfacePropertyOtherSideCoefficients.hpp"
+#include "../../model/SurfacePropertyOtherSideConditionsModel.hpp"
+#include "../../model/SurfacePropertyConvectionCoefficients.hpp"
 
 #include "../../utilities/idf/IdfExtensibleGroup.hpp"
 
 #include <utilities/idd/FenestrationSurface_Detailed_FieldEnums.hxx>
 
+#include "../../utilities/idd/IddEnums.hpp"
 #include <utilities/idd/IddEnums.hxx>
 #include <utilities/idd/IddFactory.hxx>
+
+#include "../../utilities/geometry/Vector3d.hpp"
 
 using namespace openstudio::model;
 
@@ -60,13 +77,21 @@ boost::optional<IdfObject> ForwardTranslator::translateSubSurface( model::SubSur
   }else if (istringEqual("Skylight", subSurfaceType)){
     subSurfaceType = "Window";
   }
-  
-  idfObject.setString(FenestrationSurface_DetailedFields::SurfaceType, subSurfaceType);
 
   boost::optional<ConstructionBase> construction = modelObject.construction();
   if (construction){
     idfObject.setString(FenestrationSurface_DetailedFields::ConstructionName, construction->name().get());
+
+    if (subSurfaceType == "Door" && construction->isFenestration()){
+      LOG(Warn, "SubSurface '" << modelObject.name().get() << "' uses fenestration construction, changing SubSurfaceType to Door");
+      subSurfaceType = "GlassDoor";
+    } else if (subSurfaceType == "GlassDoor" && !construction->isFenestration()){
+      LOG(Warn, "SubSurface '" << modelObject.name().get() << "' uses non-fenestration construction, changing SubSurfaceType to GlassDoor");
+      subSurfaceType = "Door";
+    }
   }
+
+  idfObject.setString(FenestrationSurface_DetailedFields::SurfaceType, subSurfaceType);
 
   boost::optional<Surface> surface = modelObject.surface();
   if (surface){
@@ -76,6 +101,26 @@ boost::optional<IdfObject> ForwardTranslator::translateSubSurface( model::SubSur
   boost::optional<SubSurface> adjacentSubSurface = modelObject.adjacentSubSurface();
   if (adjacentSubSurface){
     idfObject.setString(FenestrationSurface_DetailedFields::OutsideBoundaryConditionObject, adjacentSubSurface->name().get());
+  }
+
+  boost::optional<SurfacePropertyOtherSideCoefficients> surfacePropertyOtherSideCoefficients = modelObject.surfacePropertyOtherSideCoefficients();
+  if (surfacePropertyOtherSideCoefficients){
+    boost::optional<IdfObject> osc = translateAndMapModelObject(*surfacePropertyOtherSideCoefficients);
+    if (osc && osc->name()){
+      idfObject.setString(FenestrationSurface_DetailedFields::OutsideBoundaryConditionObject, osc->name().get());
+    } else{
+      LOG(Error, "SubSurface '" << modelObject.name().get() << "', could not translate OutsideBoundaryConditionObject");
+    }
+  }
+
+  boost::optional<SurfacePropertyOtherSideConditionsModel> surfacePropertyOtherSideConditionsModel = modelObject.surfacePropertyOtherSideConditionsModel();
+  if (surfacePropertyOtherSideConditionsModel){
+    boost::optional<IdfObject> oscm = translateAndMapModelObject(*surfacePropertyOtherSideConditionsModel);
+    if (oscm && oscm->name()){
+      idfObject.setString(FenestrationSurface_DetailedFields::OutsideBoundaryConditionObject, oscm->name().get());
+    } else{
+      LOG(Error, "SubSurface '" << modelObject.name().get() << "', could not translate OutsideBoundaryConditionObject");
+    }
   }
 
   boost::optional<double> viewFactortoGround = modelObject.viewFactortoGround();
@@ -88,7 +133,14 @@ boost::optional<IdfObject> ForwardTranslator::translateSubSurface( model::SubSur
     idfObject.setString(FenestrationSurface_DetailedFields::ShadingControlName, shadingControl->name().get());
   }
 
-  // TODO: \field Frame and Divider Name
+  boost::optional<WindowPropertyFrameAndDivider> frameAndDivider = modelObject.windowPropertyFrameAndDivider();
+  openstudio::Vector3d offset(0, 0, 0);
+  if (frameAndDivider){
+    if (!frameAndDivider->isOutsideRevealDepthDefaulted()){
+      offset = -frameAndDivider->outsideRevealDepth() * modelObject.outwardNormal();
+    }
+    idfObject.setString(FenestrationSurface_DetailedFields::FrameandDividerName, frameAndDivider->name().get());
+  }
 
   if(!modelObject.isMultiplierDefaulted()){
     idfObject.setDouble(FenestrationSurface_DetailedFields::Multiplier, modelObject.multiplier());
@@ -102,9 +154,12 @@ boost::optional<IdfObject> ForwardTranslator::translateSubSurface( model::SubSur
           << ", because it has more vertices than allowed by EnergyPlus.");
       return boost::none;
     }
-    group.setDouble(0, point.x());
-    group.setDouble(1, point.y());
-    group.setDouble(2, point.z());
+
+    Point3d newPoint = point + offset;
+
+    group.setDouble(0, newPoint.x());
+    group.setDouble(1, newPoint.y());
+    group.setDouble(2, newPoint.z());
   }
   
   m_idfObjects.push_back(idfObject);

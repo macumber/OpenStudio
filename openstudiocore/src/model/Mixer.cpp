@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Model.hpp"
 #include "Mixer.hpp"
@@ -56,17 +65,17 @@ Mixer_Impl::Mixer_Impl(const Mixer_Impl& other,
 {
 }
 
-boost::optional<ModelObject> Mixer_Impl::outletModelObject()
+boost::optional<ModelObject> Mixer_Impl::outletModelObject() const
 {
   return connectedObject( outletPort() );
 }
 
-boost::optional<ModelObject> Mixer_Impl::inletModelObject(unsigned branchIndex)
+boost::optional<ModelObject> Mixer_Impl::inletModelObject(unsigned branchIndex) const
 {
   return connectedObject( inletPort( branchIndex ) );
 }
 
-boost::optional<ModelObject> Mixer_Impl::lastInletModelObject()
+boost::optional<ModelObject> Mixer_Impl::lastInletModelObject() const
 {
   std::vector<ModelObject> objects = inletModelObjects();
   if( objects.size() > 0 )
@@ -98,7 +107,7 @@ unsigned Mixer_Impl::newInletPortAfterBranch(unsigned branchIndex)
   return inletPort(branchIndex++);
 }
 
-unsigned Mixer_Impl::branchIndexForInletModelObject( ModelObject modelObject )
+unsigned Mixer_Impl::branchIndexForInletModelObject( ModelObject modelObject ) const
 {
   unsigned stop = nextBranchIndex();
 
@@ -112,7 +121,7 @@ unsigned Mixer_Impl::branchIndexForInletModelObject( ModelObject modelObject )
   return 0;
 }
 
-unsigned Mixer_Impl::nextBranchIndex()
+unsigned Mixer_Impl::nextBranchIndex() const
 {
   unsigned i = 0;
   OptionalModelObject modelObject;
@@ -138,7 +147,7 @@ void Mixer_Impl::removePortForBranch(unsigned branchIndex)
   }
 }
 
-std::vector<ModelObject> Mixer_Impl::inletModelObjects()
+std::vector<ModelObject> Mixer_Impl::inletModelObjects() const
 {
   std::vector<ModelObject> result;
   unsigned stop = nextBranchIndex();
@@ -149,11 +158,11 @@ std::vector<ModelObject> Mixer_Impl::inletModelObjects()
   return result;
 }
 
-std::vector<HVACComponent> Mixer_Impl::edges(bool isDemandComponent)
+std::vector<HVACComponent> Mixer_Impl::edges(const boost::optional<HVACComponent> & prev)
 {
   std::vector<HVACComponent> edges;
-  if( boost::optional<ModelObject> edgeModelObject = this->outletModelObject() ) {
-    if( boost::optional<HVACComponent> edgeObject = edgeModelObject->optionalCast<HVACComponent>() ) {
+  if( auto edgeModelObject = this->outletModelObject() ) {
+    if( auto edgeObject = edgeModelObject->optionalCast<HVACComponent>() ) {
       edges.push_back(*edgeObject);
     }
   }
@@ -184,37 +193,37 @@ Mixer::Mixer(IddObjectType type,const Model& model)
   OS_ASSERT(getImpl<detail::Mixer_Impl>());
 }     
 
-unsigned Mixer::outletPort()
+unsigned Mixer::outletPort() const
 {
   return getImpl<detail::Mixer_Impl>()->outletPort();
 }     
 
-unsigned Mixer::inletPort(unsigned branchIndex)
+unsigned Mixer::inletPort(unsigned branchIndex) const
 {
   return getImpl<detail::Mixer_Impl>()->inletPort(branchIndex);
 }     
 
-unsigned Mixer::nextInletPort()
+unsigned Mixer::nextInletPort() const
 {
   return getImpl<detail::Mixer_Impl>()->nextInletPort();
 }     
 
-boost::optional<ModelObject> Mixer::outletModelObject()
+boost::optional<ModelObject> Mixer::outletModelObject() const
 {
   return getImpl<detail::Mixer_Impl>()->outletModelObject();
 }     
 
-boost::optional<ModelObject> Mixer::inletModelObject(unsigned branchIndex)
+boost::optional<ModelObject> Mixer::inletModelObject(unsigned branchIndex) const
 {
   return getImpl<detail::Mixer_Impl>()->inletModelObject(branchIndex);
 }     
 
-boost::optional<ModelObject> Mixer::lastInletModelObject()
+boost::optional<ModelObject> Mixer::lastInletModelObject() const
 {
   return getImpl<detail::Mixer_Impl>()->lastInletModelObject();
 }     
 
-std::vector<ModelObject> Mixer::inletModelObjects()
+std::vector<ModelObject> Mixer::inletModelObjects() const
 {
   return getImpl<detail::Mixer_Impl>()->inletModelObjects();
 }     
@@ -224,12 +233,12 @@ unsigned Mixer::newInletPortAfterBranch(unsigned branchIndex)
   return getImpl<detail::Mixer_Impl>()->newInletPortAfterBranch(branchIndex);
 }     
 
-unsigned Mixer::branchIndexForInletModelObject( ModelObject modelObject )
+unsigned Mixer::branchIndexForInletModelObject( ModelObject modelObject ) const
 {
   return getImpl<detail::Mixer_Impl>()->branchIndexForInletModelObject(modelObject);
 }     
 
-unsigned Mixer::nextBranchIndex()
+unsigned Mixer::nextBranchIndex() const
 {
   return getImpl<detail::Mixer_Impl>()->nextBranchIndex();
 }     

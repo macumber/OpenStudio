@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ExteriorLights.hpp"
 #include "ExteriorLights_Impl.hpp"
@@ -30,7 +39,9 @@
 #include "Facility_Impl.hpp"
 
 #include <utilities/idd/IddFactory.hxx>
+
 #include <utilities/idd/OS_Exterior_Lights_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 
 #include "../utilities/core/Assert.hpp"
 
@@ -95,10 +106,8 @@ namespace detail {
     return value.get();
   }
 
-  Schedule ExteriorLights_Impl::schedule() const {
-    boost::optional<Schedule> value = getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_Exterior_LightsFields::ScheduleName);
-    OS_ASSERT(value);
-    return value.get();
+  boost::optional<Schedule> ExteriorLights_Impl::schedule() const {
+    return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_Exterior_LightsFields::ScheduleName);
   }
 
   std::string ExteriorLights_Impl::controlOption() const {
@@ -142,6 +151,11 @@ namespace detail {
                                                 "Exterior Lights",
                                                 schedule);
     return result;
+  }
+
+  void ExteriorLights_Impl::resetSchedule() {
+    bool result = setString(OS_Exterior_LightsFields::ScheduleName, "");
+    OS_ASSERT(result);
   }
 
   bool ExteriorLights_Impl::setControlOption(std::string controlOption) {
@@ -188,7 +202,10 @@ namespace detail {
   }
 
   boost::optional<ModelObject> ExteriorLights_Impl::scheduleAsModelObject() const {
-    OptionalModelObject result = schedule();
+    OptionalModelObject result;
+    if( auto t_schedule = schedule() ) {
+      result = t_schedule->cast<ModelObject>();
+    }
     return result;
   }
 
@@ -229,9 +246,7 @@ ExteriorLights::ExteriorLights(const ExteriorLightsDefinition& definition,
   bool ok = setExteriorLightsDefinition(definition);
   OS_ASSERT(ok);
 
-  ScheduleConstant defaultSchedule(model());
-  defaultSchedule.setValue(1.0);
-  defaultSchedule.setName(name().get() + " Always On Schedule");
+  auto defaultSchedule = definition.model().alwaysOnDiscreteSchedule();
   ok = setSchedule(defaultSchedule);
   OS_ASSERT(ok);
 
@@ -275,7 +290,7 @@ ExteriorLightsDefinition ExteriorLights::exteriorLightsDefinition() const {
   return getImpl<detail::ExteriorLights_Impl>()->exteriorLightsDefinition();
 }
 
-Schedule ExteriorLights::schedule() const {
+boost::optional<Schedule> ExteriorLights::schedule() const {
   return getImpl<detail::ExteriorLights_Impl>()->schedule();
 }
 
@@ -309,6 +324,10 @@ bool ExteriorLights::setExteriorLightsDefinition(const ExteriorLightsDefinition&
 
 bool ExteriorLights::setSchedule(Schedule& schedule) {
   return getImpl<detail::ExteriorLights_Impl>()->setSchedule(schedule);
+}
+
+void ExteriorLights::resetSchedule() {
+  getImpl<detail::ExteriorLights_Impl>()->resetSchedule();
 }
 
 bool ExteriorLights::setControlOption(std::string controlOption) {

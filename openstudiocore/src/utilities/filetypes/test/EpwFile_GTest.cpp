@@ -1,26 +1,36 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "../EpwFile.hpp"
 #include "../../time/Time.hpp"
 #include "../../time/Date.hpp"
+#include "../../core/Checksum.hpp"
 
 #include <resources.hxx>
 
@@ -37,10 +47,11 @@ TEST(Filetypes, EpwFile)
     // COMMENTS 1,California Climate Zone 01 Version 2;
     // COMMENTS 2, -- Ground temps produced with a standard soil diffusivity of 2.3225760E-03 {m**2/day}
     // DATA PERIODS,1,1,Data,Sunday, 1/ 1,12/31
-    path p = resourcesPath() / toPath("runmanager/USA_CO_Golden-NREL.724666_TMY3.epw");
+    path p = resourcesPath() / toPath("utilities/Filetypes/USA_CO_Golden-NREL.724666_TMY3.epw");
     EpwFile epwFile(p);
     EXPECT_EQ(p, epwFile.path());
-    EXPECT_EQ("F188656D", epwFile.checksum());
+    EXPECT_EQ("BDF687C1", epwFile.checksum());
+    EXPECT_EQ(openstudio::checksum(epwFile.path()), epwFile.checksum());
     EXPECT_EQ("Denver Centennial  Golden   Nr", epwFile.city());
     EXPECT_EQ("CO", epwFile.stateProvinceRegion());
     EXPECT_EQ("USA", epwFile.country());
@@ -62,10 +73,11 @@ TEST(Filetypes, EpwFile)
 TEST(Filetypes, EpwFile_Data)
 {
   try{
-    path p = resourcesPath() / toPath("runmanager/USA_CO_Golden-NREL.724666_TMY3.epw");
+    path p = resourcesPath() / toPath("utilities/Filetypes/USA_CO_Golden-NREL.724666_TMY3.epw");
     EpwFile epwFile(p);
     EXPECT_EQ(p, epwFile.path());
-    EXPECT_EQ("F188656D", epwFile.checksum());
+    EXPECT_EQ("BDF687C1", epwFile.checksum());
+    EXPECT_EQ(openstudio::checksum(epwFile.path()), epwFile.checksum());
     EXPECT_EQ("Denver Centennial  Golden   Nr", epwFile.city());
     EXPECT_EQ("CO", epwFile.stateProvinceRegion());
     EXPECT_EQ("USA", epwFile.country());
@@ -82,14 +94,34 @@ TEST(Filetypes, EpwFile_Data)
     // Up to here, everything should be the same as the first test. Now ask for the data
     std::vector<EpwDataPoint> data = epwFile.data();
     EXPECT_EQ(8760,data.size());
-    // The last data point should be on 12/31/1996, with a dry bulb temp of 4C and presure 81100
+    // The last data point should be for the last hour 12/31/1996, with a dry bulb temp of 4C and pressure 81100
+    openstudio::DateTime dateTime = data[8759].dateTime();
+    EXPECT_EQ(1, dateTime.date().monthOfYear().value());
+    EXPECT_EQ(1, dateTime.date().dayOfMonth());
+    // Stopgap test until things are straightened out with years
+    EXPECT_EQ(2010, dateTime.date().year());
+    //EXPECT_EQ(1997, dateTime.date().year());
+    EXPECT_EQ(0, dateTime.time().hours());
+    EXPECT_EQ(0, dateTime.time().minutes());
+    EXPECT_EQ(0, dateTime.time().seconds());
     EXPECT_EQ(4.0,data[8759].dryBulbTemperature().get());
     EXPECT_EQ(81100,data[8759].atmosphericStationPressure().get());
     // Try out the alternate access functions, dew point temperature should be -1C
-    EXPECT_EQ(-1.0,data[8759].fieldByName("Dew Point Temperature").get());
-    EXPECT_EQ(-1.0,data[8759].field(EpwDataField("Dew Point Temperature")).get());
+    EXPECT_EQ(-1.0,data[8759].getFieldByName("Dew Point Temperature").get());
+    EXPECT_EQ(-1.0,data[8759].getField(EpwDataField("Dew Point Temperature")).get());
     // The last data point should not have a liquid precipitation depth
-    EXPECT_FALSE(data[8759].fieldByName("Liquid Precipitation Depth"));
+    EXPECT_FALSE(data[8759].getFieldByName("Liquid Precipitation Depth"));
+    // Get the data as strings
+    std::vector<std::string> epwStrings = data[8759].toEpwStrings();
+    ASSERT_EQ(35, epwStrings.size());
+    std::vector<std::string> known = { "1996", "12", "31", "24", "0",
+      "?9?9?9?9E0?9?9?9?9?9?9?9?9?9?9?9?9?9?9?9*9*9?9*9*9", "4.0", "-1.0",
+      "69", "81100", "0", "0", "294", "0.000000", "0", "0", "0", "0", "0",
+      "0", "130", "6.200000", "9", "9", "48.3", "7500", "9", "999999999",
+      "60", "0.0310", "0", "88", "0.210", "999", "99" };
+    for (unsigned i = 0; i < 35; i++) {
+      EXPECT_EQ(known[i], epwStrings[i]);
+    }
     // Get a time series
     boost::optional<openstudio::TimeSeries> series = epwFile.getTimeSeries("Wind Speed");
     ASSERT_TRUE(series);
@@ -115,7 +147,8 @@ TEST(Filetypes, EpwFile_Data)
     }
     // We should redo the original tests because we have reparsed the entire file
     EXPECT_EQ(p, epwFile.path());
-    EXPECT_EQ("F188656D", epwFile.checksum());
+    EXPECT_EQ("BDF687C1", epwFile.checksum());
+    EXPECT_EQ(openstudio::checksum(epwFile.path()), epwFile.checksum());
     EXPECT_EQ("Denver Centennial  Golden   Nr", epwFile.city());
     EXPECT_EQ("CO", epwFile.stateProvinceRegion());
     EXPECT_EQ("USA", epwFile.country());
@@ -161,10 +194,10 @@ TEST(Filetypes, EpwFile_International_Data)
     EXPECT_EQ(14.7,data[8759].dryBulbTemperature().get());
     EXPECT_EQ(101100,data[8759].atmosphericStationPressure().get());
     // Try out the alternate access functions, dew point temperature should be -1C
-    EXPECT_EQ(11.7,data[8759].fieldByName("Dew Point Temperature").get());
-    EXPECT_EQ(11.7,data[8759].field(EpwDataField("Dew Point Temperature")).get());
+    EXPECT_EQ(11.7,data[8759].getFieldByName("Dew Point Temperature").get());
+    EXPECT_EQ(11.7,data[8759].getField(EpwDataField("Dew Point Temperature")).get());
     // The last data point should not have a liquid precipitation depth
-    EXPECT_FALSE(data[8759].fieldByName("Liquid Precipitation Depth"));
+    EXPECT_FALSE(data[8759].getFieldByName("Liquid Precipitation Depth"));
     // Get a time series
     boost::optional<openstudio::TimeSeries> series = epwFile.getTimeSeries("Wind Speed");
     ASSERT_TRUE(series);
@@ -190,6 +223,65 @@ TEST(Filetypes, EpwFile_International_Data)
     }
     // No need to redo the original tests here since the data should have been loaded in the constructor
   }catch(...){
+    ASSERT_TRUE(false);
+  }
+}
+
+TEST(Filetypes, EpwFile_IWEC_Data)
+{
+  try {
+    path p = resourcesPath() / toPath("utilities/Filetypes/TUN_Tunis.607150_IWEC.epw");
+    EpwFile epwFile(p, true);
+    EXPECT_EQ(p, epwFile.path());
+    EXPECT_EQ("FEAB878E", epwFile.checksum());
+    EXPECT_EQ("TUNIS", epwFile.city());
+    EXPECT_EQ("-", epwFile.stateProvinceRegion());
+    EXPECT_EQ("TUN", epwFile.country());
+    EXPECT_EQ("IWEC Data", epwFile.dataSource());
+    EXPECT_EQ("607150", epwFile.wmoNumber());
+    EXPECT_EQ(36.83, epwFile.latitude());
+    EXPECT_EQ(10.23, epwFile.longitude());
+    EXPECT_EQ(1, epwFile.timeZone());
+    EXPECT_EQ(4, epwFile.elevation());
+    EXPECT_EQ(Time(0, 1, 0, 0), epwFile.timeStep());
+    EXPECT_EQ(DayOfWeek(DayOfWeek::Sunday), epwFile.startDayOfWeek());
+    EXPECT_EQ(Date(MonthOfYear::Jan, 1), epwFile.startDate());
+    EXPECT_EQ(Date(MonthOfYear::Dec, 31), epwFile.endDate());
+    // Up to here, everything should be the same as the first test. Now ask for the data
+    std::vector<EpwDataPoint> data = epwFile.data();
+    EXPECT_EQ(8760, data.size());
+    // The last data point check
+    EXPECT_EQ(11.3, data[8759].dryBulbTemperature().get());
+    EXPECT_EQ(102400, data[8759].atmosphericStationPressure().get());
+    // Try out the alternate access functions
+    EXPECT_EQ(9.8, data[8759].getFieldByName("Dew Point Temperature").get());
+    EXPECT_EQ(9.8, data[8759].getField(EpwDataField("Dew Point Temperature")).get());
+    // Get a time series
+    boost::optional<openstudio::TimeSeries> series = epwFile.getTimeSeries("Wind Speed");
+    ASSERT_TRUE(series);
+    ASSERT_EQ(8760, series->values().size());
+    DateTimeVector seriesTimes = series->dateTimes();
+    ASSERT_EQ(8760, seriesTimes.size());
+    // Check the times in the data and the time series
+    DateTime current(Date(1, 1, 1999), Time(0, 1)); // Use 1999 to avoid leap years
+    Time delta(0, 1);
+    for (unsigned i = 0; i<8760; i++) {
+      // This is a lot more complicated that it probably should be to avoid the year being a problem
+      DateTime datatime = data[i].dateTime();
+      EXPECT_EQ(datatime.date().monthOfYear(), current.date().monthOfYear());
+      EXPECT_EQ(datatime.date().dayOfMonth(), current.date().dayOfMonth());
+      EXPECT_EQ(datatime.time().hours(), current.time().hours());
+      EXPECT_EQ(datatime.time().minutes(), current.time().minutes());
+      DateTime seriestime = seriesTimes[i];
+      EXPECT_EQ(seriestime.date().monthOfYear(), current.date().monthOfYear());
+      EXPECT_EQ(seriestime.date().dayOfMonth(), current.date().dayOfMonth());
+      EXPECT_EQ(seriestime.time().hours(), current.time().hours());
+      EXPECT_EQ(seriestime.time().minutes(), current.time().minutes());
+      current += delta;
+    }
+    // No need to redo the original tests here since the data should have been loaded in the constructor
+  }
+  catch (...) {
     ASSERT_TRUE(false);
   }
 }

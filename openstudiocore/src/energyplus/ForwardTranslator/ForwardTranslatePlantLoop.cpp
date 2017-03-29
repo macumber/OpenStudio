@@ -1,27 +1,38 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "../ForwardTranslator.hpp"
 
 #include "../../model/Model.hpp"
 #include "../../model/PlantLoop.hpp"
 #include "../../model/PlantLoop_Impl.hpp"
+#include "../../model/AirLoopHVACOutdoorAirSystem.hpp"
+#include "../../model/AirLoopHVACOutdoorAirSystem_Impl.hpp"
 #include "../../model/SizingPlant.hpp"
 #include "../../model/SizingPlant_Impl.hpp"
 #include "../../model/Node.hpp"
@@ -37,18 +48,40 @@
 #include "../../model/BoilerHotWater_Impl.hpp"
 #include "../../model/ChillerElectricEIR.hpp"
 #include "../../model/ChillerElectricEIR_Impl.hpp"
+#include "../../model/ChillerAbsorption.hpp"
+#include "../../model/ChillerAbsorption_Impl.hpp"
+#include "../../model/ChillerAbsorptionIndirect.hpp"
+#include "../../model/ChillerAbsorptionIndirect_Impl.hpp"
 #include "../../model/WaterHeaterMixed.hpp"
 #include "../../model/WaterHeaterMixed_Impl.hpp"
+#include "../../model/WaterHeaterHeatPump.hpp"
+#include "../../model/WaterHeaterHeatPump_Impl.hpp"
+#include "../../model/WaterHeaterStratified.hpp"
+#include "../../model/WaterHeaterStratified_Impl.hpp"
 #include "../../model/CoolingTowerVariableSpeed.hpp"
 #include "../../model/CoolingTowerVariableSpeed_Impl.hpp"
 #include "../../model/CoolingTowerSingleSpeed.hpp"
 #include "../../model/CoolingTowerSingleSpeed_Impl.hpp"
+#include "../../model/CoolingTowerTwoSpeed.hpp"
+#include "../../model/CoolingTowerTwoSpeed_Impl.hpp"
+#include "../../model/GeneratorMicroTurbine.hpp"
+#include "../../model/GeneratorMicroTurbine_Impl.hpp"
+#include "../../model/GeneratorMicroTurbineHeatRecovery.hpp"
+#include "../../model/GeneratorMicroTurbineHeatRecovery_Impl.hpp"
+#include "../../model/GroundHeatExchangerVertical.hpp"
+#include "../../model/GroundHeatExchangerVertical_Impl.hpp"
+#include "../../model/GroundHeatExchangerHorizontalTrench.hpp"
+#include "../../model/GroundHeatExchangerHorizontalTrench_Impl.hpp"
+#include "../../model/HeatExchangerFluidToFluid.hpp"
+#include "../../model/HeatExchangerFluidToFluid_Impl.hpp"
 #include "../../model/WaterToAirComponent.hpp"
 #include "../../model/WaterToAirComponent_Impl.hpp"
 #include "../../model/WaterToWaterComponent.hpp"
 #include "../../model/WaterToWaterComponent_Impl.hpp"
 #include "../../model/CoilHeatingWaterBaseboard.hpp"
 #include "../../model/CoilHeatingWaterBaseboard_Impl.hpp"
+#include "../../model/CoilHeatingWaterBaseboardRadiant.hpp"
+#include "../../model/CoilHeatingWaterBaseboardRadiant_Impl.hpp"
 #include "../../model/CoilCoolingCooledBeam.hpp"
 #include "../../model/CoilCoolingCooledBeam_Impl.hpp"
 #include "../../model/StraightComponent.hpp"
@@ -64,6 +97,8 @@
 #include "../../model/ZoneHVACComponent.hpp"
 #include "../../model/ZoneHVACComponent_Impl.hpp"
 #include "../../model/SetpointManager.hpp"
+#include "../../model/SetpointManagerScheduledDualSetpoint.hpp"
+#include "../../model/SetpointManagerScheduledDualSetpoint_Impl.hpp"
 #include "../../model/LifeCycleCost.hpp"
 #include "../../utilities/idf/IdfExtensibleGroup.hpp"
 #include <utilities/idd/IddEnums.hxx>
@@ -84,7 +119,6 @@
 #include <utilities/idd/Sizing_Plant_FieldEnums.hxx>
 #include <utilities/idd/AirTerminal_SingleDuct_ConstantVolume_CooledBeam_FieldEnums.hxx>
 #include <utilities/idd/ZoneHVAC_AirDistributionUnit_FieldEnums.hxx>
-
 #include "../../utilities/core/Assert.hpp"
 
 using namespace openstudio::model;
@@ -95,51 +129,10 @@ namespace openstudio {
 
 namespace energyplus {
 
-enum SetpointComponentType {HEATING, COOLING, BOTH};
-
-struct SetpointComponentInfo
-{
-  ModelObject modelObject;
-  Node outletNode;
-  double flowRate;
-  bool isFlowRateAutosized;
-  SetpointComponentType type;
-
-  SetpointComponentInfo(const ModelObject & t_mo, const Node & t_outletNode, double t_flowRate, bool t_isFlowRateAutosized, SetpointComponentType t_type )
-    : modelObject(t_mo),
-      outletNode(t_outletNode),
-      flowRate(t_flowRate),
-      isFlowRateAutosized(t_isFlowRateAutosized),
-      type(t_type)
-  {
-  }
-};
-
-boost::optional<Node> isSetpointComponent(PlantLoop & plantLoop,const ModelObject & comp)
-{
-  boost::optional<Node> result;
-
-  Node supplyOutletNode = plantLoop.supplyOutletNode();
-  boost::optional<HVACComponent> hvacComp = comp.optionalCast<HVACComponent>();
-  OS_ASSERT(hvacComp);
-  std::vector<Node> nodes = subsetCastVector<Node>(plantLoop.supplyComponents(hvacComp.get(),supplyOutletNode));
-  OS_ASSERT(! nodes.empty());
-  Node componentOutletNode = nodes.front();
-  if( componentOutletNode != supplyOutletNode )
-  {
-    std::vector<SetpointManager> _setpointManagers = componentOutletNode.setpointManagers();
-    if( ! _setpointManagers.empty() )
-    {
-      result = componentOutletNode;
-    }
-  }
-
-  return result;
-}
-
 IdfObject ForwardTranslator::populateBranch( IdfObject & branchIdfObject, 
                           std::vector<ModelObject> & modelObjects,
-                          PlantLoop & plantLoop)
+                          Loop & loop,
+                          bool isSupplyBranch)
 {
   if(modelObjects.size() > 0)
   {
@@ -154,17 +147,21 @@ IdfObject ForwardTranslator::populateBranch( IdfObject & branchIdfObject,
     
       //translate and map each model object
       //in most cases, the name and idd object type come directly from the resulting idfObject
-      if ( boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(modelObject) )
-      {
+      if( boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(modelObject) ) {
         objectName = idfObject->name().get();
         iddType = idfObject->iddObject().name();
       }
 
-      if( boost::optional<StraightComponent> straightComponent = modelObject.optionalCast<StraightComponent>() )
+      if( modelObject.optionalCast<Node>() ) {
+        // Skip nodes we don't want them showing up on branches
+        continue;
+      }
+
+      if( auto straightComponent = modelObject.optionalCast<StraightComponent>() )
       {
         inletNode = straightComponent->inletModelObject()->optionalCast<Node>();
         outletNode = straightComponent->outletModelObject()->optionalCast<Node>();
-        //special case for ZoneHVAC:Baseeboard:Convective:Water.  In E+, this object appears on both the 
+        //special case for ZoneHVAC:Baseboard:Convective:Water.  In E+, this object appears on both the 
         //zonehvac:equipmentlist and the branch.  In OpenStudio, this object was broken into 2 objects:
         //ZoneHVACBaseboardConvectiveWater and CoilHeatingWaterBaseboard.  The ZoneHVAC goes onto the zone and
         //has a child coil that goes onto the plantloop.  In order to get the correct translation to E+, we need
@@ -179,6 +176,24 @@ IdfObject ForwardTranslator::populateBranch( IdfObject & branchIdfObject,
               //Get the name and the idd object from the idf object version of this
               objectName = idfContZnBB->name().get();
               iddType = idfContZnBB->iddObject().name();
+            }
+          }
+        }
+        //special case for ZoneHVAC:Baseeboard:RadiantConvective:Water.  In E+, this object appears on both the 
+        //zonehvac:equipmentlist and the branch.  In OpenStudio, this object was broken into 2 objects:
+        //ZoneHVACBaseboardRadiantConvectiveWater and CoilHeatingWaterBaseboardRadiant.  The ZoneHVAC goes onto the zone and
+        //has a child coil that goes onto the plantloop.  In order to get the correct translation to E+, we need
+        //to put the name of the containing ZoneHVACBaseboardRadiantConvectiveWater onto the branch.
+        if ( auto coilBBRad = modelObject.optionalCast<CoilHeatingWaterBaseboardRadiant>() )
+        {
+          if ( auto contZnBBRad = coilBBRad->containingZoneHVACComponent() )
+          {
+            //translate and map containingZoneHVACBBRadConvWater
+            if ( auto idfContZnBBRad = this->translateAndMapModelObject(*contZnBBRad) )
+            {
+              //Get the name and the idd object from the idf object version of this
+              objectName = idfContZnBBRad->name().get();
+              iddType = idfContZnBBRad->iddObject().name();
             }
           }
         }
@@ -254,37 +269,99 @@ IdfObject ForwardTranslator::populateBranch( IdfObject & branchIdfObject,
             }
           }
         }
+        //special case for Generator:MicroTurbine. 
+        //In OpenStudio, this object was broken into 2 objects:
+        //GeneratorMicroTurbine and GeneratorMicroTurbineHeatRecovery. 
+        //The GeneratorMicroTurbineHeatRecovery goes onto the plantloop.  In order to get the correct translation to E+, we need
+        //to put the name of the linked GeneratorMicroTurbine onto the branch.
+        if (boost::optional<GeneratorMicroTurbineHeatRecovery> mchpHR = modelObject.optionalCast<GeneratorMicroTurbineHeatRecovery>() )
+        {
+          if (boost::optional<GeneratorMicroTurbine> mchp = mchpHR->generatorMicroTurbine())
+          {
+            //translate and map containingZoneHVACBBConvWater
+            if ( boost::optional<IdfObject> idfmchp = this->translateAndMapModelObject(*mchp) )
+            {
+              //Get the name and the idd object from the idf object version of this
+              objectName = idfmchp->name().get();
+              iddType = idfmchp->iddObject().name();
+            }
+          }
+        }
       }
-      else if( boost::optional<WaterToAirComponent> waterToAirComponent = modelObject.optionalCast<WaterToAirComponent>() )
+      else if( auto waterToAirComponent = modelObject.optionalCast<WaterToAirComponent>() )
       {
-        inletNode = waterToAirComponent->waterInletModelObject()->optionalCast<Node>();
-        outletNode = waterToAirComponent->waterOutletModelObject()->optionalCast<Node>();
+        if( loop.optionalCast<PlantLoop>() ) {
+          inletNode = waterToAirComponent->waterInletModelObject()->optionalCast<Node>();
+          outletNode = waterToAirComponent->waterOutletModelObject()->optionalCast<Node>();
+        } else {
+          inletNode = waterToAirComponent->airInletModelObject()->optionalCast<Node>();
+          outletNode = waterToAirComponent->airOutletModelObject()->optionalCast<Node>();
+        }
       }
-      else if( boost::optional<WaterToWaterComponent> waterToWaterComponent = modelObject.optionalCast<WaterToWaterComponent>() )
+      else if( auto waterToWaterComponent = modelObject.optionalCast<WaterToWaterComponent>() )
       {
-        if( plantLoop.supplyComponent(waterToWaterComponent->handle()) )
+        if( isSupplyBranch )
         {
           inletNode = waterToWaterComponent->supplyInletModelObject()->optionalCast<Node>();
           outletNode = waterToWaterComponent->supplyOutletModelObject()->optionalCast<Node>();
         }
-        else if( plantLoop.demandComponent(waterToWaterComponent->handle()) )
+        else
         {
-          inletNode = waterToWaterComponent->demandInletModelObject()->optionalCast<Node>();
-          outletNode = waterToWaterComponent->demandOutletModelObject()->optionalCast<Node>();
+          if( auto tertiaryInletModelObject = waterToWaterComponent->tertiaryInletModelObject() ) {
+            if( auto tertiaryInletNode = tertiaryInletModelObject->optionalCast<Node>() ) {
+              if( loop.demandComponent(tertiaryInletNode->handle()) ) {
+                inletNode = tertiaryInletNode;
+                if( auto tertiaryOutletModelObject = waterToWaterComponent->tertiaryOutletModelObject() ) {
+                  outletNode = tertiaryOutletModelObject->optionalCast<Node>();
+                }
+              }
+            }
+          }
+          if( ! inletNode ) {
+            inletNode = waterToWaterComponent->demandInletModelObject()->optionalCast<Node>();
+            outletNode = waterToWaterComponent->demandOutletModelObject()->optionalCast<Node>();
+          }
+        }
+        //special case for WaterHeater:HeatPump. In E+, this object appears on both the 
+        //zonehvac:equipmentlist and the branch.  In OpenStudio the tank (WaterHeater:Mixed)
+        //is attached to the plant and the WaterHeaterHeatPump is connected to the zone and zonehvac equipment list.
+        //Here we resolve all of that since it is the WaterHeaterHeatPump that must show up on both
+        if( auto tank = modelObject.optionalCast<WaterHeaterMixed>() ) {
+          // containingZoneHVACComponent can be WaterHeaterHeatPump
+          if( auto hpwh = tank->containingZoneHVACComponent() ) {
+            //translate and map containingZoneHVAC
+            if ( auto hpwhIDF = translateAndMapModelObject(hpwh.get()) ) {
+              //Get the name and the idd object from the idf object version of this
+              objectName = hpwhIDF->name().get();
+              iddType = hpwhIDF->iddObject().name();
+            }
+          }
+        }
+        if( auto tank = modelObject.optionalCast<WaterHeaterStratified>() ) {
+          // containingZoneHVACComponent can be WaterHeaterHeatPump
+          if( auto hpwh = tank->containingZoneHVACComponent() ) {
+            //translate and map containingZoneHVAC
+            if ( auto hpwhIDF = translateAndMapModelObject(hpwh.get()) ) {
+              //Get the name and the idd object from the idf object version of this
+              objectName = hpwhIDF->name().get();
+              iddType = hpwhIDF->iddObject().name();
+            }
+          }
         }
       }
+      else if( auto oaSystem = modelObject.optionalCast<AirLoopHVACOutdoorAirSystem>() )
+      {
+        inletNode = oaSystem->returnAirModelObject()->optionalCast<Node>();
+        outletNode = oaSystem->mixedAirModelObject()->optionalCast<Node>();
+      }
 
-      IdfExtensibleGroup eg = branchIdfObject.pushExtensibleGroup();
-      eg.setString(BranchExtensibleFields::ComponentObjectType,iddType);
-      eg.setString(BranchExtensibleFields::ComponentName,objectName);
-      eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNode->name().get());
-      eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNode->name().get());
-      eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
-
-      //
-
-
-
+      if( inletNode && outletNode ) {
+        IdfExtensibleGroup eg = branchIdfObject.pushExtensibleGroup();
+        eg.setString(BranchExtensibleFields::ComponentObjectType,iddType);
+        eg.setString(BranchExtensibleFields::ComponentName,objectName);
+        eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNode->name().get());
+        eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNode->name().get());
+      }
 
       i++;
     }
@@ -365,8 +442,20 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
   }
 
   // LoadDistributionScheme
+  {
+    auto scheme = plantLoop.loadDistributionScheme();
+    idfObject.setString(PlantLoopFields::LoadDistributionScheme,scheme);
+  }
 
-  idfObject.setString(PlantLoopFields::LoadDistributionScheme,"Optimal");
+  //  PlantLoopDemandCalculationScheme
+  {
+    auto spms = plantLoop.supplyOutletNode().setpointManagers();
+    if( subsetCastVector<model::SetpointManagerScheduledDualSetpoint>(spms).empty() ) {
+      idfObject.setString(PlantLoopFields::PlantLoopDemandCalculationScheme,"SingleSetpoint");
+    } else {
+      idfObject.setString(PlantLoopFields::PlantLoopDemandCalculationScheme,"DualSetpointDeadband");
+    }
+  }
 
   // Plant Loop Volume
 
@@ -392,307 +481,14 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
   idfObject.setString(PlantLoopFields::DemandSideInletNodeName,plantLoop.demandInletNode().name().get());
   idfObject.setString(PlantLoopFields::DemandSideOutletNodeName,plantLoop.demandOutletNode().name().get());
 
-  // Operation Scheme
-
-  IdfObject _operationScheme(IddObjectType::PlantEquipmentOperationSchemes);
-  m_idfObjects.push_back(_operationScheme);
-  _operationScheme.setName(plantLoop.name().get() + " Operation Scheme List");
-  _operationScheme.clearExtensibleGroups();
-  
-  idfObject.setString(PlantLoopFields::PlantEquipmentOperationSchemeName,_operationScheme.name().get());
-
-  std::vector<ModelObject> supplyComponents = plantLoop.supplyComponents();
-  std::vector<ModelObject> heatingComponents;
-  std::vector<ModelObject> coolingComponents;
-  std::vector<ModelObject> uncontrolledComponents;
-  std::vector<SetpointComponentInfo> setpointComponents;
-
-  // These will be used later, but only if reasonable sizing values have not already been provided.
-  bool sizeAsCondenserSystem = false;
-  bool sizeAsHotWaterSystem = false;
-  bool sizeAsChilledWaterSystem = false;
-
-  for( const auto & supplyComponent : supplyComponents )
-  {
-    bool autosize = false;
-    double flowRate = 0.0;
-
-    switch(supplyComponent.iddObject().type().value())
-    {
-      case openstudio::IddObjectType::OS_Boiler_HotWater :
-      {
-        sizeAsHotWaterSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          BoilerHotWater boiler = supplyComponent.cast<BoilerHotWater>();
-          if( boiler.isDesignWaterFlowRateAutosized() )
-          {
-            autosize = true;
-          }
-          else if(boost::optional<double> optionalFlowRate = boiler.designWaterFlowRate())
-          {
-            flowRate = optionalFlowRate.get();
-          }
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,flowRate,autosize,HEATING));
-        }
-        else
-        {
-          heatingComponents.push_back(supplyComponent);
-        }
-        break;
-      }
-      case openstudio::IddObjectType::OS_WaterHeater_Mixed :
-      {
-        sizeAsHotWaterSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          WaterHeaterMixed waterHeater = supplyComponent.cast<WaterHeaterMixed>();
-          if( waterHeater.isUseSideDesignFlowRateAutosized() )
-          {
-            autosize = true;
-          }
-          else if(boost::optional<double> optionalFlowRate = waterHeater.useSideDesignFlowRate())
-          {
-            flowRate = optionalFlowRate.get();
-          }
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,flowRate,autosize,HEATING));
-        }
-        else
-        {
-          heatingComponents.push_back(supplyComponent);
-        }
-        break;
-      }
-      case openstudio::IddObjectType::OS_DistrictHeating :
-      {
-        sizeAsHotWaterSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,0.0,true,HEATING));
-        }
-        else
-        {
-          heatingComponents.push_back(supplyComponent);
-        }
-        break;
-      }      
-      case openstudio::IddObjectType::OS_Chiller_Electric_EIR :
-      {
-        sizeAsChilledWaterSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          ChillerElectricEIR chiller = supplyComponent.cast<ChillerElectricEIR>();
-          if( chiller.isReferenceChilledWaterFlowRateAutosized() )
-          {
-            autosize = true;
-          }
-          else if(boost::optional<double> optionalFlowRate = chiller.referenceChilledWaterFlowRate())
-          {
-            flowRate = optionalFlowRate.get();
-          }
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,flowRate,autosize,COOLING));
-        }
-        else
-        {
-          coolingComponents.push_back(supplyComponent);
-        }
-        break;
-      }
-      case openstudio::IddObjectType::OS_DistrictCooling :
-      {
-        sizeAsChilledWaterSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,0.0,true,COOLING));
-        }
-        else
-        {
-          coolingComponents.push_back(supplyComponent);
-        }
-        break;
-      }      
-      case openstudio::IddObjectType::OS_CoolingTower_SingleSpeed :
-      {
-        sizeAsCondenserSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          CoolingTowerSingleSpeed tower = supplyComponent.cast<CoolingTowerSingleSpeed>();
-          if( tower.isDesignWaterFlowRateAutosized() )
-          {
-            autosize = true;
-          }
-          else if(boost::optional<double> optionalFlowRate = tower.designWaterFlowRate())
-          {
-            flowRate = optionalFlowRate.get();
-          }
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,0.0,true,COOLING));
-        }
-        else
-        {
-          coolingComponents.push_back(supplyComponent);
-        }
-        break;
-      }
-      case openstudio::IddObjectType::OS_CoolingTower_VariableSpeed :
-      {
-        sizeAsCondenserSystem = true;
-        if( boost::optional<Node> outletNode = isSetpointComponent(plantLoop,supplyComponent) ) 
-        {
-          CoolingTowerVariableSpeed tower = supplyComponent.cast<CoolingTowerVariableSpeed>();
-          if( tower.isDesignWaterFlowRateAutosized() )
-          {
-            autosize = true;
-          }
-          else if(boost::optional<double> optionalFlowRate = tower.designWaterFlowRate())
-          {
-            flowRate = optionalFlowRate.get();
-          }
-          setpointComponents.push_back(SetpointComponentInfo(supplyComponent,*outletNode,0.0,true,COOLING));
-        }
-        else
-        {
-          coolingComponents.push_back(supplyComponent);
-        }
-        break;
-      }
-      case openstudio::IddObjectType::OS_GroundHeatExchanger_Vertical :
-      {
-        sizeAsCondenserSystem = true;
-        uncontrolledComponents.push_back(supplyComponent);
-        break;
-      }
-      default:
-      {
-        break;
-      }
-    }
-  }
-
-  boost::optional<IdfObject> _optionalHeatingPlantEquipmentList;
-  boost::optional<IdfObject> _optionalCoolingPlantEquipmentList;
-  boost::optional<IdfObject> _optionalUncontrolledPlantEquipmentList;
-  boost::optional<IdfObject> _optionalSetpointOperation;
-
-  if( ! setpointComponents.empty() )
-  {
-    Schedule alwaysOn = plantLoop.model().alwaysOnDiscreteSchedule();
-    IdfObject scheduleCompact = translateAndMapModelObject(alwaysOn).get();
-
-    IdfObject _setpointOperation(IddObjectType::PlantEquipmentOperation_ComponentSetpoint);
-    _setpointOperation.setName(plantLoop.name().get() + " Setpoint Operation Scheme");
-    m_idfObjects.push_back(_setpointOperation);
-    _setpointOperation.clearExtensibleGroups();
-    _optionalSetpointOperation = _setpointOperation;
-
-    IdfExtensibleGroup eg = _operationScheme.pushExtensibleGroup();
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeObjectType,_setpointOperation.iddObject().name());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeName,_setpointOperation.name().get());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeScheduleName,scheduleCompact.name().get());
-  }
-
-  if( ! heatingComponents.empty() )
-  {
-    Schedule alwaysOn = plantLoop.model().alwaysOnDiscreteSchedule();
-    IdfObject scheduleCompact = translateAndMapModelObject(alwaysOn).get();
-
-    IdfObject _heatingOperation(IddObjectType::PlantEquipmentOperation_HeatingLoad);
-    _heatingOperation.setName(plantLoop.name().get() + " Heating Operation Scheme");
-    m_idfObjects.push_back(_heatingOperation);
-    _heatingOperation.clearExtensibleGroups();
-
-    IdfObject _plantEquipmentList(IddObjectType::PlantEquipmentList);
-    _plantEquipmentList.setName(plantLoop.name().get() + " Heating Equipment List");
-    _plantEquipmentList.clearExtensibleGroups();
-    m_idfObjects.push_back(_plantEquipmentList);
-    _optionalHeatingPlantEquipmentList = _plantEquipmentList;
-
-    IdfExtensibleGroup eg = _heatingOperation.pushExtensibleGroup();
-    eg.setDouble(PlantEquipmentOperation_HeatingLoadExtensibleFields::LoadRangeLowerLimit,0.0);
-    eg.setDouble(PlantEquipmentOperation_HeatingLoadExtensibleFields::LoadRangeUpperLimit,1E9);
-    eg.setString(PlantEquipmentOperation_HeatingLoadExtensibleFields::RangeEquipmentListName,_plantEquipmentList.name().get());
-
-    eg = _operationScheme.pushExtensibleGroup();
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeObjectType,_heatingOperation.iddObject().name());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeName,_heatingOperation.name().get());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeScheduleName,scheduleCompact.name().get());
-  }
-
-  if( ! coolingComponents.empty() )
-  {
-    Schedule alwaysOn2 = plantLoop.model().alwaysOnDiscreteSchedule();
-    IdfObject scheduleCompact2 = translateAndMapModelObject(alwaysOn2).get();
-    
-    IdfObject _coolingOperation(IddObjectType::PlantEquipmentOperation_CoolingLoad);
-    _coolingOperation.setName(plantLoop.name().get() + " Cooling Operation Scheme");
-    m_idfObjects.push_back(_coolingOperation);
-    _coolingOperation.clearExtensibleGroups();
-
-    IdfObject _plantEquipmentList(IddObjectType::PlantEquipmentList);
-    _plantEquipmentList.setName(plantLoop.name().get() + " Cooling Equipment List");
-    _plantEquipmentList.clearExtensibleGroups();
-    m_idfObjects.push_back(_plantEquipmentList);
-    _optionalCoolingPlantEquipmentList = _plantEquipmentList;
-
-    IdfExtensibleGroup eg = _coolingOperation.pushExtensibleGroup();
-    eg.setDouble(PlantEquipmentOperation_CoolingLoadExtensibleFields::LoadRangeLowerLimit,0.0);
-    eg.setDouble(PlantEquipmentOperation_CoolingLoadExtensibleFields::LoadRangeUpperLimit,1E9);
-    eg.setString(PlantEquipmentOperation_CoolingLoadExtensibleFields::RangeEquipmentListName,_plantEquipmentList.name().get());
-
-    eg = _operationScheme.pushExtensibleGroup();
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeObjectType,_coolingOperation.iddObject().name());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeName,_coolingOperation.name().get());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeScheduleName,scheduleCompact2.name().get());
-  }
-
-  if( ! uncontrolledComponents.empty() )
-  {
-    Schedule alwaysOn = plantLoop.model().alwaysOnDiscreteSchedule();
-    IdfObject _alwaysOn = translateAndMapModelObject(alwaysOn).get();
-    
-    IdfObject _uncontrolledOperation(IddObjectType::PlantEquipmentOperation_Uncontrolled);
-    _uncontrolledOperation.setName(plantLoop.name().get() + " Uncontrolled Operation Scheme");
-    m_idfObjects.push_back(_uncontrolledOperation);
-    _uncontrolledOperation.clearExtensibleGroups();
-
-    IdfObject _plantEquipmentList(IddObjectType::PlantEquipmentList);
-    _plantEquipmentList.setName(plantLoop.name().get() + " Uncontrolled Equipment List");
-    _plantEquipmentList.clearExtensibleGroups();
-    m_idfObjects.push_back(_plantEquipmentList);
-    _optionalUncontrolledPlantEquipmentList = _plantEquipmentList;
-
-    _uncontrolledOperation.setString(PlantEquipmentOperation_UncontrolledFields::EquipmentListName,_plantEquipmentList.name().get());
-
-    IdfExtensibleGroup eg = _operationScheme.pushExtensibleGroup();
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeObjectType,_uncontrolledOperation.iddObject().name());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeName,_uncontrolledOperation.name().get());
-    eg.setString(PlantEquipmentOperationSchemesExtensibleFields::ControlSchemeScheduleName,_alwaysOn.name().get());
-  }
+  auto supplyComponents = plantLoop.supplyComponents();
 
   SizingPlant sizingPlant = plantLoop.sizingPlant();
-
-  if( (sizingPlant.designLoopExitTemperature() < 0.01) && (sizingPlant.loopDesignTemperatureDifference() < 0.01) )
-  {
-    if( sizeAsCondenserSystem )
-    {
-      sizingPlant.setLoopType("Condenser");
-      sizingPlant.setDesignLoopExitTemperature(29.4);
-      sizingPlant.setLoopDesignTemperatureDifference(5.6);
-    }
-    else if( sizeAsChilledWaterSystem )
-    {
-      sizingPlant.setLoopType("Cooling");
-      sizingPlant.setDesignLoopExitTemperature(7.22);
-      sizingPlant.setLoopDesignTemperatureDifference(6.67);
-    }
-    else 
-    {
-      sizingPlant.setLoopType("Heating");
-      sizingPlant.setDesignLoopExitTemperature(82.0);
-      sizingPlant.setLoopDesignTemperatureDifference(11.0);
-    }
-  }
-
   translateAndMapModelObject(sizingPlant);
+
+  // Mark where we want the plant operation schemes to go
+  // Don't actually translate yet because we don't want the components to show up yet
+  // auto operationSchemeLocation = std::distance(m_idfObjects.begin(),m_idfObjects.end());
 
   // Supply Side
 
@@ -751,34 +547,16 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
   m_idfObjects.push_back(_supplyInletBranch);
 
   std::vector<ModelObject> supplyInletModelObjects;
-  std::vector<ModelObject> supplyInletBranchModelObjects;
   supplyInletModelObjects = plantLoop.supplyComponents(supplyInletNode,supplySplitter);
 
   OS_ASSERT( supplyInletModelObjects.size() >= 2 );
 
-  supplyInletModelObjects.erase(supplyInletModelObjects.begin());
-  supplyInletModelObjects.erase(supplyInletModelObjects.end() - 1);
-
-  for( auto & supplyInletModelObject : supplyInletModelObjects )
-  {
-    //nodes don't go onto branches, but still need to be translated and mapped
-    //because doing so translates their setpoint managers
-    if( boost::optional<Node> node = supplyInletModelObject.optionalCast<Node>() )
-    {
-      boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(supplyInletModelObject);
-    }
-    //all other types of objects go onto the branch
-    else
-    {
-      supplyInletBranchModelObjects.push_back(supplyInletModelObject);
-    }
-  }
-
-  if( supplyInletBranchModelObjects.size() > 0 )
+  if( supplyInletModelObjects.size() > 2u )
   {
     populateBranch( _supplyInletBranch,
-                    supplyInletBranchModelObjects,
-                    plantLoop );
+                    supplyInletModelObjects,
+                    plantLoop,
+                    true);
   }
   else
   {
@@ -797,7 +575,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
     eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
     eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-    eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
   }
 
   // Populate supply equipment branches
@@ -819,7 +596,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     model::HVACComponent comp2 = it2->optionalCast<model::HVACComponent>().get();
 
     std::vector<model::ModelObject> allComponents = plantLoop.supplyComponents(comp1,comp2);
-    std::vector<model::ModelObject> branchComponents;
 
     IdfObject _equipmentBranch(IddObjectType::Branch); 
     _equipmentBranch.clearExtensibleGroups();
@@ -835,26 +611,12 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg = _supplyBranchList.pushExtensibleGroup();
     eg.setString(BranchListExtensibleFields::BranchName,_equipmentBranch.name().get());
 
-    for( auto & component : allComponents )
-    {
-      //nodes don't go onto branches, but still need to be translated and mapped
-      //because doing so translates their setpoint managers
-      if( boost::optional<Node> node = component.optionalCast<Node>() )
-      {
-        boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(component);
-      }
-      //all other types of objects go onto the branch
-      else
-      {
-        branchComponents.push_back(component);
-      }
-    }
-
-    if( branchComponents.size() > 0 )
+    if( allComponents.size() > 2u )
     {
       populateBranch( _equipmentBranch,
-                      branchComponents,
-                      plantLoop );
+                      allComponents,
+                      plantLoop,
+                      true);
     }
     else
     {
@@ -873,7 +635,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
       eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
       eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
       eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-      eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
     }
 
     ++it2;
@@ -892,34 +653,16 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
   m_idfObjects.push_back(_supplyOutletBranch);
 
   std::vector<ModelObject> supplyOutletModelObjects;
-  std::vector<ModelObject> supplyOutletBranchModelObjects;
   supplyOutletModelObjects = plantLoop.supplyComponents(supplyMixer,supplyOutletNode);  
 
   OS_ASSERT( supplyOutletModelObjects.size() >= 2 );
 
-  supplyOutletModelObjects.erase(supplyOutletModelObjects.begin());
-  supplyOutletModelObjects.erase(supplyOutletModelObjects.end() - 1);
-
-  for( auto & supplyOutletModelObject : supplyOutletModelObjects )
-  {
-    //nodes don't go onto branches, but still need to be translated and mapped
-    //because doing so translates their setpoint managers
-    if( boost::optional<Node> node = supplyOutletModelObject.optionalCast<Node>() )
-    {
-      boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(supplyOutletModelObject);
-    }
-    //all other types of objects go onto the branch
-    else
-    {
-      supplyOutletBranchModelObjects.push_back(supplyOutletModelObject);
-    }
-  }
-
-  if( supplyOutletBranchModelObjects.size() > 0 )
+  if( supplyOutletModelObjects.size() > 2u )
   {
     populateBranch( _supplyOutletBranch,
-                    supplyOutletBranchModelObjects,
-                    plantLoop );
+                    supplyOutletModelObjects,
+                    plantLoop,
+                    true);
   }
   else
   {
@@ -938,7 +681,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
     eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
     eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-    eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
   }
 
   // Demand Side
@@ -998,34 +740,16 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
   m_idfObjects.push_back(_demandInletBranch);
 
   std::vector<ModelObject> demandInletModelObjects;
-  std::vector<ModelObject> demandInletBranchModelObjects;
   demandInletModelObjects = plantLoop.demandComponents(demandInletNode,demandSplitter);
 
-  OS_ASSERT( demandInletModelObjects.size() >= 2 );  
+  OS_ASSERT( demandInletModelObjects.size() >= 2u );  
 
-  demandInletModelObjects.erase(demandInletModelObjects.begin());
-  demandInletModelObjects.erase(demandInletModelObjects.end() - 1);
-
-  for( auto & demandInletModelObject : demandInletModelObjects )
-  {
-    //nodes don't go onto branches, but still need to be translated and mapped
-    //because doing so translates their setpoint managers
-    if( boost::optional<Node> node = demandInletModelObject.optionalCast<Node>() )
-    {
-      boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(demandInletModelObject);
-    }
-    //all other types of objects go onto the branch
-    else
-    {
-      demandInletBranchModelObjects.push_back(demandInletModelObject);
-    }
-  }
-
-  if( demandInletBranchModelObjects.size() > 0 )
+  if( demandInletModelObjects.size() > 2u )
   {
     populateBranch( _demandInletBranch,
-                    demandInletBranchModelObjects,
-                    plantLoop );
+                    demandInletModelObjects,
+                    plantLoop,
+                    false);
   }
   else
   {
@@ -1044,7 +768,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
     eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
     eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-    eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
   }
 
   // Populate equipment branches
@@ -1066,7 +789,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     model::HVACComponent comp2 = it2->optionalCast<model::HVACComponent>().get();
 
     std::vector<model::ModelObject> allComponents = plantLoop.demandComponents(comp1,comp2);
-    std::vector<model::ModelObject> branchComponents;
 
     IdfObject _equipmentBranch(IddObjectType::Branch); 
     _equipmentBranch.clearExtensibleGroups();
@@ -1082,26 +804,12 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg = _demandBranchList.pushExtensibleGroup();
     eg.setString(BranchListExtensibleFields::BranchName,_equipmentBranch.name().get());
 
-    for( auto & component : allComponents )
-    {
-      //nodes don't go onto branches, but still need to be translated and mapped
-      //because doing so translates their setpoint managers
-      if( boost::optional<Node> node = component.optionalCast<Node>() )
-      {
-        boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(component);
-      }
-      //all other types of objects go onto the branch
-      else
-      {
-        branchComponents.push_back(component);
-      }
-    }
-
-    if( branchComponents.size() > 0 )
+    if( allComponents.size() > 2u )
     {
       populateBranch( _equipmentBranch,
-                      branchComponents,
-                      plantLoop );
+                      allComponents,
+                      plantLoop,
+                      false);
     }
     else
     {
@@ -1120,7 +828,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
       eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
       eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
       eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-      eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
     }
 
     ++it2;
@@ -1128,7 +835,7 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
 
   // Install a bypass branch with a pipe
 
-  if( splitterOutletObjects.size() > 0 )
+  if( splitterOutletObjects.size() > 0u )
   {
     IdfObject _equipmentBranch(IddObjectType::Branch); 
     _equipmentBranch.clearExtensibleGroups();
@@ -1159,7 +866,6 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
     eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
     eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-    eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Bypass");
   }
 
   // Populate demand outlet branch
@@ -1175,34 +881,16 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
   m_idfObjects.push_back(_demandOutletBranch);
 
   std::vector<ModelObject> demandOutletModelObjects;
-  std::vector<ModelObject> demandOutletBranchModelObjects;
   demandOutletModelObjects = plantLoop.demandComponents(demandMixer,demandOutletNode);  
 
-  OS_ASSERT( demandOutletModelObjects.size() >= 2 );
+  OS_ASSERT( demandOutletModelObjects.size() >= 2u );
 
-  demandOutletModelObjects.erase(demandOutletModelObjects.begin());
-  demandOutletModelObjects.erase(demandOutletModelObjects.end() - 1);
-
-  for( auto & demandOutletModelObject : demandOutletModelObjects )
-  {
-    //nodes don't go onto branches, but still need to be translated and mapped
-    //because doing so translates their setpoint managers
-    if( boost::optional<Node> node = demandOutletModelObject.optionalCast<Node>() )
-    {
-      boost::optional<IdfObject> idfObject = this->translateAndMapModelObject(demandOutletModelObject);
-    }
-    //all other types of objects go onto the branch
-    else
-    {
-      demandOutletBranchModelObjects.push_back(demandOutletModelObject);
-    }
-  }
-
-  if( demandOutletBranchModelObjects.size() > 0 )
+  if( demandOutletModelObjects.size() > 2u )
   {
     populateBranch( _demandOutletBranch,
-                    demandOutletBranchModelObjects,
-                    plantLoop );
+                    demandOutletModelObjects,
+                    plantLoop,
+                    false);
   }
   else
   {
@@ -1221,91 +909,18 @@ boost::optional<IdfObject> ForwardTranslator::translatePlantLoop( PlantLoop & pl
     eg.setString(BranchExtensibleFields::ComponentName,pipe.name().get());
     eg.setString(BranchExtensibleFields::ComponentInletNodeName,inletNodeName);
     eg.setString(BranchExtensibleFields::ComponentOutletNodeName,outletNodeName);
-    eg.setString(BranchExtensibleFields::ComponentBranchControlType,"Passive");
   }
 
-  // Populate PlantEquipmentList
+  // Operation Scheme
+  // auto opSchemeStart = m_idfObjects.end();
+  const auto & operationSchemes = translatePlantEquipmentOperationSchemes(plantLoop);
+  OS_ASSERT(operationSchemes);
+  idfObject.setString(PlantLoopFields::PlantEquipmentOperationSchemeName,operationSchemes->name().get());
+  // auto opSchemeEnd = m_idfObjects.end();
 
-  if( _optionalHeatingPlantEquipmentList )
-  {
-    for( auto & heatingComponent : heatingComponents )
-    {
-      boost::optional<IdfObject> _idfObject = translateAndMapModelObject(heatingComponent);
-
-      if( _idfObject )
-      {
-        IdfExtensibleGroup eg = _optionalHeatingPlantEquipmentList->pushExtensibleGroup();
-        eg.setString(PlantEquipmentListExtensibleFields::EquipmentObjectType,_idfObject->iddObject().name());
-        eg.setString(PlantEquipmentListExtensibleFields::EquipmentName,_idfObject->name().get());
-      }
-    }
-  }
-
-  if( _optionalCoolingPlantEquipmentList )
-  {
-    for( auto & coolingComponent : coolingComponents )
-    {
-      boost::optional<IdfObject> _idfObject = translateAndMapModelObject(coolingComponent);
-
-      if( _idfObject )
-      {
-        IdfExtensibleGroup eg = _optionalCoolingPlantEquipmentList->pushExtensibleGroup();
-        eg.setString(PlantEquipmentListExtensibleFields::EquipmentObjectType,_idfObject->iddObject().name());
-        eg.setString(PlantEquipmentListExtensibleFields::EquipmentName,_idfObject->name().get());
-      }
-    }
-  }
-
-  if( _optionalUncontrolledPlantEquipmentList )
-  {
-    for( auto & uncontrolledComponent : uncontrolledComponents )
-    {
-      boost::optional<IdfObject> _idfObject = translateAndMapModelObject(uncontrolledComponent);
-
-      if( _idfObject )
-      {
-        IdfExtensibleGroup eg = _optionalUncontrolledPlantEquipmentList->pushExtensibleGroup();
-        eg.setString(PlantEquipmentListExtensibleFields::EquipmentObjectType,_idfObject->iddObject().name());
-        eg.setString(PlantEquipmentListExtensibleFields::EquipmentName,_idfObject->name().get());
-      }
-    }
-  }
-
-  if( _optionalSetpointOperation )
-  {
-    for( auto & setpointComponent : setpointComponents )
-    {
-      boost::optional<IdfObject> _idfObject = translateAndMapModelObject(setpointComponent.modelObject);
-
-      OS_ASSERT(_idfObject);
-
-      IdfExtensibleGroup eg = _optionalSetpointOperation->pushExtensibleGroup();
-      eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::EquipmentObjectType,_idfObject->iddObject().name());
-      eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::EquipmentName,_idfObject->name().get());
-      eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::DemandCalculationNodeName,setpointComponent.outletNode.name().get());
-      eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::SetpointNodeName,setpointComponent.outletNode.name().get());
-      if( setpointComponent.isFlowRateAutosized )
-      {
-        eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::ComponentFlowRate,"Autosize");
-      }
-      else
-      {
-        eg.setDouble(PlantEquipmentOperation_ComponentSetpointExtensibleFields::ComponentFlowRate,setpointComponent.flowRate);
-      }
-      switch(setpointComponent.type)
-      {
-        case HEATING :
-          eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::OperationType,"Heating");
-          break;
-        case COOLING :
-          eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::OperationType,"Cooling");
-          break;
-        default :
-          eg.setString(PlantEquipmentOperation_ComponentSetpointExtensibleFields::OperationType,"Both");
-          break;
-      }
-    }
-  }
+  //std::vector<IdfObject> opSchemeObjects(opSchemeStart,opSchemeEnd);
+  //m_idfObjects.erase(opSchemeStart,opSchemeEnd);
+  //m_idfObjects.insert(m_idfObjects.begin() + operationSchemeLocation,opSchemeObjects.begin(),opSchemeObjects.end());
 
   return boost::optional<IdfObject>(idfObject);
 }

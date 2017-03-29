@@ -1,24 +1,41 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "AirTerminalSingleDuctSeriesPIUReheat.hpp"
 #include "AirTerminalSingleDuctSeriesPIUReheat_Impl.hpp"
+#include "AirLoopHVACReturnPlenum.hpp"
+#include "AirLoopHVACReturnPlenum_Impl.hpp"
+#include "FanVariableVolume.hpp"
+#include "FanVariableVolume_Impl.hpp"
+#include "FanConstantVolume.hpp"
+#include "FanConstantVolume_Impl.hpp"
+#include "FanOnOff.hpp"
+#include "FanOnOff_Impl.hpp"
 #include "Model.hpp"
 #include "Model_Impl.hpp"
 #include "PortList.hpp"
@@ -38,6 +55,8 @@
 #include "ScheduleTypeLimits.hpp"
 #include "ScheduleTypeRegistry.hpp"
 #include <utilities/idd/OS_AirTerminal_SingleDuct_SeriesPIU_Reheat_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
+
 #include "../utilities/units/Unit.hpp"
 #include "../utilities/core/Assert.hpp"
 
@@ -373,6 +392,11 @@ namespace detail {
                 thermalZone->addEquipment(mo);
               }
 
+              if( auto airLoopHVAC = node.airLoopHVAC() ) {
+                auto schedule = airLoopHVAC->availabilitySchedule();
+                setFanAvailabilitySchedule(schedule);
+              }
+
               return true; 
             }
           }
@@ -418,6 +442,127 @@ namespace detail {
 
 
     return modelObjectClone;
+  }
+
+  bool AirTerminalSingleDuctSeriesPIUReheat_Impl::setInducedAirPlenumZone(ThermalZone & plenumZone)
+  {
+    bool result = true;
+
+    if( ! plenumZone.isPlenum() )
+    {
+      result = false;
+    }
+
+    boost::optional<Node> t_secondaryAirInletNode;
+    if( result )
+    {
+      t_secondaryAirInletNode = secondaryAirInletNode();
+      if( ! t_secondaryAirInletNode )
+      {
+        result = false;
+      }
+    }
+
+    boost::optional<AirLoopHVACReturnPlenum> plenum;
+    if( result )
+    {
+      plenum = plenumZone.getImpl<detail::ThermalZone_Impl>()->airLoopHVACReturnPlenum();
+      if( ! plenum )
+      {
+        result = false;
+      }
+    }
+
+    if( result )
+    {
+      Model t_model = model();
+      PortList pl = plenum->getImpl<detail::AirLoopHVACReturnPlenum_Impl>()->inducedAirOutletPortList();
+      t_model.connect(pl,pl.nextPort(),t_secondaryAirInletNode.get(),t_secondaryAirInletNode->inletPort());
+    }
+
+    return result;
+  }
+
+  void AirTerminalSingleDuctSeriesPIUReheat_Impl::setFanAvailabilitySchedule(Schedule & schedule) {
+    auto component = fan();
+    if( auto constantFan = component.optionalCast<FanConstantVolume>() ) {
+      constantFan->setAvailabilitySchedule(schedule);
+    } else if(  auto onOffFan = component.optionalCast<FanOnOff>() ) {
+      onOffFan->setAvailabilitySchedule(schedule);
+    } else if( auto variableFan = component.optionalCast<FanVariableVolume>() ) {
+      variableFan->setAvailabilitySchedule(schedule);
+    }
+  }
+
+  std::vector<IdfObject> AirTerminalSingleDuctSeriesPIUReheat_Impl::remove()
+  {
+    Model _model = this->model();
+    ModelObject thisObject = this->getObject<ModelObject>();
+
+    HVACComponent _reheatCoil = reheatCoil();
+
+    boost::optional<ModelObject> sourceModelObject = this->inletModelObject();
+    boost::optional<unsigned> sourcePort = this->connectedObjectPort(this->inletPort());
+    
+    boost::optional<ModelObject> targetModelObject = this->outletModelObject();
+    boost::optional<unsigned> targetPort = this->connectedObjectPort(this->outletPort());
+
+    std::vector<ThermalZone> thermalZones = _model.getConcreteModelObjects<ThermalZone>();
+    for( auto & thermalZone : thermalZones )
+    {
+      std::vector<ModelObject> equipment = thermalZone.equipment();
+
+      if( std::find(equipment.begin(),equipment.end(),thisObject) != equipment.end() )
+      {
+        thermalZone.removeEquipment(thisObject);
+
+        break;
+      }
+    }
+
+    if( boost::optional<Node> secondaryAirInletNode = this->secondaryAirInletNode() )
+    {
+      secondaryAirInletNode->disconnect();
+      secondaryAirInletNode->remove();
+    }
+
+    if( sourcePort && sourceModelObject
+        && targetPort && targetModelObject )
+    {
+      if( boost::optional<Node> inletNode = sourceModelObject->optionalCast<Node>() )
+      {
+        if( boost::optional<ModelObject> source2ModelObject = inletNode->inletModelObject() )
+        {
+          if( boost::optional<unsigned> source2Port = inletNode->connectedObjectPort(inletNode->inletPort()) )
+          {
+            _model.connect( source2ModelObject.get(),
+                            source2Port.get(),
+                            targetModelObject.get(),
+                            targetPort.get() );
+
+            inletNode->disconnect();
+            inletNode->remove();
+
+            if( boost::optional<PlantLoop> loop = _reheatCoil.plantLoop() )
+            {
+              loop->removeDemandBranchWithComponent(_reheatCoil);
+            }
+
+            return StraightComponent_Impl::remove();
+          }
+        }
+      }
+    }
+
+    model().disconnect(getObject<ModelObject>(),inletPort());
+    model().disconnect(getObject<ModelObject>(),outletPort());
+
+    if( boost::optional<PlantLoop> loop = _reheatCoil.plantLoop() )
+    {
+      loop->removeDemandBranchWithComponent(_reheatCoil);
+    }
+
+    return StraightComponent_Impl::remove();
   }
 
 } // detail

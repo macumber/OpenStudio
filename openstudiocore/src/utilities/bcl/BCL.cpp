@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "BCL.hpp"
 
@@ -152,6 +161,8 @@ namespace openstudio{
   {
     QDomElement softwareProgramElement = fileElement.firstChildElement("version").firstChildElement("software_program");
     QDomElement identifierElement = fileElement.firstChildElement("version").firstChildElement("identifier");
+    QDomElement minCompatibleElement = fileElement.firstChildElement("version").firstChildElement("min_compatible");
+    QDomElement maxCompatibleElement = fileElement.firstChildElement("version").firstChildElement("max_compatible");
     QDomElement filenameElement = fileElement.firstChildElement("filename");
     QDomElement urlElement = fileElement.firstChildElement("url");
     QDomElement filetypeElement = fileElement.firstChildElement("filetype");
@@ -160,6 +171,24 @@ namespace openstudio{
 
     m_softwareProgram = softwareProgramElement.firstChild().nodeValue().toStdString();
     m_identifier = identifierElement.firstChild().nodeValue().toStdString();
+    if (minCompatibleElement.isNull()){
+      try{
+        // if minCompatibleVersion not explicitly set, assume identifier is min
+        m_minCompatibleVersion = VersionString(m_identifier);
+      } catch (const std::exception&){
+      }
+    }else{
+      try{
+        m_minCompatibleVersion = VersionString(minCompatibleElement.firstChild().nodeValue().toStdString());
+      } catch (const std::exception&){
+      }
+    }
+    if (!maxCompatibleElement.isNull()){
+      try{
+        m_maxCompatibleVersion = VersionString(maxCompatibleElement.firstChild().nodeValue().toStdString());
+      } catch (const std::exception&){
+      }
+    }
     m_filename = filenameElement.firstChild().nodeValue().toStdString();
     m_url = urlElement.firstChild().nodeValue().toStdString();
     m_filetype = filetypeElement.firstChild().nodeValue().toStdString();
@@ -175,6 +204,16 @@ namespace openstudio{
   std::string BCLFile::identifier() const
   {
     return m_identifier;
+  }
+
+  boost::optional<VersionString> BCLFile::minCompatibleVersion() const
+  {
+    return m_minCompatibleVersion;
+  }
+
+  boost::optional<VersionString> BCLFile::maxCompatibleVersion() const
+  {
+    return m_maxCompatibleVersion;
   }
 
   std::string BCLFile::filename() const
@@ -435,54 +474,60 @@ namespace openstudio{
           .nodeValue().toStdString();
         std::string value = attributeElement.firstChildElement("value").firstChild()
           .nodeValue().toStdString();
-        //std::string datatype = attributeElement.firstChildElement("datatype").firstChild()
-        //  .nodeValue().toStdString();
+        std::string datatype = attributeElement.firstChildElement("datatype").firstChild()
+          .nodeValue().toStdString();
 
         // Units are optional
         std::string units = attributeElement.firstChildElement("units").firstChild()
           .nodeValue().toStdString();
+
+        bool doubleOk;
+        double doubleValue = toQString(value).toDouble(&doubleOk);
+
+        bool intOk;
+        int intValue = toQString(value).toInt(&intOk);
         
-        /*if (datatype == "float")
+        if (datatype == "float" && doubleOk)
         {
           if (units.empty())
           {
-            Attribute attr(name, boost::lexical_cast<double>(value));
+            Attribute attr(name, doubleValue);
             m_attributes.push_back(attr);
           }
           else
           {
-            Attribute attr(name, boost::lexical_cast<double>(value), units);
+            Attribute attr(name, doubleValue, units);
             m_attributes.push_back(attr);
           }
         }
-        else if (datatype == "int")
+        else if (datatype == "int" && intOk)
         {
           if (units.empty())
           {
-            Attribute attr(name, boost::lexical_cast<int>(value));
+            Attribute attr(name, intValue);
             m_attributes.push_back(attr);
           }
           else
           {
-            Attribute attr(name, boost::lexical_cast<int>(value), units);
+            Attribute attr(name, intValue, units);
             m_attributes.push_back(attr);
           }
         }
         // Assume string
         else
-        {*/
-        if (units.empty())
         {
-          Attribute attr(name, value);
-          m_attributes.push_back(attr);
-        }
-        else
-        {
-          Attribute attr(name, value, units);
-          m_attributes.push_back(attr);
-        }
+          if (units.empty())
+          {
+            Attribute attr(name, value);
+            m_attributes.push_back(attr);
+          }
+          else
+          {
+            Attribute attr(name, value, units);
+            m_attributes.push_back(attr);
+          }
           //LOG(Error, "Error: Unrecognized attribute datatype \"" << datatype << "\"");
-        //}
+        }
       }
       else
       {

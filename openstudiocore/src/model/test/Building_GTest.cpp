@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -61,9 +70,9 @@ TEST_F(ModelFixture, Building)
   EXPECT_EQ(0, building.northAxis());
   EXPECT_FALSE(building.getDouble(2));
   EXPECT_TRUE(building.isNorthAxisDefaulted());
-  EXPECT_EQ(3, building.nominalFloortoFloorHeight());
+  EXPECT_FALSE(building.nominalFloortoFloorHeight());
   EXPECT_FALSE(building.getDouble(3));
-  EXPECT_TRUE(building.isNominalFloortoFloorHeightDefaulted());
+
 
   OptionalString buildingName = building.name();
   ASSERT_TRUE(buildingName);
@@ -284,3 +293,107 @@ TEST_F(ModelFixture, Building_Cost)
   EXPECT_DOUBLE_EQ(100, cost2->totalCost());
   EXPECT_DOUBLE_EQ(120, cost3->totalCost());
 }
+
+TEST_F(ModelFixture, Building_Clone)
+{
+  // Remember that Building is a unique object
+  // There are basically three scenarios to consider,
+  // cloning into the same model, cloning into a different model that already has a building object, 
+  // and cloning into a different model that doesn't have a building object.
+
+  // Clone into the same model
+  {
+    Model model; 
+
+    auto building = model.getUniqueModelObject<Building>(); 
+    auto buildingClone = building.clone(model);
+
+    // Don't expect cloning into the same model to do anything.
+    // Just return the Building instance
+    EXPECT_EQ(building,buildingClone);
+  }
+
+  // Clone into a different model that already has a Building instance.
+  {
+    Model model;
+    Model library;
+
+    auto modelBuilding = model.getUniqueModelObject<Building>();
+    auto libraryBuilding = library.getUniqueModelObject<Building>();
+
+    Space space1(library);
+    Space space2(library);
+
+    BuildingStory story(library);
+    space1.setBuildingStory(story);
+    space2.setBuildingStory(story);
+
+    ThermalZone zone(library);
+
+    space1.setThermalZone(zone);
+    space2.setThermalZone(zone);
+
+    EXPECT_NE(modelBuilding,libraryBuilding);
+
+    // Expect that the original modelBuilding will be removed and replaced by a clone of the libraryBuilding
+    auto clone = libraryBuilding.clone(model);
+
+    EXPECT_TRUE(modelBuilding.handle().isNull());
+    EXPECT_NE(modelBuilding,clone);
+
+    EXPECT_EQ(1u,model.getModelObjects<Building>().size());
+    EXPECT_EQ(2u,model.getModelObjects<Space>().size());
+
+    auto zones = model.getModelObjects<ThermalZone>();
+
+    ASSERT_EQ(1u,zones.size());
+    EXPECT_EQ(2u,zones.front().spaces().size());
+
+    auto stories = model.getModelObjects<BuildingStory>();
+    ASSERT_EQ(1u,stories.size());
+    ASSERT_EQ(2u,stories.front().spaces().size());
+  }
+
+  // Clone into a different model that does not already have a Building instance.
+  {
+    Model model;
+    Model library;
+
+    auto libraryBuilding = library.getUniqueModelObject<Building>();
+
+    Space space1(library);
+    Space space2(library);
+
+    BuildingStory story(library);
+    space1.setBuildingStory(story);
+    space2.setBuildingStory(story);
+
+    ThermalZone zone(library);
+
+    space1.setThermalZone(zone);
+    space2.setThermalZone(zone);
+
+    EXPECT_EQ(1u,library.getModelObjects<Building>().size());
+    EXPECT_EQ(2u,library.getModelObjects<Space>().size());
+    EXPECT_EQ(1u,library.getModelObjects<ThermalZone>().size());
+    EXPECT_EQ(1u,library.getModelObjects<BuildingStory>().size());
+    EXPECT_EQ(2u,zone.spaces().size());
+
+    auto modelBuilding = libraryBuilding.clone(model).cast<Building>();
+
+    EXPECT_NE(libraryBuilding,modelBuilding);
+
+    EXPECT_EQ(1u,model.getModelObjects<Building>().size());
+    EXPECT_EQ(2u,model.getModelObjects<Space>().size());
+
+    auto zones = model.getModelObjects<ThermalZone>();
+
+    ASSERT_EQ(1u,zones.size());
+    EXPECT_EQ(2u,zones.front().spaces().size());
+
+    auto stories = model.getModelObjects<BuildingStory>();
+    ASSERT_EQ(1u,stories.size());
+    ASSERT_EQ(2u,stories.front().spaces().size());
+  }
+}
+

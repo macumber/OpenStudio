@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "OSCollapsibleItemList.hpp"
 #include "OSItem.hpp"
@@ -37,9 +46,9 @@ namespace openstudio {
 
 OSCollapsibleItemList::OSCollapsibleItemList(bool addScrollArea, QWidget * parent)
   : OSItemSelector(parent),
-  m_vLayout(NULL),
-  m_contentLayout(NULL),
-  m_selectedCollapsibleItem(NULL),
+  m_vLayout(nullptr),
+  m_contentLayout(nullptr),
+  m_selectedCollapsibleItem(nullptr),
   m_itemsDraggable(false),
   m_itemsRemoveable(false),
   m_showFilterLayout(false),
@@ -47,14 +56,14 @@ OSCollapsibleItemList::OSCollapsibleItemList(bool addScrollArea, QWidget * paren
 { 
   this->setObjectName("GrayWidget"); 
 
-  QVBoxLayout* outerVLayout = new QVBoxLayout();
+  auto outerVLayout = new QVBoxLayout();
   outerVLayout->setContentsMargins(0,0,0,0);
   this->setLayout(outerVLayout);
 
-  QWidget* outerWidget = new QWidget();
+  auto outerWidget = new QWidget();
 
   if (addScrollArea){
-    QScrollArea* scrollArea = new QScrollArea();
+    auto scrollArea = new QScrollArea();
     scrollArea->setFrameStyle(QFrame::NoFrame);
     scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
@@ -79,7 +88,7 @@ OSCollapsibleItem* OSCollapsibleItemList::selectedCollapsibleItem() const
 
 OSItem* OSCollapsibleItemList::selectedItem() const
 {
-  OSItem* result = NULL;
+  OSItem* result = nullptr;
   if (m_selectedCollapsibleItem){
     result = m_selectedCollapsibleItem->itemList()->selectedItem();
   }
@@ -161,26 +170,19 @@ void OSCollapsibleItemList::addCollapsibleItem(OSCollapsibleItem * collapsibleIt
 
   collapsibleItem->setStyleSheet(style);
 
-  connect(collapsibleItem, &OSCollapsibleItem::collapsableItemSelected,
-          this, &OSCollapsibleItemList::onCollapsableItemSelected);
+  connect(collapsibleItem, &OSCollapsibleItem::collapsableItemSelected, this, &OSCollapsibleItemList::onCollapsableItemSelected);
 
-  connect(collapsibleItem, &OSCollapsibleItem::itemSelected,
-          this, &OSCollapsibleItemList::onItemSelected);
+  connect(collapsibleItem, &OSCollapsibleItem::itemSelected, this, &OSCollapsibleItemList::onItemSelected);
 
-  connect(collapsibleItem, &OSCollapsibleItem::itemSelected,
-          this, &OSCollapsibleItemList::itemSelected);
+  connect(collapsibleItem, &OSCollapsibleItem::itemSelected, this, &OSCollapsibleItemList::itemSelected);
 
-  connect(collapsibleItem, &OSCollapsibleItem::itemReplacementDropped,
-          this, &OSCollapsibleItemList::itemReplacementDropped);
+  connect(collapsibleItem, &OSCollapsibleItem::itemReplacementDropped, this, &OSCollapsibleItemList::itemReplacementDropped);
 
-  connect(collapsibleItem, &OSCollapsibleItem::itemRemoveClicked,
-          this, &OSCollapsibleItemList::itemRemoveClicked);
+  connect(collapsibleItem, &OSCollapsibleItem::itemRemoveClicked, this, &OSCollapsibleItemList::itemRemoveClicked);
 
-  connect(collapsibleItem, &OSCollapsibleItem::selectionCleared,
-          this, &OSCollapsibleItemList::selectionCleared);
+  connect(collapsibleItem, &OSCollapsibleItem::selectionCleared, this, &OSCollapsibleItemList::selectionCleared);
 
-  connect(collapsibleItem, &OSCollapsibleItem::openLibDlgClicked,
-          this, &OSCollapsibleItemList::openLibDlgClicked);
+  connect(collapsibleItem, &OSCollapsibleItem::openLibDlgClicked, this, &OSCollapsibleItemList::openLibDlgClicked);
 
   if (!selectedItem()){
     collapsibleItem->itemList()->selectItem(collapsibleItem->itemList()->firstItem());
@@ -191,9 +193,9 @@ void OSCollapsibleItemList::addCollapsibleItem(OSCollapsibleItem * collapsibleIt
 
 void OSCollapsibleItemList::onCollapsableItemSelected(OSCollapsibleItem* selectedItem)
 {
-  QLayoutItem * layoutItem = NULL;
-  OSCollapsibleItem* collapsibleItem = NULL;
-  OSItem* newSelectedItem = NULL;
+  QLayoutItem * layoutItem = nullptr;
+  OSCollapsibleItem* collapsibleItem = nullptr;
+  OSItem* newSelectedItem = nullptr;
 
   for (int i = 0; i < m_vLayout->count(); ++i){
 
@@ -224,8 +226,8 @@ void OSCollapsibleItemList::onCollapsableItemSelected(OSCollapsibleItem* selecte
 
 void OSCollapsibleItemList::onItemSelected(OSItem* item)
 {
-  QLayoutItem * layoutItem = NULL;
-  OSCollapsibleItem* collapsibleItem = NULL;
+  QLayoutItem * layoutItem = nullptr;
+  OSCollapsibleItem* collapsibleItem = nullptr;
 
   for (int i = 0; i < m_vLayout->count(); ++i){
 

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "InspectorGadget.hpp"
 #include "InspectorDialog.hpp"
@@ -193,7 +202,7 @@ bool InspectorDialog::setSelectedObjectHandles(const std::vector<openstudio::Han
 
     QString handleString = m_tableWidget->item(i,0)->data(Qt::UserRole).toString();
     //std::string temp = toString(handleString);
-    Handle handle(handleString);
+    Handle handle(toUUID(handleString));
 
     auto it = std::find(m_selectedObjectHandles.begin(),
                         m_selectedObjectHandles.end(),
@@ -280,9 +289,6 @@ void InspectorDialog::setModel(openstudio::model::Model& model, bool force)
   if ((model == m_model) && !force){
     return;
   }
-
-  // disconnect all signals with previous model
-  disconnect(m_model.getImpl<openstudio::model::detail::Model_Impl>().get(), nullptr, this, nullptr);
 
   // change model
   m_model = model;
@@ -433,7 +439,7 @@ void InspectorDialog::onTableWidgetSelectionChanged()
   setSelectedObjectHandles(selectedObjectHandles, true);
 }
 
-void InspectorDialog::onAddWorkspaceObject(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl> impl)
+void InspectorDialog::onAddWorkspaceObject(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl> impl, const openstudio::IddObjectType& type, const openstudio::UUID& uuid)
 {
   m_workspaceObjectAdded = true;
   m_workspaceChanged = true;
@@ -483,7 +489,7 @@ void InspectorDialog::onTimeout()
   }
 }
 
-void InspectorDialog::onRemoveWorkspaceObject(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl> impl)
+void InspectorDialog::onRemoveWorkspaceObject(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl> impl, const openstudio::IddObjectType& type, const openstudio::UUID& uuid)
 {
   m_workspaceObjectRemoved = true;
   m_workspaceChanged = true;
@@ -531,7 +537,7 @@ void InspectorDialog::init(InspectorDialogClient client)
       break;
     case InspectorDialogClient::SketchUpPlugin:
 
-      openstudio::model::AccessPolicyStore::Instance().loadFile(sketchUpPluginPolicy);
+      openstudio::model::AccessPolicyStore::Instance().loadFile(sketchUpPluginPolicy.readAll());
 
       m_iddFile = IddFactory::instance().getIddFile(IddFileType::OpenStudio);
 
@@ -539,30 +545,30 @@ void InspectorDialog::init(InspectorDialogClient client)
 
       //m_typesToDisplay.insert(IddObjectType::OS_Version);
 
-      m_typesToDisplay.insert(IddObjectType::OS_ConvergenceLimits);
-      m_typesToDisplay.insert(IddObjectType::OS_HeatBalanceAlgorithm);
-      m_typesToDisplay.insert(IddObjectType::OS_RunPeriod);
-      m_typesToDisplay.insert(IddObjectType::OS_RunPeriodControl_DaylightSavingTime);
+      //m_typesToDisplay.insert(IddObjectType::OS_ConvergenceLimits);
+      //m_typesToDisplay.insert(IddObjectType::OS_HeatBalanceAlgorithm);
+      //m_typesToDisplay.insert(IddObjectType::OS_RunPeriod);
+      //m_typesToDisplay.insert(IddObjectType::OS_RunPeriodControl_DaylightSavingTime);
       //m_typesToDisplay.insert(IddObjectType::OS_RunPeriodControl_SpecialDays);
-      m_typesToDisplay.insert(IddObjectType::OS_ShadowCalculation);
-      m_typesToDisplay.insert(IddObjectType::OS_SimulationControl);
-      m_typesToDisplay.insert(IddObjectType::OS_Sizing_Parameters);
-      m_typesToDisplay.insert(IddObjectType::OS_SurfaceConvectionAlgorithm_Inside);
-      m_typesToDisplay.insert(IddObjectType::OS_SurfaceConvectionAlgorithm_Outside);
-      m_typesToDisplay.insert(IddObjectType::OS_Timestep);
-      m_typesToDisplay.insert(IddObjectType::OS_ZoneAirContaminantBalance);
-      m_typesToDisplay.insert(IddObjectType::OS_ZoneAirHeatBalanceAlgorithm);
-      m_typesToDisplay.insert(IddObjectType::OS_ZoneCapacitanceMultiplier_ResearchSpecial);
+      //m_typesToDisplay.insert(IddObjectType::OS_ShadowCalculation);
+      //m_typesToDisplay.insert(IddObjectType::OS_SimulationControl);
+      //m_typesToDisplay.insert(IddObjectType::OS_Sizing_Parameters);
+      //m_typesToDisplay.insert(IddObjectType::OS_SurfaceConvectionAlgorithm_Inside);
+      //m_typesToDisplay.insert(IddObjectType::OS_SurfaceConvectionAlgorithm_Outside);
+      //m_typesToDisplay.insert(IddObjectType::OS_Timestep);
+      //m_typesToDisplay.insert(IddObjectType::OS_ZoneAirContaminantBalance);
+      //m_typesToDisplay.insert(IddObjectType::OS_ZoneAirHeatBalanceAlgorithm);
+      //m_typesToDisplay.insert(IddObjectType::OS_ZoneCapacitanceMultiplier_ResearchSpecial);
 
-      m_typesToDisplay.insert(IddObjectType::OS_Site);
-      m_typesToDisplay.insert(IddObjectType::OS_Site_GroundReflectance);
-      m_typesToDisplay.insert(IddObjectType::OS_Site_GroundTemperature_BuildingSurface);
-      m_typesToDisplay.insert(IddObjectType::OS_Site_WaterMainsTemperature);
-      m_typesToDisplay.insert(IddObjectType::OS_SizingPeriod_DesignDay);
-      m_typesToDisplay.insert(IddObjectType::OS_SizingPeriod_WeatherFileConditionType);
-      m_typesToDisplay.insert(IddObjectType::OS_SizingPeriod_WeatherFileDays);
-      m_typesToDisplay.insert(IddObjectType::OS_WeatherFile);
-      m_typesToDisplay.insert(IddObjectType::OS_WeatherProperty_SkyTemperature);
+      //m_typesToDisplay.insert(IddObjectType::OS_Site);
+      //m_typesToDisplay.insert(IddObjectType::OS_Site_GroundReflectance);
+      //m_typesToDisplay.insert(IddObjectType::OS_Site_GroundTemperature_BuildingSurface);
+      //m_typesToDisplay.insert(IddObjectType::OS_Site_WaterMainsTemperature);
+      //m_typesToDisplay.insert(IddObjectType::OS_SizingPeriod_DesignDay);
+      //m_typesToDisplay.insert(IddObjectType::OS_SizingPeriod_WeatherFileConditionType);
+      //m_typesToDisplay.insert(IddObjectType::OS_SizingPeriod_WeatherFileDays);
+      //m_typesToDisplay.insert(IddObjectType::OS_WeatherFile);
+      //m_typesToDisplay.insert(IddObjectType::OS_WeatherProperty_SkyTemperature);
 
       m_typesToDisplay.insert(IddObjectType::OS_BuildingStory);
       m_typesToDisplay.insert(IddObjectType::OS_DefaultConstructionSet);
@@ -570,50 +576,52 @@ void InspectorDialog::init(InspectorDialogClient client)
       m_typesToDisplay.insert(IddObjectType::OS_DefaultSurfaceConstructions);
       m_typesToDisplay.insert(IddObjectType::OS_DefaultSubSurfaceConstructions);
       m_typesToDisplay.insert(IddObjectType::OS_Rendering_Color);
-      m_typesToDisplay.insert(IddObjectType::OS_DesignSpecification_OutdoorAir);
+      //m_typesToDisplay.insert(IddObjectType::OS_DesignSpecification_OutdoorAir);
       m_typesToDisplay.insert(IddObjectType::OS_SpaceType);
       m_typesToDisplay.insert(IddObjectType::OS_ShadingControl);
+      m_typesToDisplay.insert(IddObjectType::OS_WindowProperty_FrameAndDivider);
 
-      m_typesToDisplay.insert(IddObjectType::OS_Material);
-      m_typesToDisplay.insert(IddObjectType::OS_Material_AirGap);
-      m_typesToDisplay.insert(IddObjectType::OS_Material_AirWall);
-      m_typesToDisplay.insert(IddObjectType::OS_Material_InfraredTransparent);
-      m_typesToDisplay.insert(IddObjectType::OS_Material_NoMass);
-      m_typesToDisplay.insert(IddObjectType::OS_Material_RoofVegetation);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Blind);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Gas);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_GasMixture);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Glazing);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_GlazingGroup_Thermochromic);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Glazing_RefractionExtinctionMethod);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Screen);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Shade);
-      m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_SimpleGlazingSystem);
+      //m_typesToDisplay.insert(IddObjectType::OS_Material);
+      //m_typesToDisplay.insert(IddObjectType::OS_Material_AirGap);
+      //m_typesToDisplay.insert(IddObjectType::OS_Material_AirWall);
+      //m_typesToDisplay.insert(IddObjectType::OS_Material_InfraredTransparent);
+      //m_typesToDisplay.insert(IddObjectType::OS_Material_NoMass);
+      //m_typesToDisplay.insert(IddObjectType::OS_Material_RoofVegetation);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Blind);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_DaylightRedirectionDevice);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Gas);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_GasMixture);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Glazing);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_GlazingGroup_Thermochromic);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Glazing_RefractionExtinctionMethod);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Screen);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_Shade);
+      //m_typesToDisplay.insert(IddObjectType::OS_WindowMaterial_SimpleGlazingSystem);
+      
+      //m_typesToDisplay.insert(IddObjectType::OS_Construction);
+      //m_typesToDisplay.insert(IddObjectType::OS_Construction_CfactorUndergroundWall);
+      //m_typesToDisplay.insert(IddObjectType::OS_Construction_FfactorGroundFloor);
+      //m_typesToDisplay.insert(IddObjectType::OS_Construction_InternalSource);
+      //m_typesToDisplay.insert(IddObjectType::OS_Construction_WindowDataFile);
+      //m_typesToDisplay.insert(IddObjectType::OS_Construction_InternalSource);
 
-      m_typesToDisplay.insert(IddObjectType::OS_Construction);
-      m_typesToDisplay.insert(IddObjectType::OS_Construction_CfactorUndergroundWall);
-      m_typesToDisplay.insert(IddObjectType::OS_Construction_FfactorGroundFloor);
-      m_typesToDisplay.insert(IddObjectType::OS_Construction_InternalSource);
-      m_typesToDisplay.insert(IddObjectType::OS_Construction_WindowDataFile);
-      m_typesToDisplay.insert(IddObjectType::OS_Construction_InternalSource);
+      //m_typesToDisplay.insert(IddObjectType::OS_Schedule_Compact);
+      //m_typesToDisplay.insert(IddObjectType::OS_Schedule_Day);
+      //m_typesToDisplay.insert(IddObjectType::OS_Schedule_Week);
+      //m_typesToDisplay.insert(IddObjectType::OS_Schedule_Year);
+      //m_typesToDisplay.insert(IddObjectType::OS_Schedule_FixedInterval);
+      //m_typesToDisplay.insert(IddObjectType::OS_Schedule_VariableInterval);
+      //m_typesToDisplay.insert(IddObjectType::OS_ScheduleTypeLimits);
 
-      m_typesToDisplay.insert(IddObjectType::OS_Schedule_Compact);
-      m_typesToDisplay.insert(IddObjectType::OS_Schedule_Day);
-      m_typesToDisplay.insert(IddObjectType::OS_Schedule_Week);
-      m_typesToDisplay.insert(IddObjectType::OS_Schedule_Year);
-      m_typesToDisplay.insert(IddObjectType::OS_Schedule_FixedInterval);
-      m_typesToDisplay.insert(IddObjectType::OS_Schedule_VariableInterval);
-      m_typesToDisplay.insert(IddObjectType::OS_ScheduleTypeLimits);
-
-      m_typesToDisplay.insert(IddObjectType::OS_ElectricEquipment_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_GasEquipment_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_HotWaterEquipment_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_SteamEquipment_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_OtherEquipment_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_Lights_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_Luminaire_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_People_Definition);
-      m_typesToDisplay.insert(IddObjectType::OS_InternalMass_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_ElectricEquipment_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_GasEquipment_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_HotWaterEquipment_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_SteamEquipment_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_OtherEquipment_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_Lights_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_Luminaire_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_People_Definition);
+      //m_typesToDisplay.insert(IddObjectType::OS_InternalMass_Definition);
 
       m_typesToDisplay.insert(IddObjectType::OS_Building);
       //m_typesToDisplay.insert(IddObjectType::OS_DaylightingDevice_Shelf);
@@ -626,17 +634,17 @@ void InspectorDialog::init(InspectorDialogClient client)
       m_typesToDisplay.insert(IddObjectType::OS_Surface);
       m_typesToDisplay.insert(IddObjectType::OS_SubSurface);
 
-      m_typesToDisplay.insert(IddObjectType::OS_ElectricEquipment);
-      m_typesToDisplay.insert(IddObjectType::OS_GasEquipment);
-      m_typesToDisplay.insert(IddObjectType::OS_HotWaterEquipment);
-      m_typesToDisplay.insert(IddObjectType::OS_SteamEquipment);
-      m_typesToDisplay.insert(IddObjectType::OS_OtherEquipment);
-      m_typesToDisplay.insert(IddObjectType::OS_Lights);
-      m_typesToDisplay.insert(IddObjectType::OS_Luminaire);
-      m_typesToDisplay.insert(IddObjectType::OS_People);
-      m_typesToDisplay.insert(IddObjectType::OS_SpaceInfiltration_DesignFlowRate);
-      m_typesToDisplay.insert(IddObjectType::OS_SpaceInfiltration_EffectiveLeakageArea);
-      m_typesToDisplay.insert(IddObjectType::OS_InternalMass);
+      //m_typesToDisplay.insert(IddObjectType::OS_ElectricEquipment);
+      //m_typesToDisplay.insert(IddObjectType::OS_GasEquipment);
+      //m_typesToDisplay.insert(IddObjectType::OS_HotWaterEquipment);
+      //m_typesToDisplay.insert(IddObjectType::OS_SteamEquipment);
+      //m_typesToDisplay.insert(IddObjectType::OS_OtherEquipment);
+      //m_typesToDisplay.insert(IddObjectType::OS_Lights);
+      //m_typesToDisplay.insert(IddObjectType::OS_Luminaire);
+      //m_typesToDisplay.insert(IddObjectType::OS_People);
+      //m_typesToDisplay.insert(IddObjectType::OS_SpaceInfiltration_DesignFlowRate);
+      //m_typesToDisplay.insert(IddObjectType::OS_SpaceInfiltration_EffectiveLeakageArea);
+      //m_typesToDisplay.insert(IddObjectType::OS_InternalMass);
 
       m_typesToDisplay.insert(IddObjectType::OS_Daylighting_Control);
       m_typesToDisplay.insert(IddObjectType::OS_IlluminanceMap);
@@ -646,10 +654,10 @@ void InspectorDialog::init(InspectorDialogClient client)
       //m_typesToDisplay.insert(IddObjectType::OS_LightingSimulationZone);
 
       m_typesToDisplay.insert(IddObjectType::OS_ThermalZone);
-      m_typesToDisplay.insert(IddObjectType::OS_ThermostatSetpoint_DualSetpoint);
+      //m_typesToDisplay.insert(IddObjectType::OS_ThermostatSetpoint_DualSetpoint);
 
-      m_typesToDisplay.insert(IddObjectType::OS_Meter);
-      m_typesToDisplay.insert(IddObjectType::OS_Output_Variable);
+      //m_typesToDisplay.insert(IddObjectType::OS_Meter);
+      //m_typesToDisplay.insert(IddObjectType::OS_Output_Variable);
 
       // DISABLE ADD
       
@@ -668,7 +676,8 @@ void InspectorDialog::init(InspectorDialogClient client)
       m_disableAddTypes.insert(IddObjectType::OS_IlluminanceMap);
       m_disableAddTypes.insert(IddObjectType::OS_Luminaire);
       m_disableAddTypes.insert(IddObjectType::OS_Glare_Sensor);
-      
+      m_disableAddTypes.insert(IddObjectType::OS_ThermalZone);
+
       // DISABLE COPY
 
       m_disableCopyTypes.insert(IddObjectType::OS_RunPeriod);
@@ -685,7 +694,8 @@ void InspectorDialog::init(InspectorDialogClient client)
       m_disableCopyTypes.insert(IddObjectType::OS_IlluminanceMap);
       m_disableCopyTypes.insert(IddObjectType::OS_Luminaire);
       m_disableCopyTypes.insert(IddObjectType::OS_Glare_Sensor);
-      
+      m_disableCopyTypes.insert(IddObjectType::OS_ThermalZone);
+
       // DISABLE REMOVE
 
       m_disableRemoveTypes.insert(IddObjectType::OS_RunPeriod);
@@ -703,7 +713,8 @@ void InspectorDialog::init(InspectorDialogClient client)
       m_disableRemoveTypes.insert(IddObjectType::OS_IlluminanceMap);
       m_disableRemoveTypes.insert(IddObjectType::OS_Luminaire);
       m_disableRemoveTypes.insert(IddObjectType::OS_Glare_Sensor);
-      
+      //m_disableRemoveTypes.insert(IddObjectType::OS_ThermalZone); // DLM: continue to allow this for now
+
       // DISABLE PURGE
 
       //m_disablePurgeTypes.insert(IddObjectType::OS_RunPeriod);
@@ -937,17 +948,11 @@ void InspectorDialog::connectSelfSignalsAndSlots()
 
 void InspectorDialog::connectModelSignalsAndSlots()
 {
-  connect(m_model.getImpl<model::detail::Model_Impl>().get(),
-    static_cast<void (model::detail::Model_Impl::*)(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const IddObjectType &, const UUID &) const>(&model::detail::Model_Impl::addWorkspaceObject),
-    this,
-    &InspectorDialog::onAddWorkspaceObject);
+  m_model.getImpl<model::detail::Model_Impl>().get()->addWorkspaceObjectPtr.connect<InspectorDialog, &InspectorDialog::onAddWorkspaceObject>(this);
 
-  connect(m_model.getImpl<model::detail::Model_Impl>().get(), &model::detail::Model_Impl::onChange, this, &InspectorDialog::onWorkspaceChange);
+  m_model.getImpl<model::detail::Model_Impl>().get()->onChange.connect<InspectorDialog, &InspectorDialog::onWorkspaceChange>(this);
 
-  connect(m_model.getImpl<model::detail::Model_Impl>().get(),
-    static_cast<void (model::detail::Model_Impl::*)(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const IddObjectType &, const UUID &) const>(&model::detail::Model_Impl::removeWorkspaceObject),
-    this,
-    &InspectorDialog::onRemoveWorkspaceObject);
+  m_model.getImpl<model::detail::Model_Impl>().get()->removeWorkspaceObjectPtr.connect<InspectorDialog, &InspectorDialog::onRemoveWorkspaceObject>(this);
 }
 
 void InspectorDialog::hideSelectionWidget(bool hideSelectionWidget)
@@ -1112,7 +1117,7 @@ void InspectorDialog::loadTableWidgetData()
 
     auto tableItem = new QTableWidgetItem(displayName);
     tableItem->setFlags(Qt::NoItemFlags | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-    QString handleString(object.handle().toString());
+    QString handleString(toQString(object.handle()));
     //std::string temp = toString(handleString);
     tableItem->setData(Qt::UserRole, handleString);
     m_tableWidget->setItem(i,j++,tableItem);
@@ -1146,7 +1151,7 @@ void InspectorDialog::getTableWidgetSelected(std::vector<openstudio::Handle>& se
     if (column == 0){
       QString handleString = selectedItems.at(i)->data(Qt::UserRole).toString();
       //std::string temp = toString(handleString);
-      selectedHandles.push_back(Handle(handleString));
+      selectedHandles.push_back(Handle(toUUID(handleString)));
     }
   }
 

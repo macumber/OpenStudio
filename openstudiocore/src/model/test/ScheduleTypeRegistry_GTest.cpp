@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -24,6 +33,7 @@
 #include "../Model.hpp"
 #include "../ScheduleConstant.hpp"
 #include "../ScheduleTypeLimits.hpp"
+#include "../ScheduleTypeLimits_Impl.hpp"
 #include "../LightsDefinition.hpp"
 #include "../Lights.hpp"
 
@@ -112,3 +122,89 @@ TEST_F(ModelFixture, ScheduleTypeRegistry_UseInSetSchedule) {
   EXPECT_DOUBLE_EQ(1.0,lightsLimits.upperLimitValue().get());
 }
 
+TEST_F(ModelFixture, ScheduleTypeRegistry_GetOrCreateScheduleTypeLimits) {
+  {
+    Model model;
+
+    ScheduleType scheduleType = ScheduleTypeRegistry::instance().getScheduleType("People", "Activity Level");
+
+    ASSERT_TRUE(scheduleType.lowerLimitValue);
+    EXPECT_EQ(0.0, scheduleType.lowerLimitValue.get());
+    EXPECT_FALSE(scheduleType.upperLimitValue);
+
+    ScheduleTypeLimits limits = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+    ScheduleTypeLimits limits2 = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+
+    EXPECT_EQ(limits.handle(), limits2.handle());
+
+    EXPECT_TRUE(isCompatible(scheduleType, limits));
+  }
+
+  {
+    Model model;
+
+    ScheduleType scheduleType = ScheduleTypeRegistry::instance().getScheduleType("RefrigerationCase", "Refrigerated Case Restocking");
+
+    ASSERT_TRUE(scheduleType.lowerLimitValue);
+    EXPECT_EQ(0.0, scheduleType.lowerLimitValue.get());
+    EXPECT_FALSE(scheduleType.upperLimitValue);
+
+    ScheduleTypeLimits limits = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+    ScheduleTypeLimits limits2 = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+
+    EXPECT_EQ(limits.handle(), limits2.handle());
+
+    EXPECT_TRUE(isCompatible(scheduleType, limits));
+  }
+
+  {
+    Model model;
+
+    ScheduleType scheduleType = ScheduleTypeRegistry::instance().getScheduleType("ThermostatSetpointDualSetpoint", "Heating Setpoint Temperature");
+    
+    EXPECT_FALSE(scheduleType.lowerLimitValue);
+    EXPECT_FALSE(scheduleType.upperLimitValue);
+
+    ScheduleTypeLimits limits = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+    ScheduleTypeLimits limits2 = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+
+    EXPECT_EQ(limits.handle(), limits2.handle());
+    EXPECT_EQ("Temperature", limits.name().get());
+
+    EXPECT_TRUE(isCompatible(scheduleType, limits));
+
+    ASSERT_EQ(1u, model.getConcreteModelObjectsByName<ScheduleTypeLimits>("Temperature").size());
+    EXPECT_EQ("Temperature", model.getConcreteModelObjectsByName<ScheduleTypeLimits>("Temperature")[0].name().get());
+
+    ModelObject scheduleType2 = limits.clone();
+    EXPECT_EQ("Temperature 1", scheduleType2.name().get());
+
+    EXPECT_EQ(2u, model.getConcreteModelObjectsByName<ScheduleTypeLimits>("Temperature").size());
+
+    limits.remove();
+
+    ASSERT_EQ(1u, model.getConcreteModelObjectsByName<ScheduleTypeLimits>("Temperature").size());
+    EXPECT_EQ("Temperature 1", model.getConcreteModelObjectsByName<ScheduleTypeLimits>("Temperature 1")[0].name().get());
+
+    limits = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+    EXPECT_EQ(limits.handle(), scheduleType2.handle());
+    EXPECT_EQ("Temperature 1", limits.name().get());
+  }
+
+  {
+    Model model;
+    for (auto className : ScheduleTypeRegistry::instance().classNames()){
+      for (auto scheduleType : ScheduleTypeRegistry::instance().getScheduleTypesByClassName(className)){
+        ScheduleTypeLimits limits = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+        ScheduleTypeLimits limits2 = ScheduleTypeRegistry::instance().getOrCreateScheduleTypeLimits(scheduleType, model);
+
+        EXPECT_EQ(limits.handle(), limits2.handle());
+
+        EXPECT_EQ(ScheduleTypeLimits::units(scheduleType.unitType, false), ScheduleTypeLimits::units(limits.unitType(), false));
+
+        EXPECT_TRUE(isCompatible(scheduleType, limits));
+      }
+    }
+  }
+
+}

@@ -1,28 +1,40 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "LibraryTabWidget.hpp"
-#include <QStackedWidget>
+
+#include <QBoxLayout>
 #include <QPixmap>
-#include <QHBoxLayout>
-#include <QVBoxLayout>
 #include <QPushButton>
+#include <QStackedWidget>
+
+#include "../utilities/core/Assert.hpp"
+
 #include <vector>
 
 namespace openstudio {
@@ -30,7 +42,7 @@ namespace openstudio {
 LibraryTabWidget::LibraryTabWidget(QWidget * parent)
   : QWidget(parent)
 {
-  QVBoxLayout * mainLayout = new QVBoxLayout();
+  auto mainLayout = new QVBoxLayout();
 
   mainLayout->setSpacing(0);
 
@@ -44,7 +56,33 @@ LibraryTabWidget::LibraryTabWidget(QWidget * parent)
 
   m_tabBar->setObjectName("VBlueGradientWidget");
 
-  m_tabBar->setContentsMargins(0,0,0,0);
+  m_tabBar->setContentsMargins(0,0,5,0);
+
+  m_removeButton = new QPushButton(this);
+
+  QString str;
+  str.append("QWidget { ");
+  str.append("border: none;");
+  str.append(" background-image: url(\":/images/delete.png\")");
+  str.append("}");
+
+  m_removeButton->setFlat(true);
+  m_removeButton->setStyleSheet(str);
+  m_removeButton->setFixedSize(20, 20);
+  m_removeButton->setToolTip("Remove object");
+
+  // Default to hide
+  m_removeButton->hide();
+
+  auto isConnected = connect(m_removeButton, SIGNAL(clicked(bool)), this, SIGNAL(removeButtonClicked(bool)));
+  OS_ASSERT(isConnected);
+ 
+  auto hLayout = new QHBoxLayout();
+  hLayout->setContentsMargins(0, 0, 0, 0);
+  hLayout->addStretch();
+  hLayout->addWidget(m_removeButton, 0, Qt::AlignVCenter);
+
+  m_tabBar->setLayout(hLayout);
 
   layout()->addWidget(m_tabBar);
 
@@ -57,12 +95,21 @@ LibraryTabWidget::LibraryTabWidget(QWidget * parent)
   layout()->addWidget(m_pageStack);
 }
 
+void LibraryTabWidget::showRemoveButton()
+{
+  m_removeButton->show();
+}
+
+void LibraryTabWidget::hideRemoveButton()
+{
+  m_removeButton->hide();
+}
 
 void LibraryTabWidget::addTab( QWidget * widget,
                         const QString & selectedImagePath,
                         const QString & unSelectedImagePath )
 {
-  QPushButton * button = new QPushButton(m_tabBar);
+  auto button = new QPushButton(m_tabBar);
 
   button->setFixedSize(QSize(29,29));
 
@@ -85,7 +132,7 @@ void LibraryTabWidget::select()
 
   int index = 0;
 
-  for( std::vector<QPushButton*>::iterator  it = m_tabButtons.begin();
+  for( auto it = m_tabButtons.begin();
        it < m_tabButtons.end();
        ++it )
   {

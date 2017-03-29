@@ -1,4 +1,7 @@
 .idea
+.ruby-version
+.bundle
+test_fails.txt
 /build/
 /build_debug/
 /build-debug/
@@ -8,3 +11,11 @@
 /build-64/
 /build_profile/
 /build-profile/
+/core-build/
+/super-build/
+
+*.sublime-workspace
+
+*.sublime-project
+cmake-build-debug
+

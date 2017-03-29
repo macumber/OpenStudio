@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -30,6 +39,7 @@
 #include "../IdfExtensibleGroup.hpp"
 #include "../WorkspaceExtensibleGroup.hpp"
 
+#include "../../idd/IddEnums.hpp"
 #include <utilities/idd/IddEnums.hxx>
 #include <utilities/idd/IddFactory.hxx>
 #include <utilities/idd/Building_FieldEnums.hxx>
@@ -42,8 +52,8 @@
 #include <utilities/idd/Wall_Adiabatic_FieldEnums.hxx>
 #include <utilities/idd/Window_FieldEnums.hxx>
 #include <utilities/idd/BuildingSurface_Detailed_FieldEnums.hxx>
-#include <utilities/idd/OS_TimeDependentValuation_FieldEnums.hxx>
 #include <utilities/idd/Sizing_Zone_FieldEnums.hxx>
+#include <utilities/idd/OS_WeatherFile_FieldEnums.hxx>
 #include "../WorkspaceWatcher.hpp"
 #include "IdfTestQObjects.hpp"
 
@@ -58,8 +68,8 @@
 
 #include <resources.hxx>
 
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem.hpp>
+
+
 
 using namespace openstudio;
 
@@ -81,7 +91,7 @@ TEST_F(IdfFixture, IdfFile_Workspace_Roundtrip)
   IdfFile copyOfIdfFile = workspace.toIdfFile();
   // until == available, print out for diff
   openstudio::path outPath = outDir/toPath("passedThroughWorkspace.idf");
-  boost::filesystem::ofstream outFile(outPath); ASSERT_TRUE(outFile?true:false);
+  openstudio::filesystem::ofstream outFile(outPath); ASSERT_TRUE(outFile?true:false);
   copyOfIdfFile.print(outFile); outFile.close();
 }
 
@@ -1170,6 +1180,12 @@ TEST_F(IdfFixture,Workspace_ComplexNames) {
   oObject = ws.addObject(IdfObject(IddObjectType::Zone));
   ASSERT_TRUE(oObject);
   zone = *oObject;
+  EXPECT_TRUE(zone.setName("My (!@#$^&*()least)(*&^$#@!) favorite zone 1"));
+  EXPECT_EQ("My (!@#$^&*()least)(*&^$#@!) favorite zone 2", zone.name().get());
+
+  oObject = ws.addObject(IdfObject(IddObjectType::Zone));
+  ASSERT_TRUE(oObject);
+  zone = *oObject;
   EXPECT_TRUE(zone.setName("My (!@#$^&*()least)(*&^$#@!) favorite zone            "));
   EXPECT_EQ("My (!@#$^&*()least)(*&^$#@!) favorite zone            ",zone.name().get());
 
@@ -1178,6 +1194,12 @@ TEST_F(IdfFixture,Workspace_ComplexNames) {
   zone = *oObject;
   EXPECT_TRUE(zone.setName("My (!@#$^&*()least)(*&^$#@!) favorite zone            "));
   EXPECT_EQ("My (!@#$^&*()least)(*&^$#@!) favorite zone             1",zone.name().get());
+
+  oObject = ws.addObject(IdfObject(IddObjectType::Zone));
+  ASSERT_TRUE(oObject);
+  zone = *oObject;
+  EXPECT_TRUE(zone.setName("My (!@#$^&*()least)(*&^$#@!) favorite zone             1"));
+  EXPECT_EQ("My (!@#$^&*()least)(*&^$#@!) favorite zone             2", zone.name().get());
 
   oObject = ws.addObject(IdfObject(IddObjectType::Zone));
   ASSERT_TRUE(oObject);
@@ -1227,8 +1249,47 @@ TEST_F(IdfFixture,Workspace_ComplexNames) {
   EXPECT_TRUE(zone.setName("My (!@#$^&*()least)(*&^$#@!) favorite zone "));
   EXPECT_EQ("My (!@#$^&*()least)(*&^$#@!) favorite zone  1",zone.name().get());
 
-  EXPECT_EQ(static_cast<unsigned>(15),ws.numObjectsOfType(IddObjectType::Zone));
+  EXPECT_EQ(static_cast<unsigned>(17),ws.numObjectsOfType(IddObjectType::Zone));
 }
+
+TEST_F(IdfFixture, Workspace_SpecialNames) {
+  Workspace ws(StrictnessLevel::Draft, IddFileType::EnergyPlus);
+
+  OptionalWorkspaceObject oObject = ws.addObject(IdfObject(IddObjectType::Zone));
+  ASSERT_TRUE(oObject);
+  WorkspaceObject zone = *oObject;
+  EXPECT_TRUE(zone.setName("Office, Hallway, and Other Zone"));
+  EXPECT_EQ("Office, Hallway, and Other Zone", zone.name().get());
+
+  oObject = ws.addObject(IdfObject(IddObjectType::Lights));
+  ASSERT_TRUE(oObject);
+  WorkspaceObject lights1 = *oObject;
+  EXPECT_TRUE(lights1.setName("Office, Hallway, and Other Lights"));
+  EXPECT_EQ("Office, Hallway, and Other Lights", lights1.name().get());
+
+  oObject = ws.addObject(IdfObject(IddObjectType::Lights));
+  ASSERT_TRUE(oObject);
+  WorkspaceObject lights2 = *oObject;
+  EXPECT_TRUE(lights2.setName("Office, Hallway, and Other Lights"));
+  EXPECT_EQ("Office, Hallway, and Other Lights 1", lights2.name().get());
+
+  bool exactMatch = true;
+  std::vector<WorkspaceObject> objects = ws.getObjectsByName("Office, Hallway, and Other Lights", exactMatch);
+  ASSERT_EQ(1u, objects.size());
+  EXPECT_EQ(lights1.handle(), objects[0].handle());
+
+  exactMatch = false;
+  objects = ws.getObjectsByName("Office, Hallway, and Other Lights", exactMatch);
+  ASSERT_EQ(2u, objects.size());
+
+  EXPECT_TRUE(lights1.setString(LightsFields::ZoneorZoneListName, "Office, Hallway, and Other Zone"));
+  ASSERT_TRUE(lights1.getTarget(LightsFields::ZoneorZoneListName));
+  EXPECT_EQ(zone.handle(), lights1.getTarget(LightsFields::ZoneorZoneListName).get().handle());
+
+  EXPECT_TRUE(lights2.setString(LightsFields::ZoneorZoneListName, "Office, Hallway, and Other Zone"));
+  ASSERT_TRUE(lights2.getTarget(LightsFields::ZoneorZoneListName));
+  EXPECT_EQ(zone.handle(), lights2.getTarget(LightsFields::ZoneorZoneListName).get().handle());
+} 
 
 TEST_F(IdfFixture,Workspace_AvoidingNameClashes_IdfObject) {
   // create workspace with one object
@@ -1409,80 +1470,82 @@ TEST_F(IdfFixture,Workspace_AddAndInsertWorkspaceObjects) {
 }
 
 TEST_F(IdfFixture,Workspace_LocateURLs) {
+  // DLM: replace with OS_WeatherFileFields
+
   // create workspace with single TDV object in it
   Workspace ws;
-  OptionalWorkspaceObject owo = ws.addObject(IdfObject(IddObjectType::OS_TimeDependentValuation));
+  OptionalWorkspaceObject owo = ws.addObject(IdfObject(IddObjectType::OS_WeatherFile));
   ASSERT_TRUE(owo);
-  WorkspaceObject tdv = *owo;
+  WorkspaceObject epw = *owo;
 
   // set the url to be the absolute path on disk (to resources in build directory)
-  openstudio::path absoluteTdvFilePath = resourcesPath()/toPath("utilities/Filetypes/TDV_2008_kBtu_CZ13.csv");
-  EXPECT_TRUE(tdv.setString(OS_TimeDependentValuationFields::Url,toString(absoluteTdvFilePath)));
+  openstudio::path absoluteEpwFilePath = resourcesPath()/toPath("utilities/Filetypes/USA_CO_Golden-NREL.724666_TMY3.epw");
+  EXPECT_TRUE(epw.setString(OS_WeatherFileFields::Url, toString(absoluteEpwFilePath)));
   // check that setter worked as expected, and demonstrate getting field back out
-  ASSERT_TRUE(tdv.getString(OS_TimeDependentValuationFields::Url));
-  EXPECT_EQ(toString(absoluteTdvFilePath),tdv.getString(OS_TimeDependentValuationFields::Url).get());
+  ASSERT_TRUE(epw.getString(OS_WeatherFileFields::Url));
+  EXPECT_EQ(toString(absoluteEpwFilePath), epw.getString(OS_WeatherFileFields::Url).get());
 
   // test making path relative
   //
   std::vector<std::pair<QUrl, openstudio::path> > located = ws.locateUrls(std::vector<URLSearchPath>(), true, openstudio::path());
 
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(), "file:TDV_2008_kBtu_CZ13.csv");
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(), "file:USA_CO_Golden-NREL.724666_TMY3.epw");
   ASSERT_EQ(located.size(), 1u);
   std::string a = located[0].first.toString().toStdString();
-  std::string b = QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)).toString().toStdString();
-  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)));
-  EXPECT_EQ(located[0].second, openstudio::toPath("TDV_2008_kBtu_CZ13.csv"));
+  std::string b = QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)).toString().toStdString();
+  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)));
+  EXPECT_EQ(located[0].second, openstudio::toPath("USA_CO_Golden-NREL.724666_TMY3.epw"));
 
 
   // test making path absolute again, by searching with an absolute search path
   std::vector<URLSearchPath> searchpaths;
-  searchpaths.push_back(URLSearchPath(QUrl::fromLocalFile(toQString(absoluteTdvFilePath.parent_path()))));
+  searchpaths.push_back(URLSearchPath(QUrl::fromLocalFile(toQString(absoluteEpwFilePath.parent_path()))));
   located = ws.locateUrls(searchpaths, false, openstudio::path());
 
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(),
-      toString(QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)).toString()));
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(),
+            toString(QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)).toString()));
   ASSERT_EQ(located.size(), 1u);
-  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)));
-  EXPECT_EQ(located[0].second, absoluteTdvFilePath);
+  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)));
+  EXPECT_EQ(located[0].second, absoluteEpwFilePath);
 
   // Make the path relative again
   ws.locateUrls(std::vector<URLSearchPath>(), true, openstudio::path());
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(), "file:TDV_2008_kBtu_CZ13.csv");
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(), "file:USA_CO_Golden-NREL.724666_TMY3.epw");
 
   // test making path absolute again, this time, let's find it relative to a made-up location of the osm
   searchpaths.clear();
   searchpaths.push_back(URLSearchPath(QUrl::fromLocalFile("utilities/Filetypes/"), URLSearchPath::ToInputFile));
   located = ws.locateUrls(searchpaths, false, resourcesPath() / toPath("madeuposm.osm")); // give the search algo a relative place to start from
 
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(),
-      toString(QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)).toString()));
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(),
+            toString(QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)).toString()));
   ASSERT_EQ(located.size(), 1u);
-  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)));
-  EXPECT_EQ(located[0].second, absoluteTdvFilePath);
+  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)));
+  EXPECT_EQ(located[0].second, absoluteEpwFilePath);
 
   // Make the path relative again
   ws.locateUrls(std::vector<URLSearchPath>(), true, openstudio::path());
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(), "file:TDV_2008_kBtu_CZ13.csv");
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(), "file:USA_CO_Golden-NREL.724666_TMY3.epw");
 
   // This time we want to fail, by providing it with a search that should work, but we give it the wrong object type
   searchpaths.clear();
   searchpaths.push_back(URLSearchPath(QUrl::fromLocalFile("utilities/Filetypes"), URLSearchPath::ToInputFile,
         IddObjectType::OS_Version));
   located = ws.locateUrls(searchpaths, false, resourcesPath() / toPath("madeuposm.osm")); // give the search algo a relative place to start from
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(), "file:TDV_2008_kBtu_CZ13.csv");
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(), "file:USA_CO_Golden-NREL.724666_TMY3.epw");
   ASSERT_EQ(located.size(), 0u);
 
   // And finally, provide the correct field type for the search path, find it
   searchpaths.clear();
   searchpaths.push_back(URLSearchPath(QUrl::fromLocalFile("utilities/Filetypes"), URLSearchPath::ToInputFile,
-        IddObjectType::OS_TimeDependentValuation));
+        IddObjectType::OS_WeatherFile));
   located = ws.locateUrls(searchpaths, false, resourcesPath() / toPath("madeuposm.osm")); // give the search algo a relative place to start from
 
-  EXPECT_EQ(tdv.getString(OS_TimeDependentValuationFields::Url).get(),
-      toString(QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)).toString()));
+  EXPECT_EQ(epw.getString(OS_WeatherFileFields::Url).get(),
+            toString(QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)).toString()));
   ASSERT_EQ(located.size(), 1u);
-  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteTdvFilePath)));
-  EXPECT_EQ(located[0].second, absoluteTdvFilePath);
+  EXPECT_TRUE(located[0].first == QUrl::fromLocalFile(openstudio::toQString(absoluteEpwFilePath)));
+  EXPECT_EQ(located[0].second, absoluteEpwFilePath);
 
 }
 
@@ -1798,26 +1861,55 @@ std::string text = "\
     idfObjects.push_back(workspaceObject.idfObject());
   }
 
+  // add workspace objects to workspace of none strictness
+  {
+    Workspace workspace2(StrictnessLevel::None, IddFileType::EnergyPlus);
+    WorkspaceObjectVector workspaceObjects = workspace1.objects();
+    workspace2.addObjects(workspaceObjects);
+    EXPECT_EQ(2u, workspace2.objects().size());
+    ASSERT_EQ(1u, workspace2.getObjectsByType(IddObjectType::Construction).size());
+    ASSERT_EQ(1u, workspace2.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem).size());
+    ASSERT_TRUE(workspace2.getObjectsByType(IddObjectType::Construction)[0].getTarget(1));
+    EXPECT_EQ(workspace2.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem)[0].handle(),
+              workspace2.getObjectsByType(IddObjectType::Construction)[0].getTarget(1)->handle());
+  }
 
-  Workspace workspace2(StrictnessLevel::None,IddFileType::EnergyPlus);
-  workspace2.addObjects(workspace1.objects());
-  EXPECT_EQ(2u, workspace2.objects().size());
-  ASSERT_EQ(1u, workspace2.getObjectsByType(IddObjectType::Construction).size());
-  ASSERT_EQ(1u, workspace2.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem).size());
-  ASSERT_TRUE(workspace2.getObjectsByType(IddObjectType::Construction)[0].getTarget(1));
-  EXPECT_EQ(workspace2.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem)[0].handle(),
-            workspace2.getObjectsByType(IddObjectType::Construction)[0].getTarget(1)->handle());
+  // add workspace objects to workspace of draft strictness
+  {
+    Workspace workspace2(StrictnessLevel::Draft, IddFileType::EnergyPlus);
+    WorkspaceObjectVector workspaceObjects = workspace1.objects();
+    workspace2.addObjects(workspaceObjects);
+    EXPECT_EQ(2u, workspace2.objects().size());
+    ASSERT_EQ(1u, workspace2.getObjectsByType(IddObjectType::Construction).size());
+    ASSERT_EQ(1u, workspace2.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem).size());
+    ASSERT_TRUE(workspace2.getObjectsByType(IddObjectType::Construction)[0].getTarget(1));
+    EXPECT_EQ(workspace2.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem)[0].handle(),
+              workspace2.getObjectsByType(IddObjectType::Construction)[0].getTarget(1)->handle());
+  }
 
+  // add idf objects to workspace of none strictness
+  {
+    Workspace workspace3(StrictnessLevel::None, IddFileType::EnergyPlus);
+    workspace3.addObjects(idfObjects);
+    EXPECT_EQ(2u, workspace3.objects().size());
+    ASSERT_EQ(1u, workspace3.getObjectsByType(IddObjectType::Construction).size());
+    ASSERT_EQ(1u, workspace3.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem).size());
+    ASSERT_TRUE(workspace3.getObjectsByType(IddObjectType::Construction)[0].getTarget(1));
+    EXPECT_EQ(workspace3.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem)[0].handle(),
+              workspace3.getObjectsByType(IddObjectType::Construction)[0].getTarget(1)->handle());
+  }
 
-  Workspace workspace3(StrictnessLevel::None,IddFileType::EnergyPlus);
-  workspace3.addObjects(idfObjects);
-  EXPECT_EQ(2u, workspace3.objects().size());
-  ASSERT_EQ(1u, workspace3.getObjectsByType(IddObjectType::Construction).size());
-  ASSERT_EQ(1u, workspace3.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem).size());
-  ASSERT_TRUE(workspace3.getObjectsByType(IddObjectType::Construction)[0].getTarget(1));
-  EXPECT_EQ(workspace3.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem)[0].handle(),
-            workspace3.getObjectsByType(IddObjectType::Construction)[0].getTarget(1)->handle());
-
+  // add idf objects to workspace of draft strictness
+  {
+    Workspace workspace3(StrictnessLevel::Draft, IddFileType::EnergyPlus);
+    workspace3.addObjects(idfObjects);
+    EXPECT_EQ(2u, workspace3.objects().size());
+    ASSERT_EQ(1u, workspace3.getObjectsByType(IddObjectType::Construction).size());
+    ASSERT_EQ(1u, workspace3.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem).size());
+    ASSERT_TRUE(workspace3.getObjectsByType(IddObjectType::Construction)[0].getTarget(1));
+    EXPECT_EQ(workspace3.getObjectsByType(IddObjectType::WindowMaterial_SimpleGlazingSystem)[0].handle(),
+              workspace3.getObjectsByType(IddObjectType::Construction)[0].getTarget(1)->handle());
+  }
 }
 
 TEST_F(IdfFixture, Workspace_AddObjects2) {
@@ -1899,10 +1991,11 @@ TEST_F(IdfFixture, Workspace_AddObjects3) {
 
 TEST_F(IdfFixture, Workspace_Signals)
 {
+  openstudio::Application::instance().application(false);
   IdfFile idfFile(IddFileType::EnergyPlus);
   Workspace workspace(idfFile);
 
-  WorkspaceReciever* reciever = NULL;
+  WorkspaceReciever* reciever = nullptr;
 
   ASSERT_NO_THROW( reciever = new WorkspaceReciever(workspace) );
 
@@ -1912,12 +2005,6 @@ TEST_F(IdfFixture, Workspace_Signals)
 
   WorkspaceObject object = workspace.addObject(IdfObject(IddObjectType::Zone)).get();
   Handle handle = object.handle();
-
-  EXPECT_FALSE(reciever->m_objectImpl);
-  EXPECT_FALSE(reciever->m_iddObjectType);
-  EXPECT_FALSE(reciever->m_handle);
-
-  openstudio::Application::instance().processEvents();
 
   ASSERT_TRUE(reciever->m_objectImpl.get());
   ASSERT_TRUE(reciever->m_iddObjectType);
@@ -1932,12 +2019,6 @@ TEST_F(IdfFixture, Workspace_Signals)
   EXPECT_FALSE(reciever->m_handle);
 
   object.remove();
-
-  EXPECT_FALSE(reciever->m_objectImpl);
-  EXPECT_FALSE(reciever->m_iddObjectType);
-  EXPECT_FALSE(reciever->m_handle);
-
-  Application::instance().processEvents();
 
   ASSERT_TRUE(reciever->m_objectImpl.get());
   ASSERT_TRUE(reciever->m_iddObjectType);
@@ -1974,17 +2055,17 @@ TEST_F(IdfFixture, Workspace_DaylightingControlsZoneName)
   ASSERT_TRUE(daylightingControl);
 
   zone->setName("Zone 1");
-  EXPECT_FALSE(daylightingControl->getString(0,false,true));
-  EXPECT_TRUE(daylightingControl->setPointer(0, zone->handle()));
-  ASSERT_TRUE(daylightingControl->getString(0,false,true));
-  EXPECT_EQ("Zone 1", daylightingControl->getString(0,false,true).get());
+  EXPECT_FALSE(daylightingControl->getString(1,false,true));
+  EXPECT_TRUE(daylightingControl->setPointer(1, zone->handle()));
+  ASSERT_TRUE(daylightingControl->getString(1,false,true));
+  EXPECT_EQ("Zone 1", daylightingControl->getString(1,false,true).get());
 
-  EXPECT_TRUE(daylightingControl->setString(0, ""));
-  EXPECT_FALSE(daylightingControl->getString(0,false,true));
+  EXPECT_TRUE(daylightingControl->setString(1, ""));
+  EXPECT_FALSE(daylightingControl->getString(1,false,true));
 
-  EXPECT_TRUE(daylightingControl->setString(0, "Zone 1"));
-  ASSERT_TRUE(daylightingControl->getString(0,false,true));
-  EXPECT_EQ("Zone 1", daylightingControl->getString(0,false,true).get());
+  EXPECT_TRUE(daylightingControl->setString(1, "Zone 1"));
+  ASSERT_TRUE(daylightingControl->getString(1,false,true));
+  EXPECT_EQ("Zone 1", daylightingControl->getString(1,false,true).get());
 
 }
 

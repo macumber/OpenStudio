@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_THERMALZONE_IMPL_HPP
 #define MODEL_THERMALZONE_IMPL_HPP
@@ -35,72 +44,75 @@ class IlluminanceMap;
 class RenderingColor;
 class HVACTemplateZoneIdealLoadsAirSystem;
 class ThermostatSetpointDualSetpoint;
+class Thermostat;
+class ZoneControlContaminantController;
 class ZoneControlHumidistat;
 class ThermalZone;
 class SizingZone;
 class PortList;
+class ZoneMixing;
 class ZoneHVACEquipmentList;
 
 namespace detail {
 
   /** ThermalZone_Impl is a HVACComponent_Impl that is the implementation class for ThermalZone.*/
   class MODEL_API ThermalZone_Impl : public HVACComponent_Impl {
-    Q_OBJECT;
-
-    Q_PROPERTY(int multiplier READ multiplier WRITE setMultiplier RESET resetMultiplier);
-    Q_PROPERTY(bool isMultiplierDefaulted READ isMultiplierDefaulted);
     
-    Q_PROPERTY(boost::optional<double> ceilingHeight READ ceilingHeight WRITE setCeilingHeight RESET resetCeilingHeight);
-    Q_PROPERTY(openstudio::OSOptionalQuantity ceilingHeight_SI READ ceilingHeight_SI WRITE setCeilingHeight RESET resetCeilingHeight);
-    Q_PROPERTY(openstudio::OSOptionalQuantity ceilingHeight_IP READ ceilingHeight_IP WRITE setCeilingHeight RESET resetCeilingHeight);
-    Q_PROPERTY(bool isCeilingHeightDefaulted READ isCeilingHeightDefaulted);
-    Q_PROPERTY(bool isCeilingHeightAutocalculated READ isCeilingHeightAutocalculated);
 
-    Q_PROPERTY(boost::optional<double> volume READ volume WRITE setVolume RESET resetVolume);
-    Q_PROPERTY(openstudio::OSOptionalQuantity volume_SI READ volume_SI WRITE setVolume RESET resetVolume);
-    Q_PROPERTY(openstudio::OSOptionalQuantity volume_IP READ volume_IP WRITE setVolume RESET resetVolume);
-    Q_PROPERTY(bool isVolumeDefaulted READ isVolumeDefaulted);
-    Q_PROPERTY(bool isVolumeAutocalculated READ isVolumeAutocalculated);
+    
+    
+    
+    
+    
+    
+    
+    
 
-    Q_PROPERTY(boost::optional<std::string> zoneInsideConvectionAlgorithm READ zoneInsideConvectionAlgorithm WRITE setZoneInsideConvectionAlgorithm RESET resetZoneInsideConvectionAlgorithm);
     
-    Q_PROPERTY(boost::optional<std::string> zoneOutsideConvectionAlgorithm READ zoneOutsideConvectionAlgorithm WRITE setZoneOutsideConvectionAlgorithm RESET resetZoneOutsideConvectionAlgorithm);
     
-    Q_PROPERTY(std::string zoneConditioningEquipmentListName READ zoneConditioningEquipmentListName WRITE setZoneConditioningEquipmentListName);
     
-    Q_PROPERTY(double fractionofZoneControlledbyPrimaryDaylightingControl READ fractionofZoneControlledbyPrimaryDaylightingControl WRITE setFractionofZoneControlledbyPrimaryDaylightingControl RESET resetFractionofZoneControlledbyPrimaryDaylightingControl);
-    Q_PROPERTY(openstudio::Quantity fractionofZoneControlledbyPrimaryDaylightingControl_SI READ fractionofZoneControlledbyPrimaryDaylightingControl_SI WRITE setFractionofZoneControlledbyPrimaryDaylightingControl RESET resetFractionofZoneControlledbyPrimaryDaylightingControl);
-    Q_PROPERTY(openstudio::Quantity fractionofZoneControlledbyPrimaryDaylightingControl_IP READ fractionofZoneControlledbyPrimaryDaylightingControl_IP WRITE setFractionofZoneControlledbyPrimaryDaylightingControl RESET resetFractionofZoneControlledbyPrimaryDaylightingControl);    
-    Q_PROPERTY(bool isFractionofZoneControlledbyPrimaryDaylightingControlDefaulted READ isFractionofZoneControlledbyPrimaryDaylightingControlDefaulted);
     
-    Q_PROPERTY(double fractionofZoneControlledbySecondaryDaylightingControl READ fractionofZoneControlledbySecondaryDaylightingControl WRITE setFractionofZoneControlledbySecondaryDaylightingControl RESET resetFractionofZoneControlledbySecondaryDaylightingControl);
-    Q_PROPERTY(openstudio::Quantity fractionofZoneControlledbySecondaryDaylightingControl_SI READ fractionofZoneControlledbySecondaryDaylightingControl_SI WRITE setFractionofZoneControlledbySecondaryDaylightingControl RESET resetFractionofZoneControlledbySecondaryDaylightingControl);
-    Q_PROPERTY(openstudio::Quantity fractionofZoneControlledbySecondaryDaylightingControl_IP READ fractionofZoneControlledbySecondaryDaylightingControl_IP WRITE setFractionofZoneControlledbySecondaryDaylightingControl RESET resetFractionofZoneControlledbySecondaryDaylightingControl);    
-    Q_PROPERTY(bool isFractionofZoneControlledbySecondaryDaylightingControlDefaulted READ isFractionofZoneControlledbySecondaryDaylightingControlDefaulted);
+    
 
-    Q_PROPERTY(double floorArea READ floorArea);
-    Q_PROPERTY(double numberOfPeople READ numberOfPeople);
-    Q_PROPERTY(double peoplePerFloorArea READ peoplePerFloorArea);
-    Q_PROPERTY(double floorAreaPerPerson READ floorAreaPerPerson);
-    Q_PROPERTY(double lightingPower READ lightingPower);
-    Q_PROPERTY(double lightingPowerPerFloorArea READ lightingPowerPerFloorArea);
-    Q_PROPERTY(double lightingPowerPerPerson READ lightingPowerPerPerson);
-    Q_PROPERTY(double electricEquipmentPower READ electricEquipmentPower);
-    Q_PROPERTY(double electricEquipmentPowerPerFloorArea READ electricEquipmentPowerPerFloorArea);
-    Q_PROPERTY(double electricEquipmentPowerPerPerson READ electricEquipmentPowerPerPerson);
-    Q_PROPERTY(double gasEquipmentPower READ gasEquipmentPower);
-    Q_PROPERTY(double gasEquipmentPowerPerFloorArea READ gasEquipmentPowerPerFloorArea);
-    Q_PROPERTY(double gasEquipmentPowerPerPerson READ gasEquipmentPowerPerPerson);
-    Q_PROPERTY(bool useIdealAirLoads READ useIdealAirLoads WRITE setUseIdealAirLoads);
+    
+    
+    
+    
+    
+    
+    
+    
+        
+    
+    
+    
+    
+        
+    
 
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> thermostatSetpointDualSetpoint READ thermostatSetpointDualSetpointAsModelObject WRITE setThermostatSetpointDualSetpointAsModelObject RESET resetThermostatSetpointDualSetpoint);
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> zoneControlHumidistat READ zoneControlHumidistatAsModelObject WRITE setZoneControlHumidistatAsModelObject RESET resetZoneControlHumidistat);
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> primaryDaylightingControl READ primaryDaylightingControlAsModelObject WRITE setPrimaryDaylightingControlAsModelObject RESET resetPrimaryDaylightingControl);
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> secondaryDaylightingControl READ secondaryDaylightingControlAsModelObject WRITE setSecondaryDaylightingControlAsModelObject RESET resetSecondaryDaylightingControl);
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> illuminanceMap READ illuminanceMapAsModelObject WRITE setIlluminanceMapAsModelObject RESET resetIlluminanceMap);
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> renderingColor READ renderingColorAsModelObject WRITE setRenderingColorAsModelObject RESET resetRenderingColor);
-    Q_PROPERTY(std::vector<openstudio::model::ModelObject> equipment READ equipmentAsModelObjects);
-    Q_PROPERTY(std::vector<openstudio::model::ModelObject> spaces READ spacesAsModelObjects);
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+
+    
+    
+    
+    
+    
+    
+    
+    
    public:
     /** @name Constructors and Destructors */
     //@{
@@ -120,27 +132,23 @@ namespace detail {
     //@}
 
     // return the parent object in the hierarchy
-    virtual boost::optional<ParentObject> parent() const;
+    virtual boost::optional<ParentObject> parent() const override;
 
     // set the parent, child may have to call methods on the parent
-    virtual bool setParent(ParentObject& newParent);
+    virtual bool setParent(ParentObject& newParent) override;
 
     // return any children objects in the hierarchy
-    virtual std::vector<ModelObject> children() const;
+    virtual std::vector<ModelObject> children() const override;
 
     /// get a vector of allowable children types
-    virtual std::vector<IddObjectType> allowableChildTypes() const;
+    virtual std::vector<IddObjectType> allowableChildTypes() const override;
 
     // Get all output variable names that could be associated with this object.
-    virtual const std::vector<std::string>& outputVariableNames() const;
+    virtual const std::vector<std::string>& outputVariableNames() const override;
 
-    virtual IddObjectType iddObjectType() const;
+    virtual IddObjectType iddObjectType() const override;
 
-    /** This function returns a vector of HVACComponent that are directly downstream
-     *  from this object on an AirLoopHVAC or PlantLoop. 
-     *  @param[in]  isDemandComponent  Boolean passed in whether object is a demand or supply component
-    **/
-    virtual std::vector<HVACComponent> edges(bool isDemandComponent);
+    virtual std::vector<HVACComponent> edges(const boost::optional<HVACComponent> & prev) override;
 
     /** @name Getters */
     //@{
@@ -172,6 +180,10 @@ namespace detail {
     std::string zoneConditioningEquipmentListName() const;
 
     boost::optional<ThermostatSetpointDualSetpoint> thermostatSetpointDualSetpoint() const;
+
+    boost::optional<Thermostat> thermostat() const;
+
+    boost::optional<ZoneControlContaminantController> zoneControlContaminantController() const;
 
     boost::optional<ZoneControlHumidistat> zoneControlHumidistat() const;
 
@@ -233,9 +245,17 @@ namespace detail {
 
     void resetThermostatSetpointDualSetpoint();
 
+    bool setThermostat(const Thermostat& thermostat);
+
+    void resetThermostat();
+
     bool setZoneControlHumidistat(const ZoneControlHumidistat & humidistat);
 
     void resetZoneControlHumidistat();
+
+    bool setZoneControlContaminantController(const ZoneControlContaminantController & contaminantController);
+
+    void resetZoneControlContaminantController();
 
     bool setFractionofZoneControlledbyPrimaryDaylightingControl(double fractionofZoneControlledbyPrimaryDaylightingControl);
     
@@ -390,17 +410,17 @@ namespace detail {
 
     SizingZone sizingZone() const;
 
-    void disconnect();
+    void disconnect() override;
 
-    bool isRemovable() const;
+    bool isRemovable() const override;
 
-    std::vector<IdfObject> remove();
+    std::vector<IdfObject> remove() override;
 
     bool useIdealAirLoads() const;
 
     void setUseIdealAirLoads(bool useIdealAirLoads);
 
-    bool addToNode(Node & node);
+    bool addToNode(Node & node) override;
 
     PortList inletPortList() const;
 
@@ -420,7 +440,7 @@ namespace detail {
 
     ZoneHVACEquipmentList zoneHVACEquipmentList() const;
 
-    virtual ModelObject clone(Model model) const;
+    virtual ModelObject clone(Model model) const override;
 
     boost::optional<AirLoopHVACSupplyPlenum> airLoopHVACSupplyPlenum() const;
 
@@ -429,9 +449,17 @@ namespace detail {
     bool isPlenum() const;
     bool canBePlenum() const;
     bool setSupplyPlenum(const ThermalZone & plenumZone);
+    bool setSupplyPlenum(const ThermalZone & plenumZone, unsigned branchIndex);
     void removeSupplyPlenum();
     bool setReturnPlenum(const ThermalZone & plenumZone);
     void removeReturnPlenum();
+    void removeSupplyPlenum(unsigned branchIndex);
+
+    std::vector<ZoneMixing> zoneMixing() const;
+    std::vector<ZoneMixing> supplyZoneMixing() const;
+    std::vector<ZoneMixing> exhaustZoneMixing() const;
+
+    boost::optional<HVACComponent> airLoopHVACTerminal() const;
 
    protected:
 

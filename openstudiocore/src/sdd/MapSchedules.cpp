@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ReverseTranslator.hpp"
 
@@ -47,14 +56,28 @@ namespace sdd {
     QDomElement nameElement = element.firstChildElement("Name");
     QDomElement typeElement = element.firstChildElement("Type");
 
-    OS_ASSERT(!nameElement.isNull());
-    std::string name = escapeName(nameElement.text());
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "SchDay element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
+
+    if (typeElement.isNull()){
+      LOG(Error, "SchDay element 'Type' is empty for SchDay named '" << name << "'.  ScheduleDay will not be created");
+      return boost::none;
+    }
+    std::string type = escapeName(typeElement.text());
+
+    QDomNodeList hrElements = element.elementsByTagName("Hr");
+    if (hrElements.count() != 24){
+      LOG(Error, "SchDay does not have 24 'Hr' elements empty for SchDay named '" << name << "'.  ScheduleDay will not be created");
+      return boost::none;
+    }
 
     model::ScheduleDay scheduleDay(model);
     scheduleDay.setName(name);
-
-    OS_ASSERT(!typeElement.isNull());
-    std::string type = escapeName(typeElement.text());
+   
     boost::optional<model::ScheduleTypeLimits> scheduleTypeLimits = model.getModelObjectByName<model::ScheduleTypeLimits>(type);
     bool isTemperature = false;
     if (type == "Temperature"){
@@ -88,8 +111,6 @@ namespace sdd {
       scheduleDay.setScheduleTypeLimits(*scheduleTypeLimits);
     }
 
-    QDomNodeList hrElements = element.elementsByTagName("Hr");
-    OS_ASSERT(hrElements.count() == 24);
     for (int i = 0; i < hrElements.count(); i++){
       QDomElement hrElement = hrElements.at(i).toElement();
       double value = hrElement.text().toDouble();
@@ -119,14 +140,23 @@ namespace sdd {
     QDomElement schDayClgDDRefElement = element.firstChildElement("SchDayClgDDRef");
     QDomElement schDayHtgDDRefElement = element.firstChildElement("SchDayHtgDDRef");
 
-    OS_ASSERT(!nameElement.isNull());
-    std::string name = escapeName(nameElement.text());
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "SchWeek element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
+
+    if (typeElement.isNull()){
+      LOG(Error, "SchWeek element 'Type' is empty for SchWeek named '" << name << "'.  ScheduleWeek will not be created");
+      return boost::none;
+    }
+    std::string type = escapeName(typeElement.text());
 
     model::ScheduleWeek scheduleWeek(model);
     scheduleWeek.setName(name);
 
-    OS_ASSERT(!typeElement.isNull());
-    std::string type = escapeName(typeElement.text());
+
     boost::optional<model::ScheduleTypeLimits> scheduleTypeLimits = model.getModelObjectByName<model::ScheduleTypeLimits>(type);
     if (scheduleTypeLimits){
       //scheduleWeek.setScheduleTypeLimits(*scheduleTypeLimits);
@@ -232,26 +262,41 @@ namespace sdd {
     QDomElement nameElement = element.firstChildElement("Name");
     QDomElement typeElement = element.firstChildElement("Type");
 
-    OS_ASSERT(!nameElement.isNull());
-    std::string name = escapeName(nameElement.text());
-
-    model::ScheduleYear scheduleYear(model);
-    scheduleYear.setName(name);
-
-    OS_ASSERT(!typeElement.isNull());
-    std::string type = escapeName(typeElement.text());
-    boost::optional<model::ScheduleTypeLimits> scheduleTypeLimits = model.getModelObjectByName<model::ScheduleTypeLimits>(type);
-    if (scheduleTypeLimits){
-      scheduleYear.setScheduleTypeLimits(*scheduleTypeLimits);
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "Sch element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
     }
+
+    if (typeElement.isNull()){
+      LOG(Error, "Sch element 'Type' is empty for Sch named '" << name << "'.  ScheduleYear will not be created");
+      return boost::none;
+    }
+    std::string type = escapeName(typeElement.text());
 
     QDomNodeList endMonthElements = element.elementsByTagName("EndMonth");
     QDomNodeList endDayElements = element.elementsByTagName("EndDay");
     QDomNodeList schWeekRefElements = element.elementsByTagName("SchWeekRef");
 
-    OS_ASSERT(endMonthElements.count() == endDayElements.count());
-    OS_ASSERT(endMonthElements.count() == schWeekRefElements.count());
+    if (endMonthElements.count() != endDayElements.count()){
+      LOG(Error, "Number of 'EndMonth' elements not equal to number of 'EndDay' elements for Sch named '" << name << "'.  ScheduleYear will not be created");
+      return boost::none;
+    }
+
+    if (endMonthElements.count() != schWeekRefElements.count()){
+      LOG(Error, "Number of 'EndMonth' elements not equal to number of 'SchWeekRef' elements for Sch named '" << name << "'.  ScheduleYear will not be created");
+      return boost::none;
+    }
+
+    model::ScheduleYear scheduleYear(model);
+    scheduleYear.setName(name);
     
+    boost::optional<model::ScheduleTypeLimits> scheduleTypeLimits = model.getModelObjectByName<model::ScheduleTypeLimits>(type);
+    if (scheduleTypeLimits){
+      scheduleYear.setScheduleTypeLimits(*scheduleTypeLimits);
+    }
+
     for (int i = 0; i < endMonthElements.count(); i++){
       QDomElement endMonthElement = endMonthElements.at(i).toElement();
       QDomElement endDayElement = endDayElements.at(i).toElement();
@@ -293,15 +338,32 @@ namespace sdd {
     boost::optional<openstudio::model::ModelObject> result;
 
     QDomElement nameElement = element.firstChildElement("Name");
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "Hol element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
+
     QDomElement specificationMethodElement = element.firstChildElement("SpecMthd");
-    OS_ASSERT(!nameElement.isNull());
-    OS_ASSERT(!specificationMethodElement.isNull());
+    if (specificationMethodElement.isNull()){
+      LOG(Error, "Hol element 'SpecMthd' is empty for Hol named '" << name << "'.  Holiday will not be created");
+      return boost::none;
+    }
 
     if (specificationMethodElement.text() == "Date"){
       QDomElement monthElement = element.firstChildElement("Month");
       QDomElement dayElement = element.firstChildElement("Day");
-      OS_ASSERT(!monthElement.isNull());
-      OS_ASSERT(!dayElement.isNull());
+
+      if (monthElement.isNull()){
+        LOG(Error, "Hol element 'Month' is empty for Hol named '" << name << "'.  Holiday will not be created");
+        return boost::none;
+      }
+
+      if (dayElement.isNull()){
+        LOG(Error, "Hol element 'Day' is empty for Hol named '" << name << "'.  Holiday will not be created");
+        return boost::none;
+      }
 
       MonthOfYear monthOfYear(toString(monthElement.text()));
       unsigned day = dayElement.text().toUInt();
@@ -312,8 +374,16 @@ namespace sdd {
     }else{
       QDomElement dayOfWeekElement = element.firstChildElement("DayOfWeek");
       QDomElement monthElement = element.firstChildElement("Month");
-      OS_ASSERT(!dayOfWeekElement.isNull());
-      OS_ASSERT(!monthElement.isNull());
+
+      if (dayOfWeekElement.isNull()){
+        LOG(Error, "Hol element 'DayOfWeek' is empty for Hol named '" << name << "'.  Holiday will not be created");
+        return boost::none;
+      }
+
+      if (monthElement.isNull()){
+        LOG(Error, "Hol element 'Month' is empty for Hol named '" << name << "'.  Holiday will not be created");
+        return boost::none;
+      }
 
       // fifth is treated equivalently to last
       std::string specificationMethod = toString(specificationMethodElement.text());

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "WaterToWaterComponent.hpp"
 #include "WaterToWaterComponent_Impl.hpp"
@@ -86,22 +95,60 @@ OptionalModelObject WaterToWaterComponent_Impl::demandOutletModelObject()
   return connectedObject(demandOutletPort());
 }
 
-std::vector<HVACComponent> WaterToWaterComponent_Impl::edges(bool isDemandComponent)
+std::vector<HVACComponent> WaterToWaterComponent_Impl::edges(const boost::optional<HVACComponent> & prev)
 {
   std::vector<HVACComponent> edges;
-  if( isDemandComponent ) {
-    if( boost::optional<ModelObject> edgeModelObject = this->demandOutletModelObject() ) {
-      if( boost::optional<HVACComponent> edgeObject = edgeModelObject->optionalCast<HVACComponent>() ) {
-        edges.push_back(*edgeObject);
+
+  auto pushSupplyOutletModelObject = [&]() {
+    if( auto edgeModelObject = supplyOutletModelObject() ) {
+      auto edgeHVACComponent = edgeModelObject->optionalCast<HVACComponent>();
+      OS_ASSERT(edgeHVACComponent);
+      edges.push_back(edgeHVACComponent.get());
+    }
+  };
+
+  auto pushDemandOutletModelObject = [&]() {
+    if( auto edgeModelObject = demandOutletModelObject() ) {
+      auto edgeHVACComponent = edgeModelObject->optionalCast<HVACComponent>();
+      OS_ASSERT(edgeHVACComponent);
+      edges.push_back(edgeHVACComponent.get());
+    }
+  };
+
+  auto pushTertiaryOutletModelObject = [&]() {
+    if( auto edgeModelObject = tertiaryOutletModelObject() ) {
+      auto edgeHVACComponent = edgeModelObject->optionalCast<HVACComponent>();
+      OS_ASSERT(edgeHVACComponent);
+      edges.push_back(edgeHVACComponent.get());
+    }
+  };
+  
+  if( prev) {
+    if( auto inletModelObject = supplyInletModelObject() ) {
+      if( prev.get() == inletModelObject.get() ) {
+        pushSupplyOutletModelObject();
+        return edges;
+      }
+    }
+    if( auto inletModelObject = demandInletModelObject() ) {
+      if( prev.get() == inletModelObject.get() ) {
+        pushDemandOutletModelObject();
+        return edges;
+      }
+    }
+    if( auto inletModelObject = tertiaryInletModelObject() ) {
+      if( prev.get() == inletModelObject.get() ) {
+        pushTertiaryOutletModelObject();
+        return edges;
       }
     }
   } else {
-    if( boost::optional<ModelObject> edgeModelObject = this->supplyOutletModelObject() ) {
-      if( boost::optional<HVACComponent> edgeObject = edgeModelObject->optionalCast<HVACComponent>() ) {
-        edges.push_back(*edgeObject);
-      }
-    }
+    pushSupplyOutletModelObject();
+    pushDemandOutletModelObject();
+    pushTertiaryOutletModelObject();
+    return edges;
   }
+
   return edges;
 }
 
@@ -110,6 +157,8 @@ std::vector<openstudio::IdfObject> WaterToWaterComponent_Impl::remove()
   removeFromPlantLoop();
 
   removeFromSecondaryPlantLoop();
+
+  removeFromTertiaryPlantLoop();
 
   return HVACComponent_Impl::remove();
 }
@@ -133,106 +182,49 @@ void WaterToWaterComponent_Impl::disconnect()
   this->model().disconnect(mo, this->supplyOutletPort());
   this->model().disconnect(mo, this->demandInletPort());
   this->model().disconnect(mo, this->demandOutletPort());
+  this->model().disconnect(mo, this->tertiaryInletPort());
+  this->model().disconnect(mo, this->tertiaryOutletPort());
 }
 
 bool WaterToWaterComponent_Impl::addToNode(Node & node)
 {
-  Model _model = model();
-  ModelObject thisModelObject = getObject<ModelObject>();
+  auto _model = node.model(); 
+  auto thisModelObject = getObject<ModelObject>();
+  auto t_plantLoop = node.plantLoop();
 
-  if( node.model() != _model )
-  {
+  boost::optional<unsigned> componentInletPort;
+  boost::optional<unsigned> componentOutletPort;
+
+  boost::optional<HVACComponent> systemStartComponent;
+  boost::optional<HVACComponent> systemEndComponent;
+
+  if( node.getImpl<Node_Impl>()->isConnected(thisModelObject) ) return false;
+
+  if( t_plantLoop ) {
+    if( t_plantLoop->supplyComponent(node.handle()) ) {
+
+      systemStartComponent = t_plantLoop->supplyInletNode();
+      systemEndComponent = t_plantLoop->supplyOutletNode();
+      componentInletPort = supplyInletPort();
+      componentOutletPort = supplyOutletPort();
+
+      removeFromPlantLoop();
+    } else if( t_plantLoop->demandComponent(node.handle()) ) {
+
+      systemStartComponent = t_plantLoop->demandInletNode();
+      systemEndComponent = t_plantLoop->demandOutletNode();
+      componentInletPort = demandInletPort();
+      componentOutletPort = demandOutletPort();
+
+      removeFromSecondaryPlantLoop();
+    }
+  }
+
+  if( systemStartComponent && systemEndComponent && componentOutletPort && componentInletPort ) {
+    return HVACComponent_Impl::addToNode(node,systemStartComponent.get(),systemEndComponent.get(),componentInletPort.get(),componentOutletPort.get());
+  } else {
     return false;
   }
-
-  if( boost::optional<PlantLoop> _plantLoop = node.plantLoop() )
-  {
-    int inletport;
-    int outletport;
-
-    boost::optional<Node> loopInletNode;
-    boost::optional<Node> loopOutletNode;
-
-    if( _plantLoop->supplyComponent(node.handle()) )
-    {
-      loopOutletNode = _plantLoop->supplyOutletNode();
-      loopInletNode = _plantLoop->supplyInletNode();
-
-      inletport = supplyInletPort();
-      outletport = supplyOutletPort();
-
-      if( plantLoop() )
-      {
-        removeFromPlantLoop();
-      }
-    }
-    else if( _plantLoop->demandComponent(node.handle()) )
-    {
-      loopOutletNode = _plantLoop->demandOutletNode();
-      loopInletNode = _plantLoop->demandInletNode();
-
-      inletport = demandInletPort();
-      outletport = demandOutletPort();
-
-      if( secondaryPlantLoop() )
-      {
-        removeFromSecondaryPlantLoop();
-      }
-    }
-    else
-    {
-      return false;
-    }
-
-    if( node == loopOutletNode.get() &&
-        node.inletModelObject().get() == loopInletNode.get() )
-    {
-      unsigned oldOutletPort = node.connectedObjectPort( node.inletPort() ).get();
-      unsigned oldInletPort = node.inletPort();
-      ModelObject oldSourceModelObject = node.connectedObject( node.inletPort() ).get();
-      ModelObject oldTargetModelObject = node;
-
-      _model.connect( oldSourceModelObject, oldOutletPort,
-                      thisModelObject, inletport );
-      _model.connect( thisModelObject, outletport,
-                      oldTargetModelObject, oldInletPort );
-      return true;
-    }
-    else if( node == loopOutletNode.get() )
-    {
-      unsigned oldOutletPort = node.connectedObjectPort( node.inletPort() ).get();
-      unsigned oldInletPort = node.inletPort();
-      ModelObject oldSourceModelObject = node.connectedObject( node.inletPort() ).get();
-      ModelObject oldTargetModelObject = node;
-
-      Node newNode( _model );
-      _model.connect( oldSourceModelObject, oldOutletPort,
-                      newNode, newNode.inletPort() );
-      _model.connect( newNode, newNode.outletPort(),
-                      thisModelObject, inletport );                        
-      _model.connect( thisModelObject, outletport,
-                      oldTargetModelObject, oldInletPort );
-      return true;
-    }
-    else
-    {
-      unsigned oldOutletPort = node.outletPort();
-      unsigned oldInletPort = node.connectedObjectPort( node.outletPort() ).get();
-      ModelObject oldSourceModelObject = node;
-      ModelObject oldTargetModelObject = node.connectedObject( node.outletPort() ).get();
-  
-      Node newNode( _model );
-      _model.connect( oldSourceModelObject, oldOutletPort,
-                      thisModelObject, inletport );
-      _model.connect( thisModelObject, outletport,
-                      newNode, newNode.inletPort() );
-      _model.connect( newNode, newNode.outletPort(),
-                      oldTargetModelObject, oldInletPort );
-      return true;
-    }
-  }
-
-  return false;
 }
 
 ModelObject WaterToWaterComponent_Impl::clone(Model model) const
@@ -243,6 +235,8 @@ ModelObject WaterToWaterComponent_Impl::clone(Model model) const
   mo.setString(mo.supplyOutletPort(),""); 
   mo.setString(mo.demandInletPort(),""); 
   mo.setString(mo.demandOutletPort(),""); 
+  mo.setString(mo.getImpl<detail::WaterToWaterComponent_Impl>()->tertiaryInletPort(),""); 
+  mo.setString(mo.getImpl<detail::WaterToWaterComponent_Impl>()->tertiaryOutletPort(),""); 
 
   return mo;
 }
@@ -305,104 +299,11 @@ boost::optional<PlantLoop> WaterToWaterComponent_Impl::secondaryPlantLoop() cons
 
 bool WaterToWaterComponent_Impl::removeFromPlantLoop()
 {
-  boost::optional<PlantLoop> _loop = plantLoop();
-
-  OptionalNode targetModelObject;
-  OptionalNode sourceModelObject;
-  OptionalUnsigned targetPort;
-  OptionalUnsigned sourcePort;
-
-  OptionalModelObject target2ModelObject; 
-  OptionalModelObject source2ModelObject;
-  OptionalUnsigned target2Port;
-  OptionalUnsigned source2Port;
-
-  HVACComponent thisObject = getObject<HVACComponent>();
-
-  if( _loop && _loop->supplyComponent(handle()) )
-  {
-    targetModelObject = supplyOutletModelObject()->optionalCast<Node>(); 
-    sourceModelObject = supplyInletModelObject()->optionalCast<Node>();
-    targetPort = connectedObjectPort(supplyOutletPort());
-    sourcePort = connectedObjectPort(supplyInletPort());
-    
-    target2ModelObject = targetModelObject->outletModelObject();
-    source2ModelObject = sourceModelObject->inletModelObject();
-    target2Port = targetModelObject->connectedObjectPort(targetModelObject->outletPort());
-    source2Port = sourceModelObject->connectedObjectPort(sourceModelObject->inletPort());
-
-    boost::optional<Node> supplyInletNode = _loop->supplyInletNode();
-    boost::optional<Node> supplyOutletNode = _loop->supplyOutletNode();
-
-    Splitter splitter = _loop->supplySplitter();
-    Mixer mixer = _loop->supplyMixer();
-    
-    // If the component is stuck directly between the inlet and outlet node.
-    if( supplyInletNode->handle() == supplyInletModelObject()->handle() 
-        &&
-        supplyOutletNode->handle() == supplyOutletModelObject()->handle() )
-    {
-      model().disconnect(thisObject,supplyOutletPort()); 
-      model().disconnect(thisObject,supplyInletPort()); 
-
-      model().connect( supplyInletNode.get(), supplyInletNode->outletPort(), 
-                       supplyOutletNode.get(), supplyOutletNode->inletPort() );
-
-      return true;
-    }
-    // If the component is at the very end of the supply path, but there is another component preceding this one.
-    else if( supplyOutletNode->handle() == supplyOutletModelObject()->handle() )
-    {
-      model().disconnect(thisObject,supplyOutletPort()); 
-      model().disconnect(thisObject,supplyInletPort()); 
-
-      model().connect( source2ModelObject.get(), source2Port.get(), 
-                       supplyOutletNode.get(), supplyOutletNode->inletPort() );
-
-      sourceModelObject->remove();
-
-      return true;
-    }
-    // If the component is the only component (except nodes) between a splitter mixer pair
-    else if( (target2ModelObject.get() == mixer) && 
-             (source2ModelObject.get() == splitter) )
-    {
-      Model _model = model();
-
-      int i = splitter.branchIndexForOutletModelObject(sourceModelObject.get());
-      int j = mixer.branchIndexForInletModelObject(targetModelObject.get());
-
-      OS_ASSERT(i == j);
-
-      splitter.removePortForBranch(i);
-      mixer.removePortForBranch(i);
-
-      _model.disconnect(thisObject,supplyOutletPort()); 
-      _model.disconnect(thisObject,supplyInletPort()); 
-
-      targetModelObject->remove();
-      sourceModelObject->remove();
-
-      if( ! splitter.lastOutletModelObject() )
-      {
-        Node newNode(_model);
-        _model.connect(splitter,splitter.nextOutletPort(),newNode,newNode.inletPort());
-        _model.connect(newNode,newNode.outletPort(),mixer,mixer.nextInletPort());
-      }
-
-      return true;
-    }
-    // Else remove the component and the outlet node
-    else
-    {
-      model().disconnect(thisObject,supplyOutletPort()); 
-      model().disconnect(thisObject,supplyInletPort()); 
-
-      model().connect( sourceModelObject.get(), sourcePort.get(), 
-                       target2ModelObject.get(), target2Port.get() );
-      targetModelObject->remove();
-      return true;
-    }
+  if( auto plant = plantLoop() ) {
+    return HVACComponent_Impl::removeFromLoop(plant->supplyInletNode(),
+      plant->supplyOutletNode(),
+      supplyInletPort(),
+      supplyOutletPort());
   }
 
   return false;
@@ -410,105 +311,118 @@ bool WaterToWaterComponent_Impl::removeFromPlantLoop()
 
 bool WaterToWaterComponent_Impl::removeFromSecondaryPlantLoop()
 {
-  boost::optional<PlantLoop> _secondaryLoop = secondaryPlantLoop();
-
-  OptionalNode targetModelObject;
-  OptionalNode sourceModelObject;
-  OptionalUnsigned targetPort;
-  OptionalUnsigned sourcePort;
-
-  OptionalModelObject target2ModelObject; 
-  OptionalModelObject source2ModelObject;
-  OptionalUnsigned target2Port;
-  OptionalUnsigned source2Port;
-
-  HVACComponent thisObject = getObject<HVACComponent>();
-
-  if( _secondaryLoop && _secondaryLoop->demandComponent(handle()) )
-  {
-    targetModelObject = demandOutletModelObject()->optionalCast<Node>(); 
-    sourceModelObject = demandInletModelObject()->optionalCast<Node>();
-    targetPort = connectedObjectPort(demandOutletPort());
-    sourcePort = connectedObjectPort(demandInletPort());
-    
-    target2ModelObject = targetModelObject->outletModelObject();
-    source2ModelObject = sourceModelObject->inletModelObject();
-    target2Port = targetModelObject->connectedObjectPort(targetModelObject->outletPort());
-    source2Port = sourceModelObject->connectedObjectPort(sourceModelObject->inletPort());
-
-    boost::optional<Node> demandInletNode = _secondaryLoop->demandInletNode();
-    boost::optional<Node> demandOutletNode = _secondaryLoop->demandOutletNode();
-
-    Mixer mixer = _secondaryLoop->demandMixer();
-    Splitter splitter = _secondaryLoop->demandSplitter();
-    
-    // If the component is stuck directly between the inlet and outlet node.
-    if( demandInletNode->handle() == demandInletModelObject()->handle() 
-        &&
-        demandOutletNode->handle() == demandOutletModelObject()->handle() )
-    {
-      model().disconnect(thisObject,demandOutletPort()); 
-      model().disconnect(thisObject,demandInletPort()); 
-
-      model().connect( demandInletNode.get(), demandInletNode->outletPort(), 
-                       demandOutletNode.get(), demandOutletNode->inletPort() );
-      
-      return true;
-    }
-    // If the component is at the very end of the supply path, but there is another component preceding this one.
-    else if( demandOutletNode->handle() == demandOutletModelObject()->handle() )
-    {
-      model().disconnect(thisObject,demandOutletPort()); 
-      model().disconnect(thisObject,demandInletPort()); 
-
-      model().connect( source2ModelObject.get(), source2Port.get(), 
-                       demandOutletNode.get(), demandOutletNode->inletPort() );
-      sourceModelObject->remove();
-      return true;
-    }
-    // If the component is the only component (except nodes) between a splitter mixer pair
-    else if( (target2ModelObject.get() == mixer) && 
-             (source2ModelObject.get() == splitter) )
-    {
-      Model _model = model();
-
-      int i = splitter.branchIndexForOutletModelObject(sourceModelObject.get());
-      int j = mixer.branchIndexForInletModelObject(targetModelObject.get());
-
-      OS_ASSERT(i == j);
-
-      splitter.removePortForBranch(i);
-      mixer.removePortForBranch(i);
-
-      model().disconnect(thisObject,demandOutletPort()); 
-      model().disconnect(thisObject,demandInletPort()); 
-
-      targetModelObject->remove();
-      sourceModelObject->remove();
-
-      if( ! splitter.lastOutletModelObject() )
-      {
-        Node newNode(_model);
-        _model.connect(splitter,splitter.nextOutletPort(),newNode,newNode.inletPort());
-        _model.connect(newNode,newNode.outletPort(),mixer,mixer.nextInletPort());
-      }
-
-      return true;
-    }
-    // Else remove the component and the outlet node
-    else
-    {
-      model().disconnect(thisObject,demandOutletPort()); 
-      model().disconnect(thisObject,demandInletPort()); 
-
-      model().connect( sourceModelObject.get(), sourcePort.get(), 
-                       target2ModelObject.get(), target2Port.get() );
-      targetModelObject->remove();
-      return true;
-    }
+  if( auto plant = secondaryPlantLoop() ) {
+    return HVACComponent_Impl::removeFromLoop(plant->demandInletNode(),
+      plant->demandOutletNode(),
+      demandInletPort(),
+      demandOutletPort());
   }
 
   return false;
+}
+
+unsigned WaterToWaterComponent_Impl::tertiaryInletPort() const 
+{
+  return std::numeric_limits<unsigned>::max();
+}
+
+unsigned WaterToWaterComponent_Impl::tertiaryOutletPort() const 
+{
+  return std::numeric_limits<unsigned>::max();
+}
+
+boost::optional<PlantLoop> WaterToWaterComponent_Impl::tertiaryPlantLoop() const
+{
+  if( m_tertiaryPlantLoop ) {
+    return m_tertiaryPlantLoop;
+  } else {
+    boost::optional<HVACComponent> tertiaryOutletHVACComponent;
+
+    if( auto t_tertiaryOutletModelObject = tertiaryOutletModelObject() ) {
+      tertiaryOutletHVACComponent = t_tertiaryOutletModelObject->optionalCast<HVACComponent>();
+    }
+
+    if( tertiaryOutletHVACComponent ) {
+      auto plantLoops = this->model().getConcreteModelObjects<PlantLoop>();
+
+      // WaterToWaterComponent instances can be connected to tertiary plants
+      // from the demand or supply side so check for both possibilities
+      for(const auto & plantLoop : plantLoops) {
+        if( ! plantLoop.supplyComponents(plantLoop.supplyInletNode(),tertiaryOutletHVACComponent.get()).empty() ) {
+          m_tertiaryPlantLoop = plantLoop;
+          return plantLoop;
+        }
+      }
+
+      for(const auto & plantLoop : plantLoops) {
+        if( ! plantLoop.demandComponents(plantLoop.demandInletNode(),tertiaryOutletHVACComponent.get()).empty() ) {
+          m_tertiaryPlantLoop = plantLoop;
+          return plantLoop;
+        }
+      }
+    }
+  }
+
+  return boost::none;
+}
+
+bool WaterToWaterComponent_Impl::removeFromTertiaryPlantLoop()
+{
+  if( auto plant = tertiaryPlantLoop() ) {
+    return HVACComponent_Impl::removeFromLoop(plant->demandInletNode(),
+      plant->demandOutletNode(),
+      tertiaryInletPort(),
+      tertiaryOutletPort());
+  }
+
+  return false;
+}
+
+bool WaterToWaterComponent_Impl::addToTertiaryNode(Node & node)
+{
+  auto _model = node.model(); 
+  auto thisModelObject = getObject<ModelObject>();
+  auto t_plantLoop = node.plantLoop();
+
+  boost::optional<unsigned> componentInletPort = tertiaryInletPort();
+  boost::optional<unsigned> componentOutletPort = tertiaryOutletPort();
+
+  boost::optional<HVACComponent> systemStartComponent;
+  boost::optional<HVACComponent> systemEndComponent;
+
+  if( node.getImpl<Node_Impl>()->isConnected(thisModelObject) ) return false;
+
+  if( t_plantLoop ) {
+    if( t_plantLoop->supplyComponent(node.handle()) ) {
+
+      systemStartComponent = t_plantLoop->supplyInletNode();
+      systemEndComponent = t_plantLoop->supplyOutletNode();
+
+      removeFromTertiaryPlantLoop();
+    } else if( t_plantLoop->demandComponent(node.handle()) ) {
+
+      systemStartComponent = t_plantLoop->demandInletNode();
+      systemEndComponent = t_plantLoop->demandOutletNode();
+
+      removeFromTertiaryPlantLoop();
+    }
+  }
+
+  if( systemStartComponent && systemEndComponent && componentOutletPort && componentInletPort ) {
+    return HVACComponent_Impl::addToNode(node,systemStartComponent.get(),systemEndComponent.get(),componentInletPort.get(),componentOutletPort.get());
+  } else {
+    return false;
+  }
+}
+
+boost::optional<ModelObject> WaterToWaterComponent_Impl::tertiaryInletModelObject() const
+{
+  return connectedObject(tertiaryInletPort());
+}
+
+boost::optional<ModelObject> WaterToWaterComponent_Impl::tertiaryOutletModelObject() const
+{
+  return connectedObject(tertiaryOutletPort());
 }
 
 } // detail
@@ -601,6 +515,26 @@ bool WaterToWaterComponent::removeFromPlantLoop()
 bool WaterToWaterComponent::removeFromSecondaryPlantLoop()
 {
   return getImpl<detail::WaterToWaterComponent_Impl>()->removeFromSecondaryPlantLoop();
+}
+
+boost::optional<PlantLoop> WaterToWaterComponent::tertiaryPlantLoop() const {
+  return getImpl<detail::WaterToWaterComponent_Impl>()->tertiaryPlantLoop();
+}
+
+bool WaterToWaterComponent::removeFromTertiaryPlantLoop() {
+  return getImpl<detail::WaterToWaterComponent_Impl>()->removeFromTertiaryPlantLoop();
+}
+
+bool WaterToWaterComponent::addToTertiaryNode(Node & node) {
+  return getImpl<detail::WaterToWaterComponent_Impl>()->addToTertiaryNode(node);
+}
+
+boost::optional<ModelObject> WaterToWaterComponent::tertiaryInletModelObject() const {
+  return getImpl<detail::WaterToWaterComponent_Impl>()->tertiaryInletModelObject();
+}
+
+boost::optional<ModelObject> WaterToWaterComponent::tertiaryOutletModelObject() const {
+  return getImpl<detail::WaterToWaterComponent_Impl>()->tertiaryOutletModelObject();
 }
 
 } // model

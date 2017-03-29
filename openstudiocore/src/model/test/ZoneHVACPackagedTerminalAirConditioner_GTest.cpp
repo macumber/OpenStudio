@@ -1,27 +1,38 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "../AirLoopHVAC.hpp"
 #include "../Model.hpp"
 #include "../Node.hpp"
 #include "../Node_Impl.hpp"
+#include "../Splitter.hpp"
+#include "../Splitter_Impl.hpp"
 #include "../CurveBiquadratic.hpp"
 #include "../CurveBiquadratic_Impl.hpp"
 #include "../CurveQuadratic.hpp"
@@ -30,6 +41,8 @@
 #include "../FanConstantVolume_Impl.hpp"
 #include "../CoilHeatingWater.hpp"
 #include "../CoilHeatingWater_Impl.hpp"
+#include "../CoilCoolingWater.hpp"
+#include "../CoilCoolingWater_Impl.hpp"
 #include "../CoilCoolingDXSingleSpeed.hpp"
 #include "../CoilCoolingDXSingleSpeed_Impl.hpp"
 #include "../ZoneHVACPackagedTerminalAirConditioner.hpp"
@@ -216,5 +229,34 @@ TEST(ZoneHVACPackagedTerminalAirConditioner,ZoneHVACPackagedTerminalAirCondition
      exit(0); 
   } ,
     ::testing::ExitedWithCode(0), "" );
+
+  {
+    model::Model m; 
+    model::CoilHeatingWater heatingCoil(m);
+    model::CoilCoolingDXSingleSpeed coolingCoil(m);
+    model::FanConstantVolume fan(m);
+    auto s = m.alwaysOnDiscreteSchedule();
+
+    model::ZoneHVACPackagedTerminalAirConditioner ptac(m,s,fan,heatingCoil,coolingCoil);
+    model::PlantLoop plant(m);
+    EXPECT_TRUE(plant.addDemandBranchForComponent(heatingCoil));
+
+    auto ptacClone = ptac.clone(m).cast<model::ZoneHVACPackagedTerminalAirConditioner>();
+
+    auto heatingClone = ptacClone.heatingCoil();
+    EXPECT_TRUE(heatingClone.plantLoop());
+
+    auto heatingCoils = plant.demandComponents(model::CoilHeatingWater::iddObjectType());
+    EXPECT_EQ(2u,heatingCoils.size());
+
+    // If for some reason you try to add coil to plant again (like expecting older API behavior),
+    // everything is ok.
+    plant.addDemandBranchForComponent(heatingClone);
+
+    heatingCoils = plant.demandComponents(model::CoilHeatingWater::iddObjectType());
+    EXPECT_EQ(2u,heatingCoils.size());
+
+    EXPECT_EQ(2u,plant.demandSplitter().outletModelObjects().size());
+  }
 }
 

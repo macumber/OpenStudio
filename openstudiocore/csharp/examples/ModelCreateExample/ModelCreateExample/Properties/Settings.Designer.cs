@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace RunManagerExample.Properties
+namespace ModelCreateExample.Properties
 {
 
 

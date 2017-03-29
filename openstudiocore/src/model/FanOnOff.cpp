@@ -1,24 +1,35 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "FanOnOff.hpp"
 #include "FanOnOff_Impl.hpp"
+#include "WaterHeaterHeatPump.hpp"
+#include "WaterHeaterHeatPump_Impl.hpp"
 #include "Node.hpp"
 #include "Node_Impl.hpp"
 #include "Schedule.hpp"
@@ -49,7 +60,10 @@
 #include "AirLoopHVACUnitaryHeatPumpAirToAir_Impl.hpp"
 #include "AirLoopHVACUnitarySystem.hpp"
 #include "AirLoopHVACUnitarySystem_Impl.hpp"
+#include "AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass.hpp"
+#include "AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass_Impl.hpp"
 #include <utilities/idd/OS_Fan_OnOff_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 #include "../utilities/units/Unit.hpp"
 #include "../utilities/core/Assert.hpp"
 
@@ -365,12 +379,6 @@ namespace detail {
   {
     FanOnOff newFan = ModelObject_Impl::clone(model).cast<FanOnOff>();
 
-    Curve curve1 = fanPowerRatioFunctionofSpeedRatioCurve();
-    newFan.setFanPowerRatioFunctionofSpeedRatioCurve(curve1.clone(model).cast<Curve>());
-
-    Curve curve2 = fanEfficiencyRatioFunctionofSpeedRatioCurve();
-    newFan.setFanEfficiencyRatioFunctionofSpeedRatioCurve(curve2.clone(model).cast<Curve>());
-
     return newFan;
   }
 
@@ -390,6 +398,8 @@ namespace detail {
   {
     // Process all types that might contain a FanOnOff object.
 
+    auto t_handle = handle();
+
     // AirLoopHVACUnitarySystem
     std::vector<AirLoopHVACUnitarySystem> airLoopHVACUnitarySystems = this->model().getConcreteModelObjects<AirLoopHVACUnitarySystem>();
 
@@ -400,6 +410,30 @@ namespace detail {
         if( fan->handle() == this->handle() )
         {
           return airLoopHVACUnitarySystem;
+        }
+      }
+    }
+
+    // WaterHeaterHeatPump
+    {
+      auto hpwhs = model().getConcreteModelObjects<WaterHeaterHeatPump>();
+      for( const auto & hpwh : hpwhs ) {
+        if( hpwh.fan().handle() == t_handle ) {
+          return hpwh;
+        }
+      }
+    }
+
+    // AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass
+    std::vector<AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass> bypassSystems = this->model().getConcreteModelObjects<AirLoopHVACUnitaryHeatCoolVAVChangeoverBypass>();
+
+    for( const auto & bypassSystem : bypassSystems )
+    {
+      if( boost::optional<HVACComponent> fan = bypassSystem.supplyAirFan() )
+      {
+        if( fan->handle() == this->handle() )
+        {
+          return bypassSystem;
         }
       }
     }
@@ -468,6 +502,41 @@ namespace detail {
   }
 
 } // detail
+
+FanOnOff::FanOnOff(const Model& model)
+  : StraightComponent(FanOnOff::iddObjectType(),model)
+  {
+    OS_ASSERT(getImpl<detail::FanOnOff_Impl>());
+
+    auto availabilitySchedule = model.alwaysOnDiscreteSchedule();
+    setAvailabilitySchedule(availabilitySchedule);
+
+    bool ok = setFanEfficiency(0.6);
+    OS_ASSERT(ok);
+    setPressureRise(300);
+    autosizeMaximumFlowRate();
+    ok = setMotorEfficiency(0.8);
+    OS_ASSERT(ok);
+    ok = setMotorInAirstreamFraction(1.0);
+    OS_ASSERT(ok);
+
+    CurveExponent fanPowerFtSpeedCurve(model);
+    fanPowerFtSpeedCurve.setName("Fan On Off Power Curve");
+    fanPowerFtSpeedCurve.setCoefficient1Constant(1.0);
+    fanPowerFtSpeedCurve.setCoefficient2Constant(0);
+    fanPowerFtSpeedCurve.setCoefficient3Constant(0);
+    ok = setFanPowerRatioFunctionofSpeedRatioCurve(fanPowerFtSpeedCurve);
+    OS_ASSERT(ok);
+
+    CurveCubic fanEfficiencyFtSpeedCurve(model);
+    fanEfficiencyFtSpeedCurve.setName("Fan On Off Efficiency Curve");
+    fanEfficiencyFtSpeedCurve.setCoefficient1Constant(1.0);
+    fanEfficiencyFtSpeedCurve.setCoefficient2x(0.0);
+    fanEfficiencyFtSpeedCurve.setCoefficient3xPOW2(0.0);
+    fanEfficiencyFtSpeedCurve.setCoefficient4xPOW3(0.0);
+    ok = setFanEfficiencyRatioFunctionofSpeedRatioCurve(fanEfficiencyFtSpeedCurve);
+    OS_ASSERT(ok);
+  }
 
 FanOnOff::FanOnOff(const Model& model, Schedule& availabilitySchedule)
   : StraightComponent(FanOnOff::iddObjectType(),model)

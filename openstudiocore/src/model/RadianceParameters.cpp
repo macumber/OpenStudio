@@ -1,26 +1,36 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "RadianceParameters.hpp"
 #include "RadianceParameters_Impl.hpp"
 
 #include <utilities/idd/OS_RadianceParameters_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 #include <utilities/idd/IddFactory.hxx>
 
 #include "../utilities/units/Unit.hpp"
@@ -53,6 +63,10 @@ namespace detail {
                                                    bool keepHandle)
     : ModelObject_Impl(other,model,keepHandle)
   {}
+
+  RadianceParameters_Impl::~RadianceParameters_Impl() {
+    // Empty implementation for debugging
+  }
 
   const std::vector<std::string>& RadianceParameters_Impl::outputVariableNames() const
   {
@@ -486,6 +500,92 @@ namespace detail {
     return getLimitWeightDMX(true);
   }
 
+  void RadianceParameters_Impl::applyCoarseSettings()
+  {
+    setAccumulatedRaysperRecord(1);
+    setDirectThreshold(0.0);
+    setDirectCertainty(1.0);
+    setDirectJitter(1.0);
+    setDirectPretest(1.0);
+    setAmbientBouncesVMX(6);
+    setAmbientBouncesDMX(2);
+    setAmbientDivisionsVMX(4050);
+    setAmbientDivisionsDMX(512);
+    setAmbientSupersamples(256);
+    setLimitWeightVMX(0.001);
+    setLimitWeightDMX(0.001);
+    setKlemsSamplingDensity(500);
+    setSkyDiscretizationResolution("146");
+  }
+
+  bool RadianceParameters_Impl::isCoarseSettings()
+  {
+    bool result = false;
+
+    if (accumulatedRaysperRecord() == 1 &&
+      directThreshold() == 0.0 &&
+      directCertainty() == 1.0 &&
+      directJitter() == 1.0 &&
+      directPretest() == 1.0 &&
+      ambientBouncesVMX() == 6 &&
+      ambientBouncesDMX() == 2 &&
+      ambientDivisionsVMX() == 4050 &&
+      ambientDivisionsDMX() == 512 &&
+      ambientSupersamples() == 256 &&
+      limitWeightVMX() == 0.001 &&
+      limitWeightDMX() == 0.001 &&
+      klemsSamplingDensity() == 500 &&
+      skyDiscretizationResolution() == "146")
+    {
+      result = true;
+    }
+
+    return result;
+  }
+
+  void RadianceParameters_Impl::applyFineSettings()
+  {
+    setAccumulatedRaysperRecord(1);
+    setDirectThreshold(0.0);
+    setDirectCertainty(1.0);
+    setDirectJitter(1.0);
+    setDirectPretest(1.0);
+    setAmbientBouncesVMX(10);
+    setAmbientBouncesDMX(3);
+    setAmbientDivisionsVMX(65536);
+    setAmbientDivisionsDMX(1024);
+    setAmbientSupersamples(512);
+    setLimitWeightVMX(0.0000152);
+    setLimitWeightDMX(0.0001);
+    setKlemsSamplingDensity(1000);
+    setSkyDiscretizationResolution("2306");
+  }
+
+  bool RadianceParameters_Impl::isFineSettings()
+  {
+    bool result = false;
+
+    if (accumulatedRaysperRecord() == 1 &&
+      directThreshold() == 0.0 &&
+      directCertainty() == 1.0 &&
+      directJitter() == 1.0 &&
+      directPretest() == 1.0 &&
+      ambientBouncesVMX() == 10 &&
+      ambientBouncesDMX() == 3 &&
+      ambientDivisionsVMX() == 65536 &&
+      ambientDivisionsDMX() == 1024 &&
+      ambientSupersamples() == 512 &&
+      limitWeightVMX() == 0.0000152 &&
+      limitWeightDMX() == 0.0001 &&
+      klemsSamplingDensity() == 1000 &&
+      skyDiscretizationResolution() == "2306")
+    {
+      result = true;
+    }
+
+    return result;
+  }
+
 } // detail
 
 IddObjectType RadianceParameters::iddObjectType() {
@@ -626,11 +726,13 @@ std::vector<std::string> RadianceParameters::skyDiscretizationResolutionValues()
 }
 
 std::string RadianceParameters::skyDiscretizationResolution() const {
-  return getImpl<detail::RadianceParameters_Impl>()->skyDiscretizationResolution();
+  auto impl = getImpl<detail::RadianceParameters_Impl>();
+  return impl->skyDiscretizationResolution();
 }
 
 bool RadianceParameters::setSkyDiscretizationResolution(std::string skyDiscretizationResolution) {
-  return getImpl<detail::RadianceParameters_Impl>()->setSkyDiscretizationResolution(skyDiscretizationResolution);
+  auto impl = getImpl<detail::RadianceParameters_Impl>();
+  return impl->setSkyDiscretizationResolution(skyDiscretizationResolution);
 }
 
 void RadianceParameters::resetSkyDiscretizationResolution() {
@@ -765,57 +867,38 @@ void RadianceParameters::resetKlemsSamplingDensity() {
   getImpl<detail::RadianceParameters_Impl>()->resetKlemsSamplingDensity();
 }
 
+void RadianceParameters::applyCoarseSettings()
+{
+  getImpl<detail::RadianceParameters_Impl>()->applyCoarseSettings();
+}
+
+bool RadianceParameters::isCoarseSettings()
+{
+  return getImpl<detail::RadianceParameters_Impl>()->isCoarseSettings();
+}
+
+void RadianceParameters::applyFineSettings()
+{
+  getImpl<detail::RadianceParameters_Impl>()->applyFineSettings();
+}
+
+bool RadianceParameters::isFineSettings()
+{
+  return getImpl<detail::RadianceParameters_Impl>()->isFineSettings();
+}
+
 /// @cond
 RadianceParameters::RadianceParameters(std::shared_ptr<detail::RadianceParameters_Impl> impl)
   : ModelObject(impl)
 {
 }
 
-RadianceParameters::RadianceParameters(Model& model,
-                                       int accumulatedRaysperRecord,
-                                       double directThreshold,
-                                       double directCertainty,
-                                       double directJitter,
-                                       double directPretest,
-                                       int ambientBouncesVMX,
-                                       int ambientBouncesDMX,
-                                       int ambientDivisionsVMX,
-                                       int ambientDivisionsDMX,
-                                       int ambientSupersamples,
-                                       double LimitWeightVMX,
-                                       double LimitWeightDMX,
-                                       int klemsSamplingDensity,
-                                       std::string skyDiscretizationResolution)
+RadianceParameters::RadianceParameters(Model& model)
   : ModelObject(RadianceParameters::iddObjectType(),model)
 {
   OS_ASSERT(getImpl<detail::RadianceParameters_Impl>());
 
-  bool ok = setAccumulatedRaysperRecord(accumulatedRaysperRecord);
-  OS_ASSERT(ok);
-  ok = setDirectThreshold(directThreshold);
-  OS_ASSERT(ok);
-  ok = setDirectCertainty(directCertainty);
-  OS_ASSERT(ok);
-  ok = setDirectJitter(directJitter);
-  OS_ASSERT(ok);
-  ok = setDirectPretest(directPretest);
-  OS_ASSERT(ok);
-  ok = setAmbientBouncesVMX(ambientBouncesVMX);
-  OS_ASSERT(ok);
-  ok = setAmbientBouncesDMX(ambientBouncesDMX);
-  OS_ASSERT(ok);
-  ok = setAmbientDivisionsVMX(ambientDivisionsVMX);
-  OS_ASSERT(ok);
-  ok = setAmbientDivisionsDMX(ambientDivisionsDMX);
-  OS_ASSERT(ok);
-  ok = setAmbientSupersamples(ambientSupersamples);
-  OS_ASSERT(ok);
-  ok = setLimitWeightVMX(LimitWeightVMX);
-  OS_ASSERT(ok);
-  setLimitWeightDMX(LimitWeightDMX);
-  setKlemsSamplingDensity(klemsSamplingDensity);
-  ok = setSkyDiscretizationResolution(skyDiscretizationResolution);
-  OS_ASSERT(ok);
+  applyCoarseSettings();  
 }
 
 /// @endcond

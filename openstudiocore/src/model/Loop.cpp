@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Loop.hpp"
 #include "Loop_Impl.hpp"
@@ -40,6 +49,8 @@
 #include "ConnectorSplitter.hpp"
 #include "ConnectorSplitter_Impl.hpp"
 #include "Model.hpp"
+
+#include <utilities/idd/IddEnums.hxx>
 
 #include "../utilities/core/Assert.hpp"
 
@@ -113,9 +124,13 @@ namespace detail {
     if( handle == hvacComponent.handle() ) { 
       return hvacComponent;
     }
-    std::vector<HVACComponent> nodes = hvacComponent.getImpl<HVACComponent_Impl>()->edges(isDemandComponents);
 
-    for(std::vector<HVACComponent>::iterator it = nodes.begin();
+    boost::optional<HVACComponent> prev;
+    if( visited.size() >= 2u ) prev = visited.rbegin()[1];
+
+    std::vector<HVACComponent> nodes = hvacComponent.getImpl<HVACComponent_Impl>()->edges(prev);
+
+    for(auto it = nodes.begin();
         it != nodes.end();
         it++)
     {
@@ -140,26 +155,41 @@ namespace detail {
     return this->demandComponent(handle);
   }
 
-  boost::optional<ModelObject> Loop_Impl::demandComponent(openstudio::Handle handle)
+  boost::optional<ModelObject> Loop_Impl::demandComponent(openstudio::Handle handle) const
   {
-    Node inletComp = this->demandInletNode();
-    Node outletComp = this->demandOutletNode();
-    if( handle == inletComp.handle() ) { return inletComp; }
+    auto inletComps = demandInletNodes();
+    auto outletComp = demandOutletNode();
+
     if( handle == outletComp.handle() ) { return outletComp; }
-    std::vector<HVACComponent> visited;
-    visited.push_back(inletComp);
-    return findModelObject(handle, outletComp, visited, true);
+
+    for( auto const & inletComp : inletComps ) {
+      if( handle == inletComp.handle() ) { return inletComp; }
+      std::vector<HVACComponent> visited { inletComp };
+      if( auto mo = findModelObject(handle, outletComp, visited, true) ) {
+        return mo;
+      }
+    }
+
+    return boost::none;
+
   }
 
   boost::optional<ModelObject> Loop_Impl::supplyComponent(openstudio::Handle handle) const
   {
-    Node inletComp = this->supplyInletNode();
-    Node outletComp = this->supplyOutletNode();
+    auto inletComp = supplyInletNode();
+    auto outletComps = supplyOutletNodes();
+
     if( handle == inletComp.handle() ) { return inletComp; }
-    if( handle == outletComp.handle() ) { return outletComp; }
-    std::vector<HVACComponent> visited;
-    visited.push_back(inletComp);
-    return findModelObject(handle, outletComp, visited, false);
+
+    for( auto const & outletComp : outletComps ) {
+      if( handle == outletComp.handle() ) { return outletComp; }
+      std::vector<HVACComponent> visited { inletComp };
+      if( auto mo = findModelObject(handle, outletComp, visited, false) ) {
+        return mo;
+      }
+    }
+
+    return boost::none;
   }
 
   ModelObject Loop_Impl::clone(Model model) const
@@ -177,35 +207,16 @@ namespace detail {
       openstudio::IddObjectType type
     ) const
   {
+    LOG(Warn,"supplyComponents method for " << briefDescription() << " is not implemented to take multiple inlet and outlet components");
     return std::vector<ModelObject>();
   }
 
   std::vector<ModelObject> Loop_Impl::demandComponents(std::vector<HVACComponent> inletComps, 
       std::vector<HVACComponent> outletComps,
       openstudio::IddObjectType type
-    )
+    ) const
   {
     return std::vector<ModelObject>();
-  }
-
-  Node Loop_Impl::supplyInletNode() const
-  {
-    return Node(model());
-  }
-
-  Node Loop_Impl::supplyOutletNode() const
-  {
-    return Node(model());
-  }
-
-  Node Loop_Impl::demandInletNode() const
-  {
-    return Node(model());
-  }
-
-  Node Loop_Impl::demandOutletNode() const
-  {
-    return Node(model());
   }
 
   boost::optional<ModelObject> Loop_Impl::supplyInletNodeAsModelObject() {
@@ -233,7 +244,10 @@ namespace detail {
   // when complete, paths will be populated with all nodes between the source node and sink
   void findModelObjects(const HVACComponent & sink, std::vector<HVACComponent> & visited, std::vector<HVACComponent> & paths, bool isDemandComponents)
   {
-    std::vector<HVACComponent> nodes = visited.back().getImpl<HVACComponent_Impl>()->edges(isDemandComponents);
+    boost::optional<HVACComponent> prev;
+    if( visited.size() >= 2u ) prev = visited.rbegin()[1];
+
+    std::vector<HVACComponent> nodes = visited.back().getImpl<HVACComponent_Impl>()->edges(prev);
 
     for(const auto & node : nodes)
     {
@@ -280,7 +294,7 @@ namespace detail {
 
   std::vector<ModelObject> Loop_Impl::demandComponents( HVACComponent inletComp,
                                                         HVACComponent outletComp,
-                                                        openstudio::IddObjectType type )
+                                                        openstudio::IddObjectType type ) const
   {
     std::vector<HVACComponent> visited;
     visited.push_back(inletComp);
@@ -311,18 +325,61 @@ namespace detail {
     return reducedModelObjects;
   }
 
+  template <typename T>
+  struct Duplicate {
+    bool operator()(const T& element) {
+      return ! s_.insert(element).second; // true if element already in set
+    }
+   private:
+    std::set<T> s_;
+  };
+
   std::vector<ModelObject> Loop_Impl::supplyComponents(openstudio::IddObjectType type) const
   {
-    return supplyComponents( supplyInletNode(),
-                             supplyOutletNode(),
-                             type );
+    std::vector<ModelObject> result;
+
+    auto t_supplyInletNode = supplyInletNode();
+    auto t_supplyOutletNodes = supplyOutletNodes();
+
+    for( auto const & t_supplyOutletNode : t_supplyOutletNodes ) {
+      auto components = supplyComponents( t_supplyInletNode,
+                                          t_supplyOutletNode,
+                                          type );
+      result.insert(result.end(),components.begin(),components.end());
+    }
+
+    // If there is more than one outlet node (dual duct) we might have duplicates
+    if( t_supplyOutletNodes.size() > 1u ) {
+      Duplicate<ModelObject> pred;
+      auto it = std::remove_if(result.begin(), result.end(), std::ref(pred));
+      return std::vector<ModelObject>(result.begin(),it);
+    } else {
+      return result;
+    }
   }
 
-  std::vector<ModelObject> Loop_Impl::demandComponents(openstudio::IddObjectType type)
+  std::vector<ModelObject> Loop_Impl::demandComponents(openstudio::IddObjectType type) const
   {
-    return demandComponents( demandInletNode(),
-                             demandOutletNode(),
-                             type );
+    std::vector<ModelObject> result;
+
+    auto t_demandOutletNode = demandOutletNode();
+    auto t_demandInletNodes = demandInletNodes();
+
+    for( auto const & t_demandInletNode : t_demandInletNodes ) {
+      auto components = demandComponents( t_demandInletNode,
+                                          t_demandOutletNode,
+                                          type );
+      result.insert(result.end(),components.begin(),components.end());
+    }
+
+    // If there is more than one inlet node (dual duct) we might have duplicates
+    if( t_demandInletNodes.size() > 1u ) {
+      Duplicate<ModelObject> pred;
+      auto it = std::remove_if(result.begin(), result.end(), std::ref(pred));
+      return std::vector<ModelObject>(result.begin(),it);
+    } else {
+      return result;
+    }
   }
 
   std::vector<ModelObject> Loop_Impl::components(openstudio::IddObjectType type)
@@ -423,19 +480,19 @@ boost::optional<ModelObject> Loop::component(openstudio::Handle handle)
 std::vector<ModelObject> Loop::supplyComponents(std::vector<HVACComponent> inletComps, 
     std::vector<HVACComponent> outletComps,
     openstudio::IddObjectType type
-  )
+  ) const
 {
   return getImpl<detail::Loop_Impl>()->supplyComponents( inletComps, outletComps, type);
 }
 
 std::vector<ModelObject> Loop::supplyComponents(HVACComponent inletComp, 
                                                 HVACComponent outletComp, 
-                                                openstudio::IddObjectType type)
+                                                openstudio::IddObjectType type) const
 {
   return getImpl<detail::Loop_Impl>()->supplyComponents( inletComp, outletComp, type);
 }
   
-std::vector<ModelObject> Loop::supplyComponents(openstudio::IddObjectType type)
+std::vector<ModelObject> Loop::supplyComponents(openstudio::IddObjectType type) const
 {
   return getImpl<detail::Loop_Impl>()->supplyComponents(type);
 }
@@ -443,19 +500,19 @@ std::vector<ModelObject> Loop::supplyComponents(openstudio::IddObjectType type)
 std::vector<ModelObject> Loop::demandComponents(std::vector<HVACComponent> inletComps, 
     std::vector<HVACComponent> outletComps,
     openstudio::IddObjectType type
-  )
+  ) const
 {
   return getImpl<detail::Loop_Impl>()->demandComponents( inletComps, outletComps, type);
 }
 
 std::vector<ModelObject> Loop::demandComponents( HVACComponent inletComp, 
                                                  HVACComponent outletComp, 
-                                                 openstudio::IddObjectType type )
+                                                 openstudio::IddObjectType type ) const
 {
   return getImpl<detail::Loop_Impl>()->demandComponents( inletComp, outletComp, type);
 }
   
-std::vector<ModelObject> Loop::demandComponents(openstudio::IddObjectType type)
+std::vector<ModelObject> Loop::demandComponents(openstudio::IddObjectType type) const
 {
   return getImpl<detail::Loop_Impl>()->demandComponents(type);
 }
@@ -470,7 +527,7 @@ std::vector<ModelObject> Loop::children() const
   return getImpl<detail::Loop_Impl>()->children();
 }
 
-boost::optional<ModelObject> Loop::demandComponent(openstudio::Handle handle)
+boost::optional<ModelObject> Loop::demandComponent(openstudio::Handle handle) const
 {
   return getImpl<detail::Loop_Impl>()->demandComponent( handle );
 }
@@ -480,22 +537,32 @@ boost::optional<ModelObject> Loop::supplyComponent(openstudio::Handle handle)
   return getImpl<detail::Loop_Impl>()->supplyComponent( handle );
 }
 
-Node Loop::supplyInletNode()
+Node Loop::supplyInletNode() const
 {
   return getImpl<detail::Loop_Impl>()->supplyInletNode();
 }
 
-Node Loop::supplyOutletNode()
+Node Loop::supplyOutletNode() const
 {
   return getImpl<detail::Loop_Impl>()->supplyOutletNode();
 }
 
-Node Loop::demandInletNode()
+std::vector<Node> Loop::supplyOutletNodes() const
+{
+  return getImpl<detail::Loop_Impl>()->supplyOutletNodes();
+}
+
+Node Loop::demandInletNode() const
 {
   return getImpl<detail::Loop_Impl>()->demandInletNode();
 }
 
-Node Loop::demandOutletNode()
+std::vector<Node> Loop::demandInletNodes() const
+{
+  return getImpl<detail::Loop_Impl>()->demandInletNodes();
+}
+
+Node Loop::demandOutletNode() const
 {
   return getImpl<detail::Loop_Impl>()->demandOutletNode();
 }

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "OSItem.hpp"
 #include "RefrigerationGraphicsItems.hpp"
@@ -38,7 +47,7 @@ const double RefrigerationSystemView::componentHeight = 75;
 RefrigerationView::RefrigerationView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setSpacing(0);
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setAlignment(Qt::AlignTop);
@@ -50,7 +59,7 @@ RefrigerationView::RefrigerationView()
   header->setFixedHeight(35);
   mainVLayout->addWidget(header);
 
-  QHBoxLayout * headerLayout = new QHBoxLayout();
+  auto headerLayout = new QHBoxLayout();
   headerLayout->setContentsMargins(5,5,5,5);
   headerLayout->setSpacing(0);
   header->setLayout(headerLayout);
@@ -455,7 +464,7 @@ void RefrigerationCasesView::setExpanded(bool exapanded)
 
   m_expanded = exapanded;
 
-  for( std::vector<QGraphicsObject *>::iterator it = m_caseDetailViews.begin();
+  for( auto it = m_caseDetailViews.begin();
        it != m_caseDetailViews.end();
        ++it )
   {
@@ -604,7 +613,7 @@ void RefrigerationCasesView::removeAllCaseDetailViews()
 {
   prepareGeometryChange();
 
-  for( std::vector<QGraphicsObject *>::iterator it = m_caseDetailViews.begin();
+  for( auto it = m_caseDetailViews.begin();
        it != m_caseDetailViews.end(); )
   {
     delete * it;
@@ -619,7 +628,7 @@ void RefrigerationCasesView::adjustLayout()
 {
   int i = 0;
 
-  for( std::vector<QGraphicsObject *>::iterator it = m_caseDetailViews.begin();
+  for( auto it = m_caseDetailViews.begin();
        it != m_caseDetailViews.end();
        ++it )
   {
@@ -986,7 +995,7 @@ void RefrigerationCompressorView::removeAllCompressorDetailViews()
 {
   prepareGeometryChange();
 
-  for( std::vector<QGraphicsObject *>::iterator it = m_compressorDetailViews.begin();
+  for( auto it = m_compressorDetailViews.begin();
        it != m_compressorDetailViews.end(); )
   {
     delete * it;
@@ -1004,7 +1013,7 @@ void RefrigerationCompressorView::adjustLayout()
   int x = refrigerationCompressorDropZoneView->pos().x() + refrigerationCompressorDropZoneView->boundingRect().width() + RefrigerationSystemView::margin / 2.0;
   int y = RefrigerationSystemView::margin / 2.0;
 
-  for( std::vector<QGraphicsObject *>::iterator it = m_compressorDetailViews.begin();
+  for( auto it = m_compressorDetailViews.begin();
        it != m_compressorDetailViews.end();
        ++it )
   {
@@ -1401,7 +1410,7 @@ void RefrigerationSecondaryView::insertSecondaryDetailView(int index, QGraphicsO
 
 void RefrigerationSecondaryView::removeAllSecondaryDetailViews()
 {
-  for( std::vector<QGraphicsObject *>::iterator it = m_secondaryDetailViews.begin();
+  for( auto it = m_secondaryDetailViews.begin();
        it != m_secondaryDetailViews.end(); )
   {
     delete * it;
@@ -1421,7 +1430,7 @@ void RefrigerationSecondaryView::adjustLayout()
   secondaryDropZoneView->setPos(0,0);
   y = y + secondaryDropZoneView->boundingRect().height() + RefrigerationSystemView::margin / 2.0;
 
-  for( std::vector<QGraphicsObject *>::iterator it = m_secondaryDetailViews.begin();
+  for( auto it = m_secondaryDetailViews.begin();
        it != m_secondaryDetailViews.end();
        ++it )
   {

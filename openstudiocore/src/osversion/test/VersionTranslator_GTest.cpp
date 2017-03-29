@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "OSVersionFixture.hpp"
@@ -38,7 +47,6 @@
 
 #include "../../utilities/bcl/RemoteBCL.hpp"
 #include "../../utilities/bcl/LocalBCL.hpp"
-#include "../../utilities/bcl/OnDemandGenerator.hpp"
 #include "../../utilities/bcl/BCLComponent.hpp"
 
 #include "../../utilities/idf/IdfObject.hpp"
@@ -46,7 +54,7 @@
 
 #include "../../utilities/core/Compare.hpp"
 
-#include <boost/filesystem.hpp>
+
 
 #include <resources.hxx>
 #include <OpenStudio.hxx>
@@ -55,102 +63,182 @@ using namespace openstudio;
 using namespace model;
 using namespace osversion;
 
-TEST_F(OSVersionFixture,VersionTranslator_ExampleModel) {
+void testExampleModel(int minor, int major) {
   osversion::VersionTranslator translator;
 
   // iterate through osversion subfolders
   openstudio::path resources = resourcesPath() / toPath("osversion");
-  for (boost::filesystem::directory_iterator it(resources); it != boost::filesystem::directory_iterator(); ++it) {
-    if (boost::filesystem::is_directory(it->status())) {
-      // run version translator on each example.osm
-      openstudio::path modelPath = it->path() / toPath("example.osm");
-      model::OptionalModel result = translator.loadModel(modelPath);
-      EXPECT_TRUE(result);
-      // check warnings, errors, affected objects
-      EXPECT_TRUE(translator.errors().empty());
-      EXPECT_TRUE(translator.warnings().empty());
-      // print info for visual inspection
-      ASSERT_TRUE(result);
-      LOG(Debug,"Updated '" << toString(modelPath) << "' to OpenStudio Version "
-          << result->version().str() << ".");
-      LOG(Debug,"Deprecated objects: ");
-      for (const IdfObject& object : translator.deprecatedObjects()) {
-        LOG(Debug,object);
+  for (openstudio::filesystem::directory_iterator it(resources); it != openstudio::filesystem::directory_iterator(); ++it) {
+    if (openstudio::filesystem::is_directory(it->status())) {
+
+      QString stem = toQString(it->path().stem()).replace("_", ".");
+      VersionString vs(toString(stem));
+      if (vs.major() == major && vs.minor() == minor){
+
+        // run version translator on each example.osm
+        openstudio::path modelPath = it->path() / toPath("example.osm");
+        model::OptionalModel result = translator.loadModel(modelPath);
+        EXPECT_TRUE(result);
+        // check warnings, errors, affected objects
+        EXPECT_TRUE(translator.errors().empty());
+        EXPECT_TRUE(translator.warnings().empty());
+        // print info for visual inspection
+        ASSERT_TRUE(result);
+        LOG_FREE(Debug, "OSVersionFixture", "Updated '" << toString(modelPath) << "' to OpenStudio Version "
+                 << result->version().str() << ".");
+        LOG_FREE(Debug, "OSVersionFixture", "Deprecated objects: ");
+        for (const IdfObject& object : translator.deprecatedObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", object);
+        }
+        LOG_FREE(Debug, "OSVersionFixture", "Untranslated objects: ");
+        for (const IdfObject& object : translator.untranslatedObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", object);
+        }
+        LOG_FREE(Debug, "OSVersionFixture", "New objects: ");
+        for (const IdfObject& object : translator.newObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", object);
+        }
+        LOG_FREE(Debug, "OSVersionFixture", "Refactored objects: ");
+        for (const IdfObjectPair& p : translator.refactoredObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", p.first << "replaced with" << std::endl << std::endl << p.second);
+        }
+        // make sure save and load is ok
+        modelPath = it->path() / toPath("example_updated.osm");
+        result->save(modelPath, true);
+        result = model::Model::load(modelPath);
+        EXPECT_TRUE(result);
       }
-      LOG(Debug,"Untranslated objects: ");
-      for (const IdfObject& object : translator.untranslatedObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"New objects: ");
-      for (const IdfObject& object : translator.newObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"Refactored objects: ");
-      for (const IdfObjectPair& p : translator.refactoredObjects()) {
-        LOG(Debug,p.first << "replaced with" << std::endl << std::endl << p.second);
-      }
-      // make sure save and load is ok
-      modelPath = it->path() / toPath("example_updated.osm");
-      result->save(modelPath,true);
-      result = model::Model::load(modelPath);
-      EXPECT_TRUE(result);
     }
   }
 }
-
-TEST_F(OSVersionFixture,VersionTranslator_ExampleComponent) {
+/*
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_0_7) {
+  testExampleModel(0, 7);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_0_8) {
+  testExampleModel(0, 8);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_0_9) {
+  testExampleModel(0, 9);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_0_10) {
+  testExampleModel(0, 10);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_0_11) {
+  testExampleModel(0, 11);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_1_0) {
+  testExampleModel(1, 0);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_1_1) {
+  testExampleModel(1, 1);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_1_2) {
+  testExampleModel(1, 2);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_1_3) {
+  testExampleModel(1, 3);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_1_4) {
+  testExampleModel(1, 4);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleModel_1_5) {
+  testExampleModel(1, 5);
+}
+*/
+void testExampleComponent(int major, int minor) {
   osversion::VersionTranslator translator;
 
   // iterate through osversion subfolders
   openstudio::path resources = resourcesPath() / toPath("osversion");
-  for (boost::filesystem::directory_iterator it(resources); it != boost::filesystem::directory_iterator(); ++it) {
-    if (boost::filesystem::is_directory(it->status())) {
-      // run version translator on each example.osm
-      openstudio::path componentPath = it->path() / toPath("example.osc");
-      EXPECT_TRUE(exists(componentPath));
-      model::OptionalComponent result = translator.loadComponent(componentPath);
-      EXPECT_TRUE(result);
-      // check warnings, errors, affected objects
-      EXPECT_TRUE(translator.errors().empty());
-      EXPECT_TRUE(translator.warnings().empty());
-      // print info for visual inspection
-      ASSERT_TRUE(result);
-      LOG(Debug,"Updated '" << toString(componentPath) << "' to OpenStudio Version "
-          << result->version().str() << ".");
-      LOG(Debug,"Deprecated objects: ");
-      for (const IdfObject& object : translator.deprecatedObjects()) {
-        LOG(Debug,object);
+  for (openstudio::filesystem::directory_iterator it(resources); it != openstudio::filesystem::directory_iterator(); ++it) {
+    if (openstudio::filesystem::is_directory(it->status())) {
+
+      QString stem = toQString(it->path().stem()).replace("_", ".");
+      VersionString vs(toString(stem));
+      if (vs.major() == major && vs.minor() == minor){
+
+        // run version translator on each example.osm
+        openstudio::path componentPath = it->path() / toPath("example.osc");
+        EXPECT_TRUE(exists(componentPath));
+        model::OptionalComponent result = translator.loadComponent(componentPath);
+        EXPECT_TRUE(result);
+        // check warnings, errors, affected objects
+        EXPECT_TRUE(translator.errors().empty());
+        EXPECT_TRUE(translator.warnings().empty());
+        // print info for visual inspection
+        ASSERT_TRUE(result);
+        LOG_FREE(Debug, "OSVersionFixture", "Updated '" << toString(componentPath) << "' to OpenStudio Version "
+                 << result->version().str() << ".");
+        LOG_FREE(Debug, "OSVersionFixture", "Deprecated objects: ");
+        for (const IdfObject& object : translator.deprecatedObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", object);
+        }
+        LOG_FREE(Debug, "OSVersionFixture", "Untranslated objects: ");
+        for (const IdfObject& object : translator.untranslatedObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", object);
+        }
+        LOG_FREE(Debug, "OSVersionFixture", "New objects: ");
+        for (const IdfObject& object : translator.newObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", object);
+        }
+        LOG_FREE(Debug, "OSVersionFixture", "Refactored objects: ");
+        for (const IdfObjectPair& p : translator.refactoredObjects()) {
+          LOG_FREE(Debug, "OSVersionFixture", p.first << "replaced with" << std::endl << std::endl << p.second);
+        }
+        // make sure component came out ok
+        ASSERT_TRUE(result);
+        model::Component translated = result.get();
+        model::ComponentData contents = translated.componentData();
+        ASSERT_NO_THROW(contents.primaryComponentObject());
+        model::ModelObject prime = contents.primaryComponentObject();
+        ASSERT_TRUE(prime.optionalCast<model::Construction>());
+        model::Construction construction = prime.cast<model::Construction>();
+        EXPECT_FALSE(construction.layers().empty());
+        // make sure save and load is ok
+        componentPath = it->path() / toPath("example_updated.osc");
+        result->save(componentPath, true);
+        result = model::Component::load(componentPath);
+        EXPECT_TRUE(result);
       }
-      LOG(Debug,"Untranslated objects: ");
-      for (const IdfObject& object : translator.untranslatedObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"New objects: ");
-      for (const IdfObject& object : translator.newObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"Refactored objects: ");
-      for (const IdfObjectPair& p : translator.refactoredObjects()) {
-        LOG(Debug,p.first << "replaced with" << std::endl  << std::endl << p.second);
-      }
-      // make sure component came out ok
-      ASSERT_TRUE(result);
-      model::Component translated = result.get();
-      model::ComponentData contents = translated.componentData();
-      ASSERT_NO_THROW(contents.primaryComponentObject());
-      model::ModelObject prime = contents.primaryComponentObject();
-      ASSERT_TRUE(prime.optionalCast<model::Construction>());
-      model::Construction construction = prime.cast<model::Construction>();
-      EXPECT_FALSE(construction.layers().empty());
-      // make sure save and load is ok
-      componentPath = it->path() / toPath("example_updated.osc");
-      result->save(componentPath,true);
-      result = model::Component::load(componentPath);
-      EXPECT_TRUE(result);
     }
   }
 }
-
+/*
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_0_7) {
+  testExampleComponent(0, 7);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_0_8) {
+  testExampleComponent(0, 8);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_0_9) {
+  testExampleComponent(0, 9);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_0_10) {
+  testExampleComponent(0, 10);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_0_11) {
+  testExampleComponent(0, 11);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_1_0) {
+  testExampleComponent(1, 0);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_1_1) {
+  testExampleComponent(1, 1);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_1_2) {
+  testExampleComponent(1, 2);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_1_3) {
+  testExampleComponent(1, 3);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_1_4) {
+  testExampleComponent(1, 4);
+}
+TEST_F(OSVersionFixture, VersionTranslator_ExampleComponent_1_5) {
+  testExampleComponent(1, 5);
+}
+*/
 TEST_F(OSVersionFixture,VersionTranslator_FutureVersion_ExampleModel) {
   osversion::VersionTranslator translator;
 
@@ -299,61 +387,7 @@ TEST_F(OSVersionFixture,VersionTranslator_FutureVersion_ExampleModel2) {
   m2 = translator.loadModel(ss);
   EXPECT_FALSE(m2);
 }
-
-TEST_F(OSVersionFixture,VersionTranslator_AllDefaultObjects) {
-  // iterate through osversion subfolders
-  osversion::VersionTranslator translator;
-
-  // iterate through osversion subfolders
-  openstudio::path resources = resourcesPath() / toPath("osversion");
-  for (boost::filesystem::directory_iterator it(resources); it != boost::filesystem::directory_iterator(); ++it) {
-    if (boost::filesystem::is_directory(it->status())) {
-      // load each IddFile and create an IdfFile containing one of each of its objects
-      openstudio::path iddPath = it->path() / toPath("OpenStudio.idd");
-      IddFile iddFile = IddFile::load(iddPath).get();
-      IdfFile idfFile(iddFile);
-      for (const IddObject& iddObj : iddFile.objects()) {
-        if (iddObj.name() != "OS:ComponentData"){
-          idfFile.addObject(IdfObject(iddObj));
-        }
-      }
-      openstudio::path modelPath = toPath("temp.osm");
-      idfFile.save(modelPath,true);
-      // run version translator
-      model::OptionalModel result = translator.loadModel(modelPath);
-      EXPECT_TRUE(result);
-
-      // number of warnings varies. to check, need to compose starting version from it->path().
-      // does not seem worth the effort at the moment, log messages already in log
-      //EXPECT_TRUE(translator.warnings().empty());
-
-      // check warnings, errors, affected objects, log messages already in log
-      EXPECT_TRUE(translator.errors().empty());
-
-      // print info for visual inspection
-      ASSERT_TRUE(result);
-      LOG(Debug,"Updated '" << toString(modelPath) << "' to OpenStudio Version "
-          << result->version().str() << ".");
-      LOG(Debug,"Deprecated objects: ");
-      for (const IdfObject& object : translator.deprecatedObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"Untranslated objects: ");
-      for (const IdfObject& object : translator.untranslatedObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"New objects: ");
-      for (const IdfObject& object : translator.newObjects()) {
-        LOG(Debug,object);
-      }
-      LOG(Debug,"Refactored objects: ");
-      for (const IdfObjectPair& p : translator.refactoredObjects()) {
-        LOG(Debug,p.first << "replaced with" << std::endl << std::endl << p.second);
-      }
-    }
-  }
-}
-
+/*
 TEST_F(OSVersionFixture,VersionTranslator_0_7_4_NameRefsTranslated) {
   // Translator adds handle fields, but leaves initial name references as-is.
   //
@@ -379,7 +413,9 @@ TEST_F(OSVersionFixture,VersionTranslator_0_7_4_NameRefsTranslated) {
   for (const model::Construction construction : constructions) {
     ASSERT_FALSE(construction.layers().empty());
     model::Material material = construction.layers()[0];
-    ASSERT_FALSE(material.attributeNames().empty());
+    
+    // Removed due to removal of attributes
+    // ASSERT_FALSE(material.attributeNames().empty());
   }
 }
 
@@ -450,7 +486,7 @@ TEST_F(OSVersionFixture,PrimaryObject) {
 
   openstudio::path path = resourcesPath() / toPath("osversion/unknown.osc");
 
-  ASSERT_TRUE(boost::filesystem::exists(path));
+  ASSERT_TRUE(openstudio::filesystem::exists(path));
 
   osversion::VersionTranslator translator;
   boost::optional<model::Component> component = translator.loadComponent(path);
@@ -504,34 +540,4 @@ TEST_F(OSVersionFixture,KeepHandles) {
   ASSERT_EQ(1u, workspaceObjects.size());
   EXPECT_TRUE(idfObjects[0].handle() == workspaceObjects[0].handle());
 }
-
-TEST_F(OSVersionFixture,OnDemandComponent) {
-  RemoteBCL remoteBCL;
-  bool ok = remoteBCL.downloadOnDemandGenerator("bb8aa6a0-6a25-012f-9521-00ff10704b07");
-  EXPECT_TRUE(ok);
-  boost::optional<OnDemandGenerator> oGenerator = remoteBCL.waitForOnDemandGenerator();
-  ASSERT_TRUE(oGenerator);
-  OnDemandGenerator generator = *oGenerator;
-
-  generator.setArgumentValue("NREL_reference_building_vintage","ASHRAE_90.1-2004");
-  generator.setArgumentValue("Climate_zone","ClimateZone 1-8");
-  generator.setArgumentValue("NREL_reference_building_primary_space_type","SmallOffice");
-  generator.setArgumentValue("NREL_reference_building_secondary_space_type","WholeBuilding");
-
-  boost::optional<BCLComponent> oBCLComponent = LocalBCL::instance().getOnDemandComponent(generator);
-  if (!oBCLComponent) {
-    oBCLComponent = remoteBCL.getOnDemandComponent(generator);
-  }
-  ASSERT_TRUE(oBCLComponent);
-  BCLComponent bclComponent = *oBCLComponent;
-
-  StringVector fileStrs = bclComponent.files("osc");
-  ASSERT_FALSE(fileStrs.empty());
-  openstudio::path oscPath = toPath(fileStrs[0]);
-
-  VersionTranslator translator;
-  OptionalComponent oComponent = translator.loadComponent(oscPath);
-  ASSERT_TRUE(oComponent);
-  Component component = *oComponent;
-  EXPECT_EQ(IddObjectType("OS:SpaceType"),component.primaryObject().iddObjectType());
-}
+*/

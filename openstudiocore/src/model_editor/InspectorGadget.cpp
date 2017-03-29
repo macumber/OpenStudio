@@ -1,29 +1,61 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
-#include "InspectorGadget.hpp"
-#include "IGLineEdit.hpp"
-#include "IGSpinBoxes.hpp"
-#include "BridgeClasses.hpp"
-#include "IGPrecisionDialog.hpp"
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
-#include <iostream>
+#include "InspectorGadget.hpp"
+
+#include "BridgeClasses.hpp"
+#include "IGLineEdit.hpp"
+#include "IGPrecisionDialog.hpp"
+#include "IGSpinBoxes.hpp"
+
+#include "../model/Model.hpp"
+#include "../model/ParentObject.hpp"
+#include "../model/ParentObject_Impl.hpp"
+
+#include "../utilities/core/Assert.hpp"
+#include "../utilities/core/Compare.hpp"
+#include "../utilities/core/StringHelpers.hpp"
+
+#include "../utilities/idd/IddField.hpp"
+#include "../utilities/idd/IddFieldProperties.hpp"
+#include "../utilities/idd/IddKey.hpp"
+#include "../utilities/idd/IddObject.hpp"
+#include "../utilities/idd/IddObjectProperties.hpp"
+#include "../utilities/idf/IdfExtensibleGroup.hpp"
+
+#include "../utilities/units/OSOptionalQuantity.hpp"
+#include "../utilities/units/Quantity.hpp"
+#include "../utilities/units/QuantityConverter.hpp"
+
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <float.h>
+#include <iostream>
 #include <limits.h>
 #include <vector>
 
@@ -38,29 +70,8 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollArea>
-#include <QVBoxLayout>
 #include <QTimer>
-
-#include <boost/numeric/conversion/cast.hpp>  
-
-#include "../model/Model.hpp"
-#include "../model/ParentObject.hpp"
-#include "../model/ParentObject_Impl.hpp"
-
-#include "../utilities/idf/IdfExtensibleGroup.hpp"
-
-#include "../utilities/idd/IddObject.hpp"
-#include "../utilities/idd/IddField.hpp"
-#include "../utilities/idd/IddFieldProperties.hpp"
-#include "../utilities/idd/IddObjectProperties.hpp"
-#include "../utilities/idd/IddKey.hpp"
-
-#include "../utilities/units/Quantity.hpp"
-#include "../utilities/units/OSOptionalQuantity.hpp"
-#include "../utilities/units/QuantityConverter.hpp"
-#include "../utilities/core/Assert.hpp"
-#include "../utilities/core/Compare.hpp"
-#include "../utilities/core/StringHelpers.hpp"
+#include <QVBoxLayout>
 
 using namespace openstudio;
 using namespace openstudio::model;
@@ -71,6 +82,25 @@ using std::vector;
 
 const char* InspectorGadget::s_indexSlotName="indexSlot";
 //const char* FIELDS_MATCH = "fields match";
+
+struct ModelEditorLibResourceInitializer{
+  ModelEditorLibResourceInitializer() 
+  {
+    Q_INIT_RESOURCE(modeleditorlib);
+  }
+};
+static ModelEditorLibResourceInitializer __modelEditorLibResourceInitializer__;
+
+IGWidget::IGWidget(QWidget* parent):
+  QWidget(parent)
+{
+  setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
+}
+
+QSize IGWidget::sizeHint() const
+{
+  return QSize(200, QWidget::sizeHint().height());
+}
 
 InspectorGadget::InspectorGadget(QWidget* parent, int indent,ComboHighlightBridge* bridge):
   QWidget(parent),
@@ -257,7 +287,7 @@ void InspectorGadget::clear(bool recursive)
   }
 
   // This line is commented out to prevent a crash when displaying the Inspector Gadget
-  // within SketchUp 2014.  We have no idea why this works or what repercussions it may cause
+  // within SketchUp 2016.  We have no idea why this works or what repercussions it may cause
   //m_workspaceObj.reset();
 }
 
@@ -528,15 +558,17 @@ void InspectorGadget::layoutText( QVBoxLayout* layout,
   hbox->setSpacing(0);
   hbox->setMargin(0);
 
-  if( level == AccessPolicy::LOCKED )
-  {
-    string stripped(val);
-    //stripchar(stripped,'_');
+  if( level == AccessPolicy::LOCKED ) 
+  { 
+    string stripped(val); 
+    //stripchar(stripped,'_'); 
     QLabel* label = new QLabel( QString(stripped.c_str()), parent  );
     label->setObjectName("IGHeader");
-    // Qt::Alignment a = Qt::AlignHCenter;
-    hbox->addWidget( label );
     label->setStyleSheet("font : bold");
+    // Qt::Alignment a = Qt::AlignHCenter;
+    hbox->addWidget(label);
+
+    hbox->addStretch();
   }
   else
   {
@@ -636,11 +668,19 @@ void InspectorGadget::layoutText( QVBoxLayout* layout,
         double d = *(prop.minBoundValue);
         if (m_unitSystem == IP) {
           OptionalQuantity minQ = convert(Quantity(d,u_si),u);
+          if(prop.minBoundType == IddFieldProperties::ExclusiveBound) {
+            if( minQ ) {
+              minQ->setValue(minQ->value() + std::numeric_limits<double>::epsilon());
+            }
+          }
           if (minQ) {
             text->setMin(minQ->value());
           }
         }
         else {
+          if(prop.minBoundType == IddFieldProperties::ExclusiveBound) {
+            d = d + std::numeric_limits<double>::epsilon();
+          }
           text->setMin( d );
         }
       }
@@ -649,11 +689,19 @@ void InspectorGadget::layoutText( QVBoxLayout* layout,
         double d = *(prop.maxBoundValue);
         if (m_unitSystem == IP) {
           OptionalQuantity maxQ = convert(Quantity(d,u_si),u);
+          if( maxQ ) {
+            if(prop.maxBoundType == IddFieldProperties::ExclusiveBound) {
+              maxQ->setValue(maxQ->value() - std::numeric_limits<double>::epsilon());
+            }
+          }
           if (maxQ) {
             text->setMax(maxQ->value());
           }
         }
         else {
+          if(prop.maxBoundType == IddFieldProperties::ExclusiveBound) {
+            d = d - std::numeric_limits<double>::epsilon();
+          }
           text->setMax( d );
         }
       }
@@ -680,6 +728,9 @@ void InspectorGadget::layoutText( QVBoxLayout* layout,
       text->setValidator( valid );
     }
 
+    if (s == "m(m<sup>2</sup>)") {
+      s = "cm<sup>2</sup>";
+    }
     QLabel* units = new QLabel( s.c_str(), parent );
     units->setTextFormat(Qt::RichText);
 
@@ -770,9 +821,6 @@ void InspectorGadget::layoutText( QVBoxLayout* layout,
   }
   commentText->setObjectName("IDFcomment");
 
-  label->setFocusPolicy(Qt::ClickFocus);
-  label->setFocusProxy( text );
-
   vbox->addWidget(commentText);
 
   if(exists)
@@ -806,7 +854,7 @@ void InspectorGadget::layoutComboBox( QVBoxLayout* layout,
   QComboBox* combo = new IGComboBox(parent);
   combo->setSizeAdjustPolicy( QComboBox::AdjustToContentsOnFirstShow );
 
-  if( prop.objectLists.size() )
+  if (prop.objectLists.size() && m_workspaceObj && !m_workspaceObj->handle().isNull())
   {
     Workspace workspace = m_workspaceObj->workspace();
     std::vector<std::string> names;
@@ -819,24 +867,20 @@ void InspectorGadget::layoutComboBox( QVBoxLayout* layout,
 
     std::sort(names.begin(), names.end(), IstringCompare());
 
-    combo->addItem("");
-    /*if (!prop.required){
+    if (!prop.required){
       combo->addItem("");
-    }else{
-      combo->addItem("");
-    }*/
+    }
+
     for (const std::string& name : names){
       combo->addItem(name.c_str());   
     }
   }
   else
   {
-    combo->addItem("");
-    /*if (!prop.required){
+    if (!prop.required){
       combo->addItem("");
-    }else{
-      combo->addItem("");
-    }*/
+    }
+
     for (IddKey key : field.keys()){
       combo->addItem(key.name().c_str());
     }
@@ -896,6 +940,9 @@ void InspectorGadget::createExtensibleToolBar( QVBoxLayout* layout,
                                                const IddObjectProperties& props )
 {
   if( !props.extensible )
+    return;
+
+  if ( m_locked )
     return;
 
   auto frame = new QFrame(parent);
@@ -1191,7 +1238,7 @@ void InspectorGadget::onWorkspaceObjectChanged()
 
 void InspectorGadget::onTimeout()
 {
-  if (m_workspaceObjectChanged){
+  if (m_workspaceObjectChanged && m_workspaceObj && !m_workspaceObj->handle().isNull()){
     if (m_workspaceObj){
       rebuild(false);
     }
@@ -1199,7 +1246,7 @@ void InspectorGadget::onTimeout()
   }
 }
 
-void InspectorGadget::onWorkspaceObjectRemoved()
+void InspectorGadget::onWorkspaceObjectRemoved(const openstudio::Handle &)
 {
   m_workspaceObjectChanged = true;
   clear(true);
@@ -1207,14 +1254,21 @@ void InspectorGadget::onWorkspaceObjectRemoved()
   QTimer::singleShot(0,this,SLOT(onTimeout()));
 }
 
+void InspectorGadget::removeWorkspaceObject(const openstudio::Handle &handle)
+{
+  emit workspaceObjectRemoved(handle);
+}
+
 void InspectorGadget::connectWorkspaceObjectSignals() const
 {
   if (m_workspaceObj){
     openstudio::detail::WorkspaceObject_Impl* impl = m_workspaceObj->getImpl<openstudio::detail::WorkspaceObject_Impl>().get();
     if (impl){
-      connect(impl, &openstudio::detail::WorkspaceObject_Impl::onChange, this, &InspectorGadget::onWorkspaceObjectChanged);
+      impl->openstudio::detail::WorkspaceObject_Impl::onChange.connect<InspectorGadget, &InspectorGadget::onWorkspaceObjectChanged>(const_cast<InspectorGadget *>(this));
 
-      connect(impl, &openstudio::detail::WorkspaceObject_Impl::onRemoveFromWorkspace, this, &InspectorGadget::onWorkspaceObjectRemoved);
+      impl->openstudio::detail::WorkspaceObject_Impl::onRemoveFromWorkspace.connect<InspectorGadget, &InspectorGadget::removeWorkspaceObject>(const_cast<InspectorGadget *>(this));
+
+      connect(this, &InspectorGadget::workspaceObjectRemoved, this, &InspectorGadget::onWorkspaceObjectRemoved);
     }
   }
 }
@@ -1222,10 +1276,17 @@ void InspectorGadget::connectWorkspaceObjectSignals() const
 void InspectorGadget::disconnectWorkspaceObjectSignals() const
 {
   if (m_workspaceObj){
-    QObject* impl = m_workspaceObj->getImpl<openstudio::detail::WorkspaceObject_Impl>().get();
+    auto* impl = m_workspaceObj->getImpl<openstudio::detail::WorkspaceObject_Impl>().get();
     if (impl){
       // disconnect all signals from m_workspaceObj to this
-      impl->disconnect(this); 
+
+      impl->openstudio::detail::WorkspaceObject_Impl::onChange.disconnect<InspectorGadget, &InspectorGadget::onWorkspaceObjectChanged>(const_cast<InspectorGadget *>(this));
+
+      impl->openstudio::detail::WorkspaceObject_Impl::onRemoveFromWorkspace.disconnect<InspectorGadget, &InspectorGadget::removeWorkspaceObject>(const_cast<InspectorGadget *>(this));
+
+      disconnect(this, &InspectorGadget::workspaceObjectRemoved, this, &InspectorGadget::onWorkspaceObjectRemoved);
+
+      // impl->disconnect(); 
     }
   }
 }

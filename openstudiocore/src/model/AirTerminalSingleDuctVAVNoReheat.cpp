@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "AirTerminalSingleDuctVAVNoReheat.hpp"
 #include "AirTerminalSingleDuctVAVNoReheat_Impl.hpp"
@@ -27,6 +36,7 @@
 #include "ScheduleTypeLimits.hpp"
 #include "ScheduleTypeRegistry.hpp"
 #include <utilities/idd/IddFactory.hxx>
+
 
 #include "AirLoopHVAC.hpp"
 #include "AirLoopHVAC_Impl.hpp"
@@ -44,6 +54,7 @@
 #include "ThermalZone_Impl.hpp"
 #include "Model.hpp"
 #include <utilities/idd/OS_AirTerminal_SingleDuct_VAV_NoReheat_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 //#include <utilities/units/Unit.hpp>
 //#include <utilities/core/Compare.hpp>
 #include "../utilities/core/Assert.hpp"
@@ -156,10 +167,6 @@ namespace detail {
     return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::MinimumAirFlowFractionScheduleName);
   }
 
-  boost::optional<DesignSpecificationOutdoorAir> AirTerminalSingleDuctVAVNoReheat_Impl::designSpecificationOutdoorAirObject() const {
-    return getObject<ModelObject>().getModelObjectTarget<DesignSpecificationOutdoorAir>(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::DesignSpecificationOutdoorAirObjectName);
-  }
-
   bool AirTerminalSingleDuctVAVNoReheat_Impl::setAvailabilitySchedule(Schedule& schedule) {
     bool result = setSchedule(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::AvailabilityScheduleName,
                               "AirTerminalSingleDuctVAVNoReheat",
@@ -266,23 +273,6 @@ namespace detail {
     OS_ASSERT(result);
   }
 
-  bool AirTerminalSingleDuctVAVNoReheat_Impl::setDesignSpecificationOutdoorAirObject(const boost::optional<DesignSpecificationOutdoorAir>& designSpecificationOutdoorAir) {
-    bool result(false);
-    if (designSpecificationOutdoorAir) {
-      result = setPointer(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::DesignSpecificationOutdoorAirObjectName, designSpecificationOutdoorAir.get().handle());
-    }
-    else {
-      resetDesignSpecificationOutdoorAirObject();
-      result = true;
-    }
-    return result;
-  }
-
-  void AirTerminalSingleDuctVAVNoReheat_Impl::resetDesignSpecificationOutdoorAirObject() {
-    bool result = setString(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::DesignSpecificationOutdoorAirObjectName, "");
-    OS_ASSERT(result);
-  }
-
   boost::optional<Schedule> AirTerminalSingleDuctVAVNoReheat_Impl::optionalAvailabilitySchedule() const {
     return getObject<ModelObject>().getModelObjectTarget<Schedule>(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::AvailabilityScheduleName);
   }
@@ -299,15 +289,6 @@ namespace detail {
   boost::optional<ModelObject> AirTerminalSingleDuctVAVNoReheat_Impl::minimumAirFlowFractionScheduleAsModelObject() const {
     OptionalModelObject result;
     OptionalSchedule intermediate = minimumAirFlowFractionSchedule();
-    if (intermediate) {
-      result = *intermediate;
-    }
-    return result;
-  }
-
-  boost::optional<ModelObject> AirTerminalSingleDuctVAVNoReheat_Impl::designSpecificationOutdoorAirObjectAsModelObject() const {
-    OptionalModelObject result;
-    OptionalDesignSpecificationOutdoorAir intermediate = designSpecificationOutdoorAirObject();
     if (intermediate) {
       result = *intermediate;
     }
@@ -458,21 +439,14 @@ bool AirTerminalSingleDuctVAVNoReheat_Impl::addToNode(Node & node)
     return true;
   }
 
-  bool AirTerminalSingleDuctVAVNoReheat_Impl::setDesignSpecificationOutdoorAirObjectAsModelObject(const boost::optional<ModelObject>& modelObject) {
-    if (modelObject) {
-      OptionalDesignSpecificationOutdoorAir intermediate = modelObject->optionalCast<DesignSpecificationOutdoorAir>();
-      if (intermediate) {
-        DesignSpecificationOutdoorAir designSpecificationOutdoorAir(*intermediate);
-        return setDesignSpecificationOutdoorAirObject(designSpecificationOutdoorAir);
-      }
-      else {
-        return false;
-      }
-    }
-    else {
-      resetDesignSpecificationOutdoorAirObject();
-    }
-    return true;
+  bool AirTerminalSingleDuctVAVNoReheat_Impl::controlForOutdoorAir() const
+  {
+    return getBooleanFieldValue(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::ControlForOutdoorAir);
+  }
+  
+  void AirTerminalSingleDuctVAVNoReheat_Impl::setControlForOutdoorAir(bool controlForOutdoorAir)
+  {
+    setBooleanFieldValue(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::ControlForOutdoorAir,controlForOutdoorAir);
   }
 
 } // detail
@@ -489,11 +463,10 @@ AirTerminalSingleDuctVAVNoReheat::AirTerminalSingleDuctVAVNoReheat(const Model& 
         << "availability schedule to " << schedule.briefDescription() << ".");
   }
 
-  this->autosizeMaximumAirFlowRate();
-  this->setZoneMinimumAirFlowInputMethod("Constant");
-  this->setConstantMinimumAirFlowFraction(0.3);
-  this->setString(OS_AirTerminal_SingleDuct_VAV_NoReheatFields::DesignSpecificationOutdoorAirObjectName,"");
-
+  autosizeMaximumAirFlowRate();
+  setZoneMinimumAirFlowInputMethod("Constant");
+  setConstantMinimumAirFlowFraction(0.3);
+  setControlForOutdoorAir(false);
 }
 
 IddObjectType AirTerminalSingleDuctVAVNoReheat::iddObjectType() {
@@ -538,10 +511,6 @@ bool AirTerminalSingleDuctVAVNoReheat::isFixedMinimumAirFlowRateDefaulted() cons
 
 boost::optional<Schedule> AirTerminalSingleDuctVAVNoReheat::minimumAirFlowFractionSchedule() const {
   return getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->minimumAirFlowFractionSchedule();
-}
-
-boost::optional<DesignSpecificationOutdoorAir> AirTerminalSingleDuctVAVNoReheat::designSpecificationOutdoorAirObject() const {
-  return getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->designSpecificationOutdoorAirObject();
 }
 
 bool AirTerminalSingleDuctVAVNoReheat::setAvailabilitySchedule(Schedule& schedule) {
@@ -592,12 +561,14 @@ void AirTerminalSingleDuctVAVNoReheat::resetMinimumAirFlowFractionSchedule() {
   getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->resetMinimumAirFlowFractionSchedule();
 }
 
-bool AirTerminalSingleDuctVAVNoReheat::setDesignSpecificationOutdoorAirObject(const DesignSpecificationOutdoorAir& designSpecificationOutdoorAir) {
-  return getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->setDesignSpecificationOutdoorAirObject(designSpecificationOutdoorAir);
+bool AirTerminalSingleDuctVAVNoReheat::controlForOutdoorAir() const
+{
+  return getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->controlForOutdoorAir();
 }
 
-void AirTerminalSingleDuctVAVNoReheat::resetDesignSpecificationOutdoorAirObject() {
-  getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->resetDesignSpecificationOutdoorAirObject();
+void AirTerminalSingleDuctVAVNoReheat::setControlForOutdoorAir(bool controlForOutdoorAir)
+{
+  getImpl<detail::AirTerminalSingleDuctVAVNoReheat_Impl>()->setControlForOutdoorAir(controlForOutdoorAir);
 }
 
 /// @cond

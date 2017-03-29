@@ -1,24 +1,37 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Geometry.hpp"
+#include "Intersection.hpp"
 #include "Transformation.hpp"
+#include "Point3d.hpp"
+#include "PointLatLon.hpp"
+#include "Vector3d.hpp"
 
 #include "../core/Assert.hpp"
 
@@ -345,21 +358,11 @@ namespace openstudio{
   /// lat and lon are specified in degrees
   double getDistanceLatLon(double lat1, double lon1, double lat2, double lon2)
   {
-
-    // for more accuracy would want to use WGS-84 ellipsoid params and Vincenty formula
-
-    // Haversine formula 
-    double R = 6371000; // Earth radius meters
-    double deltaLat = degToRad(lat2-lat1);
-    double deltaLon = degToRad(lon2-lon1); 
-    double a = sin(deltaLat/2) * sin(deltaLat/2) +
-               cos(degToRad(lat1)) * cos(degToRad(lat2)) * 
-               sin(deltaLon/2) * sin(deltaLon/2); 
-    double c = 2 * atan2(sqrt(a), sqrt(1-a)); 
-    double d = R * c;
-
-    return d;
+    PointLatLon p1(lat1, lon1);
+    PointLatLon p2(lat2, lon2);
+    return (p1 - p2);
   }
+
 
   bool circularEqual(const Point3dVector& points1, const Point3dVector& points2, double tol)
   {
@@ -412,28 +415,64 @@ namespace openstudio{
   {
     std::vector<std::vector<Point3d> > result;
 
+    // check input
     if (vertices.size () < 3){
       return result;
     }
 
+    boost::optional<Vector3d> normal = getOutwardNormal(vertices);
+    if (!normal || normal->z() > -0.999){
+      return result;
+    }
+
+    for (const auto& hole : holes){
+      normal = getOutwardNormal(hole);
+      if (!normal || normal->z() > -0.999){
+        return result;
+      }
+    }
+
     std::vector<Point3d> allPoints;
+
+    // PolyPartition does not support holes which intersect the polygon or share an edge
+    // if any hole is not fully contained we will use boost to remove all the holes
+    bool polyPartitionHoles = true;
+    for (const std::vector<Point3d>& hole : holes){
+      if (!within(hole, vertices, tol)){
+        // PolyPartition can't handle this
+        polyPartitionHoles = false;
+        break;
+      }
+    }
+
+    if (!polyPartitionHoles){
+      // use boost to do all the intersections
+      std::vector<std::vector<Point3d> > allFaces = subtract(vertices, holes, tol);
+      std::vector<std::vector<Point3d> > noHoles;
+      for (const std::vector<Point3d>& face : allFaces){
+        std::vector<std::vector<Point3d> > temp = computeTriangulation(face, noHoles);
+        result.insert(result.end(), temp.begin(), temp.end());
+      }
+      return result;
+    }
 
     // convert input to vector of TPPLPoly
     std::list<TPPLPoly> polys;
 
-    TPPLPoly outerPoly; // must be counter-clockwise
+    TPPLPoly outerPoly; // must be counter-clockwise, input vertices are clockwise
     outerPoly.Init(vertices.size());
     outerPoly.SetHole(false);
-    for(unsigned i = 0; i < vertices.size(); ++i){
+    unsigned n = vertices.size();
+    for(unsigned i = 0; i < n; ++i){
 
       // should all have zero z coordinate now
-      double z = vertices[i].z();
+      double z = vertices[n-i-1].z();
       if (abs(z) > tol){
         LOG_FREE(Error, "utilities.geometry.computeTriangulation", "All points must be on z = 0 plane for triangulation methods");
         return result;
       }
 
-      Point3d point = getCombinedPoint(vertices[i], allPoints, tol);
+      Point3d point = getCombinedPoint(vertices[n-i-1], allPoints, tol);
       outerPoly[i].x = point.x();
       outerPoly[i].y = point.y();
     }
@@ -448,7 +487,7 @@ namespace openstudio{
         continue;
       }
 
-      TPPLPoly innerPoly; // must be clockwise
+      TPPLPoly innerPoly; // must be clockwise, input vertices are clockwise
       innerPoly.Init(holeVertices.size());
       innerPoly.SetHole(true);
       //std::cout << "inner :";
@@ -474,6 +513,9 @@ namespace openstudio{
     std::list<TPPLPoly> resultPolys;
     int test = pp.Triangulate_EC(&polys,&resultPolys);
     if (test == 0){
+      test = pp.Triangulate_MONO(&polys, &resultPolys);
+    }
+    if (test == 0){
       LOG_FREE(Error, "utilities.geometry.computeTriangulation", "Failed to partition polygon");
       return result;
     }
@@ -482,6 +524,9 @@ namespace openstudio{
     std::list<TPPLPoly>::iterator it, itend;
     //std::cout << "Start" << std::endl;
     for(it = resultPolys.begin(), itend = resultPolys.end(); it != itend; ++it){
+
+      it->SetOrientation(TPPL_CW);
+
       std::vector<Point3d> triangle;
       for (long i = 0; i < it->GetNumPoints(); ++i){
         TPPLPoint point = it->GetPoint(i);
@@ -503,6 +548,13 @@ namespace openstudio{
       vector.setLength(distance);
       result.push_back(vertex+vector);
     }
+    return result;
+  }
+  
+  std::vector<Point3d> reverse(const Point3dVector& vertices)
+  {
+    std::vector<Point3d> result(vertices);
+    std::reverse(result.begin(), result.end());
     return result;
   }
 

@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "HVACSystemsView.hpp"
 #include "../shared_gui_components/OSComboBox.hpp"
@@ -57,7 +66,7 @@ HVACToolbarView::HVACToolbarView()
   setObjectName("NavigatorWidget");
   setStyleSheet(style);
 
-  QHBoxLayout * mainHlayout = new QHBoxLayout();
+  auto mainHlayout = new QHBoxLayout();
   mainHlayout->setContentsMargins(5,5,5,5);
   mainHlayout->setSpacing(5);
   setLayout(mainHlayout);
@@ -68,8 +77,8 @@ HVACToolbarView::HVACToolbarView()
 
   // Label Widget
 
-  QWidget * labelWidget = new QWidget();
-  QHBoxLayout * labelLayout = new QHBoxLayout();
+  auto labelWidget = new QWidget();
+  auto labelLayout = new QHBoxLayout();
   labelLayout->setContentsMargins(0,0,0,0); 
   labelLayout->setSpacing(5);
   labelLayout->setAlignment(Qt::AlignLeft);
@@ -82,8 +91,8 @@ HVACToolbarView::HVACToolbarView()
 
   // Controls Widget
 
-  QWidget * controlWidget = new QWidget();
-  QHBoxLayout * controlLayout = new QHBoxLayout();
+  auto controlWidget = new QWidget();
+  auto controlLayout = new QHBoxLayout();
   controlLayout->setContentsMargins(0,0,0,0);
   controlLayout->setSpacing(5);
   controlWidget->setLayout(controlLayout);
@@ -103,7 +112,7 @@ HVACToolbarView::HVACToolbarView()
 
   controlLayout->addStretch();
 
-  QButtonGroup * zoomButtonGroup = new QButtonGroup(this);
+  auto zoomButtonGroup = new QButtonGroup(this);
   zoomButtonGroup->setExclusive(true);
 
   topologyViewButton = new GrayButton();
@@ -159,7 +168,7 @@ HVACToolbarView::HVACToolbarView()
 
   controlLayout->addStretch();
 
-  systemComboBox = new OSComboBox();
+  systemComboBox = new OSComboBox2();
   systemComboBox->setMinimumContentsLength(40);
   mainHlayout->addWidget(systemComboBox);
   systemComboBox->setEnabled(true);
@@ -194,7 +203,7 @@ HVACSystemsView::HVACSystemsView()
 {
   setObjectName("GrayWidgetWithLeftTopBorders");
 
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(1,1,0,0);
   mainVLayout->setSpacing(0);
   mainVLayout->setAlignment(Qt::AlignTop);
@@ -242,7 +251,7 @@ void HVACSystemsView::paintEvent ( QPaintEvent * event )
   style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
 }
 
-//OSComboBox * HVACSystemsView::chooser() const
+//OSComboBox2 * HVACSystemsView::chooser() const
 //{
 //  return m_chooser;
 //}
@@ -277,9 +286,9 @@ void HVACGraphicsView::resetZoom()
 HVACControlsView::HVACControlsView()
   : QScrollArea()
 {
-  QWidget * widget = new QWidget();
+  auto widget = new QWidget();
 
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(5,5,5,5);
   mainVLayout->setSpacing(10);
   mainVLayout->setAlignment(Qt::AlignTop);
@@ -293,7 +302,7 @@ HVACControlsView::HVACControlsView()
   systemNameLabel->setObjectName("H1");
   mainVLayout->addWidget(systemNameLabel);
 
-  QHBoxLayout * hClassificationLayout = new QHBoxLayout();
+  auto hClassificationLayout = new QHBoxLayout();
   hClassificationLayout->setContentsMargins(0,0,0,0);
   hClassificationLayout->setSpacing(5);
   mainVLayout->addLayout(hClassificationLayout);
@@ -314,7 +323,7 @@ HVACControlsView::HVACControlsView()
   hClassificationLayout->addWidget(heatingTypeLabel);
   hClassificationLayout->addStretch();
 
-  QFrame * line = new QFrame();
+  auto line = new QFrame();
   line->setFrameShape(QFrame::HLine);
   line->setFrameShadow(QFrame::Sunken);
   mainVLayout->addWidget(line);
@@ -335,10 +344,10 @@ HVACControlsView::HVACControlsView()
   nightCycleTitle->setObjectName("H2");
   mainVLayout->addWidget(nightCycleTitle);
 
-  QHBoxLayout * nightCycleHLayout = new QHBoxLayout();
+  auto nightCycleHLayout = new QHBoxLayout();
   nightCycleHLayout->setContentsMargins(0,0,0,0);
   nightCycleHLayout->setSpacing(5);
-  nightCycleComboBox = new OSComboBox();
+  nightCycleComboBox = new OSComboBox2();
   nightCycleComboBox->addItem("Follow the HVAC Operation Schedule","StayOff");
   nightCycleComboBox->addItem("Cycle on Full System if Heating or Cooling Required","CycleOnAny");
   nightCycleComboBox->addItem("Cycle on Zone Terminal Units if Heating or Cooling Required","CycleOnAnyZoneFansOnly");
@@ -378,20 +387,20 @@ HVACControlsView::HVACControlsView()
 MechanicalVentilationView::MechanicalVentilationView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setAlignment(Qt::AlignTop);
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
   setLayout(mainVLayout);
 
-  QHBoxLayout * economizerHBoxLayout = new QHBoxLayout();
+  auto economizerHBoxLayout = new QHBoxLayout();
   economizerHBoxLayout->setSpacing(10);
 
   QLabel * economizerTitle = new QLabel("Economizer");
   economizerTitle->setObjectName("H2");
   economizerHBoxLayout->addWidget(economizerTitle);
 
-  economizerComboBox = new OSComboBox();
+  economizerComboBox = new OSComboBox2();
   economizerComboBox->setEnabled(true);
   economizerComboBox->addItem("Fixed Dry Bulb","FixedDryBulb");
   economizerComboBox->addItem("Fixed Enthalpy","FixedEnthalpy");
@@ -404,7 +413,7 @@ MechanicalVentilationView::MechanicalVentilationView()
   economizerHBoxLayout->addStretch();
   mainVLayout->addLayout(economizerHBoxLayout);
 
-  QHBoxLayout * methodHBoxLayout = new QHBoxLayout();
+  auto methodHBoxLayout = new QHBoxLayout();
   methodHBoxLayout->setSpacing(10);
 
   QLabel * methodTitle = new QLabel("Ventilation Calculation Method");
@@ -412,7 +421,7 @@ MechanicalVentilationView::MechanicalVentilationView()
   methodHBoxLayout->addWidget(methodTitle);
   methodTitle->setVisible(false);
 
-  ventilationCalcMethodComboBox = new OSComboBox();
+  ventilationCalcMethodComboBox = new OSComboBox2();
   ventilationCalcMethodComboBox->setEnabled(false);
   ventilationCalcMethodComboBox->addItem("Zone Sum","ZoneSum");
   ventilationCalcMethodComboBox->addItem("Ventilation Rate Procedure","VentilationRateProcedure");
@@ -424,7 +433,7 @@ MechanicalVentilationView::MechanicalVentilationView()
   methodHBoxLayout->addStretch();
   mainVLayout->addLayout(methodHBoxLayout);
 
-  QHBoxLayout * dcvHBoxLayout = new QHBoxLayout();
+  auto dcvHBoxLayout = new QHBoxLayout();
   dcvHBoxLayout->setSpacing(10);
   mainVLayout->addLayout(dcvHBoxLayout);
 
@@ -432,7 +441,7 @@ MechanicalVentilationView::MechanicalVentilationView()
   dcvTitle->setObjectName("H2");
   dcvHBoxLayout->addWidget(dcvTitle);
 
-  dcvButton = new OSSwitch();
+  dcvButton = new OSSwitch2();
   dcvHBoxLayout->addWidget(dcvButton);
 
   dcvHBoxLayout->addStretch();
@@ -445,7 +454,7 @@ MechanicalVentilationView::~MechanicalVentilationView()
 NoMechanicalVentilationView::NoMechanicalVentilationView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(5);
   setLayout(mainVLayout);
@@ -461,7 +470,7 @@ NoMechanicalVentilationView::~NoMechanicalVentilationView()
 SingleZoneReheatSPMView::SingleZoneReheatSPMView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setAlignment(Qt::AlignTop);
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
@@ -469,10 +478,10 @@ SingleZoneReheatSPMView::SingleZoneReheatSPMView()
 
   QString singleZoneResetSPText;
   singleZoneResetSPText.append("Supply temperature is controlled by a \"SingleZoneReheat\" setpoint manager.");
-  QLabel * singleZoneResetSPTitle = new QLabel(singleZoneResetSPText);
+  auto singleZoneResetSPTitle = new QLabel(singleZoneResetSPText);
   mainVLayout->addWidget(singleZoneResetSPTitle);
 
-  QHBoxLayout * zoneSelectorHBoxLayout = new QHBoxLayout();
+  auto zoneSelectorHBoxLayout = new QHBoxLayout();
   zoneSelectorHBoxLayout->setSpacing(10);
   zoneSelectorHBoxLayout->setContentsMargins(0,0,0,0);
 
@@ -480,7 +489,7 @@ SingleZoneReheatSPMView::SingleZoneReheatSPMView()
   controlZoneTitle->setObjectName("H2");
   zoneSelectorHBoxLayout->addWidget(controlZoneTitle);
 
-  controlZoneComboBox = new OSComboBox();
+  controlZoneComboBox = new OSComboBox2();
   controlZoneComboBox->setEnabled(true);
   zoneSelectorHBoxLayout->addWidget(controlZoneComboBox);
   zoneSelectorHBoxLayout->addStretch();
@@ -495,7 +504,7 @@ SingleZoneReheatSPMView::~SingleZoneReheatSPMView()
 OAResetSPMView::OAResetSPMView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setAlignment(Qt::AlignTop);
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
@@ -503,7 +512,7 @@ OAResetSPMView::OAResetSPMView()
 
   QString text;
   text.append("Supply temperature is controlled by an outdoor air reset setpoint manager.");
-  QLabel * title = new QLabel(text);
+  auto title = new QLabel(text);
   mainVLayout->addWidget(title);
 }
 
@@ -514,7 +523,7 @@ OAResetSPMView::~OAResetSPMView()
 ScheduledSPMView::ScheduledSPMView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
   setLayout(mainVLayout);
@@ -538,7 +547,7 @@ ScheduledSPMView::~ScheduledSPMView()
 FollowOATempSPMView::FollowOATempSPMView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
   setLayout(mainVLayout);
@@ -554,7 +563,7 @@ FollowOATempSPMView::~FollowOATempSPMView()
 AirLoopHVACUnitaryHeatPumpAirToAirControlView::AirLoopHVACUnitaryHeatPumpAirToAirControlView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
   setLayout(mainVLayout);
@@ -562,7 +571,7 @@ AirLoopHVACUnitaryHeatPumpAirToAirControlView::AirLoopHVACUnitaryHeatPumpAirToAi
   QLabel * heatPumplabel = new QLabel("Supply air temperature is managed by the \"AirLoopHVACUnitaryHeatPumpAirToAir\" component.");
   mainVLayout->addWidget(heatPumplabel);
 
-  QHBoxLayout * zoneSelectorHBoxLayout = new QHBoxLayout();
+  auto zoneSelectorHBoxLayout = new QHBoxLayout();
   zoneSelectorHBoxLayout->setSpacing(10);
   zoneSelectorHBoxLayout->setContentsMargins(0,0,0,0);
 
@@ -570,7 +579,7 @@ AirLoopHVACUnitaryHeatPumpAirToAirControlView::AirLoopHVACUnitaryHeatPumpAirToAi
   controlZoneTitle->setObjectName("H2");
   zoneSelectorHBoxLayout->addWidget(controlZoneTitle);
 
-  controlZoneComboBox = new OSComboBox();
+  controlZoneComboBox = new OSComboBox2();
   controlZoneComboBox->setEnabled(true);
   zoneSelectorHBoxLayout->addWidget(controlZoneComboBox);
   zoneSelectorHBoxLayout->addStretch();
@@ -585,7 +594,7 @@ AirLoopHVACUnitaryHeatPumpAirToAirControlView::~AirLoopHVACUnitaryHeatPumpAirToA
 NoSupplyAirTempControlView::NoSupplyAirTempControlView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(0,0,0,0);
   mainVLayout->setSpacing(10);
   setLayout(mainVLayout);
@@ -602,7 +611,7 @@ NoSupplyAirTempControlView::~NoSupplyAirTempControlView()
 NoControlsView::NoControlsView()
   : QWidget()
 {
-  QVBoxLayout * mainVLayout = new QVBoxLayout();
+  auto mainVLayout = new QVBoxLayout();
   mainVLayout->setContentsMargins(5,5,5,5);
   mainVLayout->setSpacing(10);
   mainVLayout->setAlignment(Qt::AlignTop);

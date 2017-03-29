@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ZoneChooserView.hpp"
 #include "../model/AirLoopHVAC.hpp"
@@ -38,13 +47,13 @@ namespace openstudio {
 ZoneChooserView::ZoneChooserView(QWidget* parent)
   : QWidget(parent)
 {
-  QVBoxLayout * mainLayout = new QVBoxLayout();
+  auto mainLayout = new QVBoxLayout();
 
   mainLayout->setContentsMargins(0,0,0,0);
 
   this->setLayout(mainLayout);
 
-  QScrollArea * scrollArea = new QScrollArea();
+  auto scrollArea = new QScrollArea();
   
   scrollArea->setWidgetResizable(true);
 
@@ -52,7 +61,7 @@ ZoneChooserView::ZoneChooserView(QWidget* parent)
 
   mainLayout->addWidget(scrollArea);
 
-  QWidget * scrollWidget = new QWidget();
+  auto scrollWidget = new QWidget();
 
   scrollArea->setWidget(scrollWidget);
 
@@ -87,7 +96,7 @@ void ZoneChooserView::layoutView()
   this->setUpdatesEnabled(false);
 
   QLayoutItem * child;
-  while((child = m_vLayout->takeAt(0)) != 0) 
+  while((child = m_vLayout->takeAt(0)) != nullptr) 
   {
       delete child->widget();
       delete child;
@@ -96,14 +105,14 @@ void ZoneChooserView::layoutView()
 
   if( m_mixer )
   {
-    QLabel * label = new QLabel();
+    auto label = new QLabel();
     label->setObjectName("IGHeader");
     label->setText(toQString(m_mixer->iddObject().name()));
     m_vLayout->addWidget(label);
   }
   else if( m_splitter )
   {
-    QLabel * label = new QLabel();
+    auto label = new QLabel();
     label->setObjectName("IGHeader");
     label->setText(toQString(m_splitter->iddObject().name()));
     m_vLayout->addWidget(label);
@@ -129,13 +138,13 @@ void ZoneChooserView::layoutView()
   zones = m_splitter->model().getConcreteModelObjects<model::ThermalZone>();
   std::sort(zones.begin(),zones.end(),WorkspaceObjectNameLess());
 
-  for( std::vector<model::ThermalZone>::iterator it = zones.begin();
+  for( auto it = zones.begin();
         it < zones.end();
         ++it )
   {
     if( ! it->isPlenum() )
     {
-      ZoneChooserItem * zoneChooserItem = new ZoneChooserItem(*it,this);
+      auto zoneChooserItem = new ZoneChooserItem(*it,this);
       m_zoneChooserItems.push_back(zoneChooserItem);
       m_vLayout->addWidget(zoneChooserItem);
       zoneChooserItem->setChecked(false);
@@ -145,7 +154,7 @@ void ZoneChooserView::layoutView()
 
   std::vector<model::ThermalZone> thermalZones;
   thermalZones = m_splitter->thermalZones();
-  for( std::vector<model::ThermalZone>::iterator it = thermalZones.begin();
+  for( auto it = thermalZones.begin();
         it < thermalZones.end();
         ++it )
   {
@@ -174,7 +183,7 @@ void ZoneChooserView::paintEvent ( QPaintEvent * event )
 
 ZoneChooserItem * ZoneChooserView::zoneChooserItemForZone(std::string zoneName)
 {
-  for( std::vector<ZoneChooserItem *>::iterator it = m_zoneChooserItems.begin();
+  for( auto it = m_zoneChooserItems.begin();
        it < m_zoneChooserItems.end();
        ++it )
   {
@@ -183,7 +192,7 @@ ZoneChooserItem * ZoneChooserView::zoneChooserItemForZone(std::string zoneName)
       return *it;
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 ZoneChooserItem::ZoneChooserItem(model::ThermalZone & zone, ZoneChooserView * parent)
@@ -191,7 +200,7 @@ ZoneChooserItem::ZoneChooserItem(model::ThermalZone & zone, ZoneChooserView * pa
     m_zoneChooserView(parent),
     m_thermalZone(zone)
 {
-  QHBoxLayout * hLayout = new QHBoxLayout();
+  auto hLayout = new QHBoxLayout();
 
   m_checkBox = new QCheckBox();
   

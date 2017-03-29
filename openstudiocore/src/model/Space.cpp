@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Space.hpp"
 #include "Space_Impl.hpp"
@@ -40,6 +49,8 @@
 #include "ThermalZone_Impl.hpp"
 #include "BuildingStory.hpp"
 #include "BuildingStory_Impl.hpp"
+#include "BuildingUnit.hpp"
+#include "BuildingUnit_Impl.hpp"
 #include "ShadingSurfaceGroup.hpp"
 #include "ShadingSurfaceGroup_Impl.hpp"
 #include "ShadingSurface.hpp"
@@ -101,6 +112,7 @@
 #include <utilities/idd/OS_Space_FieldEnums.hxx>
 #include <utilities/idd/OS_Surface_FieldEnums.hxx>
 #include <utilities/idd/OS_SubSurface_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 
 #include "../utilities/geometry/Geometry.hpp"
 #include "../utilities/geometry/Transformation.hpp"
@@ -724,6 +736,22 @@ namespace detail {
     OS_ASSERT(result);
   }
 
+  boost::optional<BuildingUnit> Space_Impl::buildingUnit() const
+  {
+    return getObject<ModelObject>().getModelObjectTarget<BuildingUnit>(OS_SpaceFields::BuildingUnitName);
+  }
+
+  bool Space_Impl::setBuildingUnit(const BuildingUnit &buildingUnit)
+  {
+    return this->setPointer(OS_SpaceFields::BuildingUnitName, buildingUnit.handle());
+  }
+
+  void Space_Impl::resetBuildingUnit()
+  {
+    bool result = this->setString(OS_SpaceFields::BuildingUnitName, "");
+    OS_ASSERT(result);
+  }
+
   ShadingSurfaceGroupVector Space_Impl::shadingSurfaceGroups() const
   {
     return getObject<ModelObject>().getModelObjectSources<ShadingSurfaceGroup>(
@@ -872,6 +900,9 @@ namespace detail {
     for (const Surface& surface : this->surfaces()) {
       if (istringEqual(surface.surfaceType(), "Floor"))
       {
+        if (surface.isAirWall()){
+          continue;
+        }
         result += surface.grossArea();
       }
     }
@@ -2631,7 +2662,7 @@ namespace detail {
     return false;
   }
 
-  template <typename T, typename TDef> 
+  template <typename T, typename TDef>
   boost::optional<T> Space_Impl::getMySpaceLoadInstance(
       const boost::optional<T>& templateSpaceLoadInstance)
   {
@@ -2774,6 +2805,11 @@ namespace detail {
       // remove additional collinear points that occur after reordering
       result = removeCollinear(result);
 
+      // if result is now empty just quit
+      if (result.size() < 3){
+        return std::vector<Point3d>();
+      }
+
       Point3d lastOuterVertex = result.back();
 
       for (const BoostRing& boostInner : boostResult[0].inners()){
@@ -2795,6 +2831,11 @@ namespace detail {
         
         // remove additional collinear points that occur after reordering
         innerLoop = removeCollinear(innerLoop);
+
+        // if inner loop is now empty just ignore it
+        if (innerLoop.size() < 3){
+          continue;
+        }
 
         // reverse the inner loop
         std::reverse(innerLoop.begin(), innerLoop.end());
@@ -2818,6 +2859,11 @@ namespace detail {
     
     // remove additional collinear points that occur after reordering
     result = removeCollinear(result);
+
+    // if result is now empty just quit
+    if (result.size() < 3){
+      return std::vector<Point3d>();
+    }
 
     return result;
   }
@@ -2921,7 +2967,7 @@ boost::optional<Space> Space::fromFloorPrint(const std::vector<Point3d>& floorPr
 
   // create the roofCeiling
   points.clear();
-  for (auto  rit = floorPrint.rbegin(), ritend = floorPrint.rend(); rit != ritend; ++rit){
+  for (auto rit = floorPrint.rbegin(), ritend = floorPrint.rend(); rit != ritend; ++rit){
     points.push_back(Point3d(rit->x(), rit->y(), z + floorHeight));
   }
   Surface roofCeiling(points, model);
@@ -3037,6 +3083,20 @@ bool Space::setBuildingStory(const BuildingStory& buildingStory)
 void Space::resetBuildingStory()
 {
   getImpl<detail::Space_Impl>()->resetBuildingStory();
+}
+
+boost::optional<BuildingUnit> Space::buildingUnit() const {
+  return getImpl<detail::Space_Impl>()->buildingUnit();
+}
+
+bool Space::setBuildingUnit(const BuildingUnit& buildingUnit)
+{
+  return getImpl<detail::Space_Impl>()->setBuildingUnit(buildingUnit);
+}
+
+void Space::resetBuildingUnit()
+{
+  getImpl<detail::Space_Impl>()->resetBuildingUnit();
 }
 
 std::vector<ShadingSurfaceGroup> Space::shadingSurfaceGroups() const {

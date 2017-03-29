@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef MODEL_LAYEREDCONSTRUCTION_IMPL_HPP
 #define MODEL_LAYEREDCONSTRUCTION_IMPL_HPP
@@ -42,10 +51,10 @@ class ModelPartitionMaterial;
 namespace detail {
 
   class MODEL_API LayeredConstruction_Impl : public ConstructionBase_Impl {
-    Q_OBJECT;
-    Q_PROPERTY(unsigned numberOfLayers READ numLayers STORED false);
+    
+    
 
-    Q_PROPERTY(boost::optional<openstudio::model::ModelObject> insulation READ insulationAsModelObject WRITE setInsulationAsModelObject RESET resetInsulation);
+    
    public:
     /** @name Constructors and Destructors */
     //@{
@@ -94,11 +103,11 @@ namespace detail {
     /** Set the u-factor of this surface in W/m^2*K, if possible. value should already include 
      *  appropriate film coefficients. By default, assumes still air indoors and 15 mph outdoor air 
      *  speed. */
-    virtual bool setUFactor(double value);
+    virtual bool setUFactor(double value) override;
 
     /** Set the u-factor of this surface in W/m^2*K, if possible. filmResistance (m^2*K/W) may be 
      *  used to convert value to a conductance. */
-    virtual bool setUFactor(double value,double filmResistance);
+    virtual bool setUFactor(double value,double filmResistance) override;
 
     /** Set the conductance of this surface in W/m^2*K, if possible. value should not include any film 
      *  coefficients. */
@@ -110,26 +119,26 @@ namespace detail {
 
     /** Same as setThermalConductance. Just adding to support current interface of ConstructionBase.
      *  One of these sets of methods should be deprecated. */
-    virtual bool setConductance(double value);
+    virtual bool setConductance(double value) override;
 
     /** Same as setThermalConductance. Just adding to support current interface of ConstructionBase.
      *  One of these sets of methods should be deprecated. */
-    virtual bool setConductance(double value,double filmResistance);
+    virtual bool setConductance(double value,double filmResistance) override;
 
     //@}
     /** @name Queries */
     //@{
 
-    bool isOpaque() const;
+    bool isOpaque() const override;
 
-    bool isFenestration() const;
+    bool isFenestration() const override;
 
-    bool isSolarDiffusing() const;
+    bool isSolarDiffusing() const override;
 
-    bool isModelPartition() const;
+    bool isModelPartition() const override;
 
     /** Returns true if the construction has RoofVegetation as the outer layer. */
-    virtual bool isGreenRoof() const;
+    virtual bool isGreenRoof() const override;
 
     /** Returns true if this is a symmetric layered construction. */
     bool isSymmetric() const;
@@ -150,37 +159,31 @@ namespace detail {
     std::vector<unsigned> getLayerIndices(const Material& material) const;
 
     /** Get the u-factor of this construction. Includes film coefficients. */
-    virtual boost::optional<double> uFactor() const;
+    virtual boost::optional<double> uFactor() const override;
 
     /** Get the u-factor of this construction. Includes filmResistance. */
-    virtual boost::optional<double> uFactor(double filmResistance) const;
+    virtual boost::optional<double> uFactor(double filmResistance) const override;
 
     /** Get the thermal conductance of this construction. Does not include film coefficients. */
-    virtual boost::optional<double> thermalConductance() const;
+    virtual boost::optional<double> thermalConductance() const override;
 
     /** Get the thermal conductance of this construction. filmResistance is subtracted out of the
      *  thermalResistance if necessary. */
-    virtual boost::optional<double> thermalConductance(double filmResistance) const;
+    virtual boost::optional<double> thermalConductance(double filmResistance) const override;
 
     /** Get the heat capacity of this construction (J/m^2*K). Only works for 
      *  \link LayeredConstruction LayeredConstructions \endlink of \link StandardOpaqueMaterial
      *  StandardOpaqueMaterials \endlink. */
-    virtual boost::optional<double> heatCapacity() const;
+    virtual boost::optional<double> heatCapacity() const override;
 
     /// get interior visible absorptance (unitless)
-    virtual boost::optional<double> interiorVisibleAbsorptance() const;
+    virtual boost::optional<double> interiorVisibleAbsorptance() const override;
 
     /// get exterior visible absorptance (unitless)
-    virtual boost::optional<double> exteriorVisibleAbsorptance() const;
+    virtual boost::optional<double> exteriorVisibleAbsorptance() const override;
 
     /// get visible transmittance (unitless)
-    virtual boost::optional<double> visibleTransmittance() const;
-
-    /** Returns a ValidityReport for this Gas object containing all errors at or below level. 
-     *  Adds on to the WorkspaceObject requirements by ensuring that the layers in the construction
-     *  make sense. At StrictnessLevel::Draft, the construction should be opaque, fenestration, or 
-     *  model partition, and at StrictnessLevel::Final, have no null layers. */
-    virtual ValidityReport validityReport(StrictnessLevel level,bool checkNames) const;
+    virtual boost::optional<double> visibleTransmittance() const override;
 
     //@}
     /** @name Standards Methods */
@@ -204,8 +207,6 @@ namespace detail {
    protected:
 
     friend class LayeredConstruction;
-
-    virtual void populateValidityReport(ValidityReport& report,bool checkNames) const;
 
     // Erase all nullLayers, and return the new value for layerIndex, if it is affected by erasures.
     // If layerIndex was originally pointing to a nullLayer, upon return it will point to the first 

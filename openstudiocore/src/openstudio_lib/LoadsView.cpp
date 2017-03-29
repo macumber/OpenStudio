@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "LoadsView.hpp"
 #include "ModelObjectTypeListView.hpp"
@@ -42,6 +51,8 @@
 #include <QScrollArea>
 #include <sstream>
 
+#include <utilities/idd/IddEnums.hxx>
+
 namespace openstudio {
 
 
@@ -52,6 +63,7 @@ LoadsView::LoadsView(bool isIP, const openstudio::model::Model& model, QWidget *
                                                                    OSItemType::CollapsibleListHeader, 
                                                                    parent),
                                        new LoadsInspectorView(isIP, model,parent),
+                                       false,
                                        parent)
 {
   connect(this, &LoadsView::toggleUnitsClicked, modelObjectInspectorView(), &ModelObjectInspectorView::toggleUnitsClicked);
@@ -147,7 +159,7 @@ void LoadsInspectorView::showInspector(QWidget * widget)
 
 void LoadsInspectorView::showPeopleDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  PeopleDefinitionInspectorView * peopleDefinitionInspectorView = new PeopleDefinitionInspectorView(m_isIP, m_model);
+  auto peopleDefinitionInspectorView = new PeopleDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, peopleDefinitionInspectorView, &PeopleDefinitionInspectorView::toggleUnitsClicked);
 
   peopleDefinitionInspectorView->selectModelObject(modelObject);
@@ -157,7 +169,7 @@ void LoadsInspectorView::showPeopleDefinitionsInspector(const openstudio::model:
 
 void LoadsInspectorView::showLightsDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  LightsDefinitionInspectorView * lightsDefinitionInspectorView = new LightsDefinitionInspectorView(m_isIP, m_model);
+  auto lightsDefinitionInspectorView = new LightsDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, lightsDefinitionInspectorView, &LightsDefinitionInspectorView::toggleUnitsClicked);
 
   lightsDefinitionInspectorView->selectModelObject(modelObject);
@@ -167,7 +179,7 @@ void LoadsInspectorView::showLightsDefinitionsInspector(const openstudio::model:
 
 void LoadsInspectorView::showLuminaireDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  LuminaireDefinitionInspectorView * luminaireDefinitionInspectorView = new LuminaireDefinitionInspectorView(m_isIP, m_model);
+  auto luminaireDefinitionInspectorView = new LuminaireDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, luminaireDefinitionInspectorView, &LuminaireDefinitionInspectorView::toggleUnitsClicked);
 
   luminaireDefinitionInspectorView->selectModelObject(modelObject);
@@ -177,7 +189,7 @@ void LoadsInspectorView::showLuminaireDefinitionsInspector(const openstudio::mod
 
 void LoadsInspectorView::showElectricEquipmentDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  ElectricEquipmentDefinitionInspectorView * electricEquipmentDefinitionInspectorView = new ElectricEquipmentDefinitionInspectorView(m_isIP, m_model);
+  auto electricEquipmentDefinitionInspectorView = new ElectricEquipmentDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, electricEquipmentDefinitionInspectorView, &ElectricEquipmentDefinitionInspectorView::toggleUnitsClicked);
 
   electricEquipmentDefinitionInspectorView->selectModelObject(modelObject);
@@ -187,7 +199,7 @@ void LoadsInspectorView::showElectricEquipmentDefinitionsInspector(const openstu
 
 void LoadsInspectorView::showGasEquipmentDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  GasEquipmentDefinitionInspectorView * gasEquipmentDefinitionInspectorView = new GasEquipmentDefinitionInspectorView(m_isIP, m_model);
+  auto gasEquipmentDefinitionInspectorView = new GasEquipmentDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, gasEquipmentDefinitionInspectorView, &GasEquipmentDefinitionInspectorView::toggleUnitsClicked);
 
   gasEquipmentDefinitionInspectorView->selectModelObject(modelObject);
@@ -197,7 +209,7 @@ void LoadsInspectorView::showGasEquipmentDefinitionsInspector(const openstudio::
 
 void LoadsInspectorView::showSteamEquipmentDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  SteamEquipmentDefinitionInspectorView * steamEquipmentDefinitionInspectorView = new SteamEquipmentDefinitionInspectorView(m_isIP, m_model);
+  auto steamEquipmentDefinitionInspectorView = new SteamEquipmentDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, steamEquipmentDefinitionInspectorView, &SteamEquipmentDefinitionInspectorView::toggleUnitsClicked);
 
   steamEquipmentDefinitionInspectorView->selectModelObject(modelObject);
@@ -207,7 +219,7 @@ void LoadsInspectorView::showSteamEquipmentDefinitionsInspector(const openstudio
 
 void LoadsInspectorView::showOtherEquipmentDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  OtherEquipmentDefinitionInspectorView * otherEquipmentDefinitionInspectorView = new OtherEquipmentDefinitionInspectorView(m_isIP, m_model);
+  auto otherEquipmentDefinitionInspectorView = new OtherEquipmentDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, otherEquipmentDefinitionInspectorView, &OtherEquipmentDefinitionInspectorView::toggleUnitsClicked);
 
   otherEquipmentDefinitionInspectorView->selectModelObject(modelObject);
@@ -217,7 +229,7 @@ void LoadsInspectorView::showOtherEquipmentDefinitionsInspector(const openstudio
 
 void LoadsInspectorView::showWaterUseEquipmentDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  WaterUseEquipmentDefinitionInspectorView * waterUseEquipmentDefinitionInspectorView = new WaterUseEquipmentDefinitionInspectorView(m_isIP, m_model);
+  auto waterUseEquipmentDefinitionInspectorView = new WaterUseEquipmentDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, waterUseEquipmentDefinitionInspectorView, &WaterUseEquipmentDefinitionInspectorView::toggleUnitsClicked);
 
   waterUseEquipmentDefinitionInspectorView->selectModelObject(modelObject);
@@ -227,7 +239,7 @@ void LoadsInspectorView::showWaterUseEquipmentDefinitionsInspector(const openstu
 
 void LoadsInspectorView::showInternalMassDefinitionsInspector(const openstudio::model::ModelObject& modelObject)
 {
-  InternalMassDefinitionInspectorView * internalMassDefinitionInspectorView = new InternalMassDefinitionInspectorView(m_isIP, m_model);
+  auto internalMassDefinitionInspectorView = new InternalMassDefinitionInspectorView(m_isIP, m_model);
   connect(this, &LoadsInspectorView::toggleUnitsClicked, internalMassDefinitionInspectorView, &InternalMassDefinitionInspectorView::toggleUnitsClicked);
 
   internalMassDefinitionInspectorView->selectModelObject(modelObject);

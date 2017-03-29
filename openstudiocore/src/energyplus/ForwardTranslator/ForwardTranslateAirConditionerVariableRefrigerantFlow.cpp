@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "../ForwardTranslator.hpp"
 #include "../../model/Model.hpp"
@@ -33,14 +42,11 @@
 #include "../../model/ZoneHVACTerminalUnitVariableRefrigerantFlow_Impl.hpp"
 #include "../../model/Curve.hpp"
 #include "../../model/Curve_Impl.hpp"
-#include "../../model/CurveBiquadratic.hpp"
-#include "../../model/CurveBiquadratic_Impl.hpp"
-#include "../../model/CurveCubic.hpp"
-#include "../../model/CurveCubic_Impl.hpp"
 #include "../../utilities/core/Logger.hpp"
 #include "../../utilities/core/Assert.hpp"
 #include <utilities/idd/AirConditioner_VariableRefrigerantFlow_FieldEnums.hxx>
 #include <utilities/idd/ZoneTerminalUnitList_FieldEnums.hxx>
+#include "../../utilities/idd/IddEnums.hpp"
 #include <utilities/idd/IddEnums.hxx>
 #include "../../utilities/idf/IdfExtensibleGroup.hpp"
 
@@ -114,7 +120,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingCapacityRatioModifierFunctionofLowTemperatureCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.coolingCapacityRatioModifierFunctionofLowTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingCapacityRatioModifierFunctionofLowTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -124,7 +130,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // CoolingCapacityRatioBoundaryCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.coolingCapacityRatioBoundaryCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingCapacityRatioBoundaryCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -134,7 +140,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingCapacityRatioModifierFunctionofHighTemperatureCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.coolingCapacityRatioModifierFunctionofHighTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingCapacityRatioModifierFunctionofHighTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -144,7 +150,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // CoolingEnergyInputRatioModifierFunctionofLowTemperatureCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.coolingEnergyInputRatioModifierFunctionofLowTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingEnergyInputRatioModifierFunctionofLowTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -154,7 +160,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingEnergyInputRatioBoundaryCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.coolingEnergyInputRatioBoundaryCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingEnergyInputRatioBoundaryCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -164,7 +170,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingEnergyInputRatioModifierFunctionofHighTemperatureCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.coolingEnergyInputRatioModifierFunctionofHighTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingEnergyInputRatioModifierFunctionofHighTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -174,7 +180,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingEnergyInputRatioModifierFunctionofLowPartLoadRatioCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.coolingEnergyInputRatioModifierFunctionofLowPartLoadRatioCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingEnergyInputRatioModifierFunctionofLowPartLoadRatioCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -184,7 +190,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingEnergyInputRatioModifierFunctionofHighPartLoadRatioCurveName
   
-  if( boost::optional<model::CurveCubic> curve = modelObject.coolingEnergyInputRatioModifierFunctionofHighPartLoadRatioCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingEnergyInputRatioModifierFunctionofHighPartLoadRatioCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -194,7 +200,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // CoolingCombinationRatioCorrectionFactorCurveName
   
-  if( boost::optional<model::CurveCubic> curve = modelObject.coolingCombinationRatioCorrectionFactorCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingCombinationRatioCorrectionFactorCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -204,7 +210,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // CoolingPartLoadFractionCorrelationCurveName
   
-  if( boost::optional<model::CurveCubic> curve = modelObject.coolingPartLoadFractionCorrelationCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.coolingPartLoadFractionCorrelationCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -253,7 +259,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingCapacityRatioModifierFunctionofLowTemperatureCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatingCapacityRatioModifierFunctionofLowTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingCapacityRatioModifierFunctionofLowTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -263,7 +269,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // HeatingCapacityRatioBoundaryCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.heatingCapacityRatioBoundaryCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingCapacityRatioBoundaryCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -273,7 +279,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // HeatingCapacityRatioModifierFunctionofHighTemperatureCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatingCapacityRatioModifierFunctionofHighTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingCapacityRatioModifierFunctionofHighTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -283,7 +289,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingEnergyInputRatioModifierFunctionofLowTemperatureCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatingEnergyInputRatioModifierFunctionofLowTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingEnergyInputRatioModifierFunctionofLowTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -293,7 +299,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingEnergyInputRatioBoundaryCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.heatingEnergyInputRatioBoundaryCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingEnergyInputRatioBoundaryCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -303,7 +309,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingEnergyInputRatioModifierFunctionofHighTemperatureCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatingEnergyInputRatioModifierFunctionofHighTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingEnergyInputRatioModifierFunctionofHighTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -320,7 +326,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingEnergyInputRatioModifierFunctionofLowPartLoadRatioCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.heatingEnergyInputRatioModifierFunctionofLowPartLoadRatioCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingEnergyInputRatioModifierFunctionofLowPartLoadRatioCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -330,7 +336,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingEnergyInputRatioModifierFunctionofHighPartLoadRatioCurveName
   
-  if( boost::optional<model::CurveCubic> curve = modelObject.heatingEnergyInputRatioModifierFunctionofHighPartLoadRatioCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingEnergyInputRatioModifierFunctionofHighPartLoadRatioCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -340,7 +346,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingCombinationRatioCorrectionFactorCurveName
   
-  if( boost::optional<model::CurveCubic> curve = modelObject.heatingCombinationRatioCorrectionFactorCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingCombinationRatioCorrectionFactorCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -350,7 +356,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatingPartLoadFractionCorrelationCurveName
 
-  if( boost::optional<model::CurveCubic> curve = modelObject.heatingPartLoadFractionCorrelationCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatingPartLoadFractionCorrelationCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -416,7 +422,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // PipingCorrectionFactorforLengthinCoolingModeCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.pipingCorrectionFactorforLengthinCoolingModeCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.pipingCorrectionFactorforLengthinCoolingModeCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -440,7 +446,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // PipingCorrectionFactorforLengthinHeatingModeCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.pipingCorrectionFactorforLengthinHeatingModeCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.pipingCorrectionFactorforLengthinHeatingModeCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -500,7 +506,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // DefrostEnergyInputRatioModifierFunctionofTemperatureCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.defrostEnergyInputRatioModifierFunctionofTemperatureCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.defrostEnergyInputRatioModifierFunctionofTemperatureCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -640,7 +646,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryCoolingCapacityModifierCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryCoolingCapacityModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryCoolingCapacityModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -664,7 +670,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryCoolingEnergyModifierCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryCoolingEnergyModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryCoolingEnergyModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -688,7 +694,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryHeatingCapacityModifierCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryHeatingCapacityModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryHeatingCapacityModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -712,7 +718,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryHeatingEnergyModifierCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryHeatingEnergyModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryHeatingEnergyModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -883,7 +889,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryCoolingCapacityModifierCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryCoolingCapacityModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryCoolingCapacityModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -900,14 +906,14 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryCoolingCapacityTimeConstant
 
-  if( (value = modelObject.heatRecoveryCoolingEnergyTimeConstant()) )
+  if( (value = modelObject.heatRecoveryCoolingCapacityTimeConstant()) )
   {
     idfObject.setDouble(AirConditioner_VariableRefrigerantFlowFields::HeatRecoveryCoolingCapacityTimeConstant,value.get());
   }
 
   // HeatRecoveryCoolingEnergyModifierCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryCoolingEnergyModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryCoolingEnergyModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -931,7 +937,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
 
   // HeatRecoveryHeatingCapacityModifierCurveName
 
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryHeatingCapacityModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryHeatingCapacityModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {
@@ -955,7 +961,7 @@ boost::optional<IdfObject> ForwardTranslator::translateAirConditionerVariableRef
   
   // HeatRecoveryHeatingEnergyModifierCurveName
   
-  if( boost::optional<model::CurveBiquadratic> curve = modelObject.heatRecoveryHeatingEnergyModifierCurve() )
+  if( boost::optional<model::Curve> curve = modelObject.heatRecoveryHeatingEnergyModifierCurve() )
   {
     if( boost::optional<IdfObject> _curve = translateAndMapModelObject(curve.get()) )
     {

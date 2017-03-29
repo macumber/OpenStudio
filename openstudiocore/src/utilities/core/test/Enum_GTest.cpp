@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -39,14 +48,6 @@ namespace enums {
     ((SIXTH)) );
 
 
-  OPENSTUDIO_ENUM7(Test7Enum, 
-     ((first)(one)(1)),
-     ((second)),
-     ((third)),
-     ((fourth)),
-     ((fifth)), 
-     ((sixth)),
-     ((seventh)(bob)) );
 }
 } // openstudio
 
@@ -61,66 +62,6 @@ TEST(Enum, EnumThrows)
   EXPECT_NO_THROW(openstudio::enums::TestEnum3("my second"));
 }
 
-TEST(Enum, Enum7Test)
-{
-  // Test OPENSTUDIO_ENUM7 which is used for the very large enumerations
-  {
-    openstudio::enums::Test7Enum te("one");
-    EXPECT_EQ("first", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(1), te.value());
-    EXPECT_EQ("one", te.valueDescription());
-  }
-
-  {
-    openstudio::enums::Test7Enum te(2);
-    EXPECT_EQ("second", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(2), te.value());
-    EXPECT_EQ("second", te.valueDescription());
-  }
-
-  {
-    openstudio::enums::Test7Enum te("third");
-    EXPECT_EQ("third", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(3), te.value());
-    EXPECT_EQ("third", te.valueDescription());
-  }
-
-  {
-    openstudio::enums::Test7Enum te("FouRtH");
-    EXPECT_EQ("fourth", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(4), te.value());
-    EXPECT_EQ("fourth", te.valueDescription());
-  }
-
-  {
-    openstudio::enums::Test7Enum te("fifth");
-    EXPECT_EQ("fifth", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(5), te.value());
-    EXPECT_EQ("fifth", te.valueDescription());
-  }
-
-  {
-    openstudio::enums::Test7Enum te(6);
-    EXPECT_EQ("sixth", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(6), te.value());
-    EXPECT_EQ("sixth", te.valueDescription());
-  }
-
-  {
-    openstudio::enums::Test7Enum te("bob");
-    EXPECT_EQ("seventh", te.valueName());
-    EXPECT_EQ("Test7Enum", te.enumName());
-    EXPECT_EQ(static_cast<openstudio::enums::Test7Enum::domain>(7), te.value());
-    EXPECT_EQ("bob", te.valueDescription());
-  }
-
-}
 
 TEST(Enum, EnumDescription)
 {

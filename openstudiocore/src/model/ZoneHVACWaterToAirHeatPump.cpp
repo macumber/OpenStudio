@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ZoneHVACWaterToAirHeatPump.hpp"
 #include "ZoneHVACWaterToAirHeatPump_Impl.hpp"
@@ -25,6 +34,8 @@
 #include "ScheduleTypeRegistry.hpp"
 #include "HVACComponent.hpp"
 #include "HVACComponent_Impl.hpp"
+#include "WaterToAirComponent.hpp"
+#include "WaterToAirComponent_Impl.hpp"
 #include "FanOnOff.hpp"
 #include "FanOnOff_Impl.hpp"
 #include "CoilHeatingWaterToAirHeatPumpEquationFit.hpp"
@@ -42,7 +53,10 @@
 
 
 #include <utilities/idd/IddFactory.hxx>
+
+
 #include <utilities/idd/OS_ZoneHVAC_WaterToAirHeatPump_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 
 #include "../utilities/units/Unit.hpp"
 
@@ -81,11 +95,14 @@ namespace detail {
 
     HVACComponent supplyFanClone = this->supplyAirFan().clone(model).cast<HVACComponent>();
 
-    HVACComponent heatingCoilClone = this->heatingCoil().clone(model).cast<HVACComponent>();
+    auto t_heatingCoil = heatingCoil();
+    HVACComponent heatingCoilClone = t_heatingCoil.clone(model).cast<HVACComponent>();
 
-    HVACComponent coolingCoilClone = this->coolingCoil().clone(model).cast<HVACComponent>();
+    auto t_coolingCoil = coolingCoil();
+    HVACComponent coolingCoilClone = t_coolingCoil.clone(model).cast<HVACComponent>();
 
-    HVACComponent supplementalHeatingCoilClone = this->supplementalHeatingCoil().clone(model).cast<HVACComponent>();
+    auto t_supplementalHeatingCoil = supplementalHeatingCoil();
+    HVACComponent supplementalHeatingCoilClone = t_supplementalHeatingCoil.clone(model).cast<HVACComponent>();
 
     wahpClone.setSupplyAirFan(supplyFanClone);
 
@@ -94,6 +111,24 @@ namespace detail {
     wahpClone.setCoolingCoil(coolingCoilClone);
 
     wahpClone.setSupplementalHeatingCoil(supplementalHeatingCoilClone);
+
+    if( model == this->model() ) {
+      if( auto waterToAirComponent = t_coolingCoil.optionalCast<WaterToAirComponent>() ) {
+        if( auto plant = waterToAirComponent->plantLoop() ) {
+          plant->addDemandBranchForComponent(coolingCoilClone);
+        }
+      }
+      if( auto waterToAirComponent = t_heatingCoil.optionalCast<WaterToAirComponent>() ) {
+        if( auto plant = waterToAirComponent->plantLoop() ) {
+          plant->addDemandBranchForComponent(heatingCoilClone);
+        }
+      }
+      if( auto waterToAirComponent = t_supplementalHeatingCoil.optionalCast<WaterToAirComponent>() ) {
+        if( auto plant = waterToAirComponent->plantLoop() ) {
+          plant->addDemandBranchForComponent(supplementalHeatingCoilClone);
+        }
+      }
+    }
 
     return wahpClone;
   }
@@ -176,12 +211,12 @@ namespace detail {
     return result;
   }
 
-  unsigned ZoneHVACWaterToAirHeatPump_Impl::inletPort()
+  unsigned ZoneHVACWaterToAirHeatPump_Impl::inletPort() const
   {
     return OS_ZoneHVAC_WaterToAirHeatPumpFields::AirInletNodeName;
   }
 
-  unsigned ZoneHVACWaterToAirHeatPump_Impl::outletPort()
+  unsigned ZoneHVACWaterToAirHeatPump_Impl::outletPort() const
   {
     return OS_ZoneHVAC_WaterToAirHeatPumpFields::AirOutletNodeName;
   }
@@ -505,49 +540,17 @@ namespace detail {
     OS_ASSERT(result);
   }
 
-  bool ZoneHVACWaterToAirHeatPump_Impl::setSupplyAirFan(HVACComponent& fansOnOff) {
-    bool isAllowedType = false;
-    if( fansOnOff.iddObjectType() == IddObjectType::OS_Fan_OnOff)
-    {
-      isAllowedType = true;
-    }
-
-    if( isAllowedType )
-    {
-      return setPointer(OS_ZoneHVAC_WaterToAirHeatPumpFields::SupplyAirFanName,fansOnOff.handle());
-    }
-    return false;
+  bool ZoneHVACWaterToAirHeatPump_Impl::setSupplyAirFan(HVACComponent& fan) {
+    return setPointer(OS_ZoneHVAC_WaterToAirHeatPumpFields::SupplyAirFanName,fan.handle());
   }
 
   bool ZoneHVACWaterToAirHeatPump_Impl::setHeatingCoil(HVACComponent& heatingCoilsWaterToAirHP) 
   {
-    bool isAllowedType = false;
-
-    if( heatingCoilsWaterToAirHP.iddObjectType() == IddObjectType::OS_Coil_Heating_WaterToAirHeatPump_EquationFit )
-    {
-      isAllowedType = true;
-    }
-
-    if( isAllowedType )
-    {
-      return setPointer(OS_ZoneHVAC_WaterToAirHeatPumpFields::HeatingCoilName,heatingCoilsWaterToAirHP.handle());
-    }
-    return false;
+    return setPointer(OS_ZoneHVAC_WaterToAirHeatPumpFields::HeatingCoilName,heatingCoilsWaterToAirHP.handle());
   }
 
   bool ZoneHVACWaterToAirHeatPump_Impl::setCoolingCoil(HVACComponent& coolingCoilsWaterToAirHP) {
-    bool isAllowedType = false;
-
-    if( coolingCoilsWaterToAirHP.iddObjectType() == IddObjectType::OS_Coil_Cooling_WaterToAirHeatPump_EquationFit )
-    {
-      isAllowedType = true;
-    }
-
-    if( isAllowedType )
-    {
-      return setPointer(OS_ZoneHVAC_WaterToAirHeatPumpFields::CoolingCoilName,coolingCoilsWaterToAirHP.handle());
-    }
-    return false;
+    return setPointer(OS_ZoneHVAC_WaterToAirHeatPumpFields::CoolingCoilName,coolingCoilsWaterToAirHP.handle());
   }
 
   bool ZoneHVACWaterToAirHeatPump_Impl::setMaximumCyclingRate(boost::optional<double> maximumCyclingRate) {

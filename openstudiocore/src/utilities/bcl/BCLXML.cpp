@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "BCLXML.hpp"
 
@@ -23,34 +32,37 @@
 
 #include "../units/Unit.hpp"
 #include "../units/Quantity.hpp"
-
+#include "../core/Compare.hpp"
 #include "../core/String.hpp"
 #include "../core/System.hpp"
+#include "../core/Checksum.hpp"
+#include "../core/Assert.hpp"
+#include "../core/FilesystemHelpers.hpp"
+#include "../time/DateTime.hpp"
 
 #include <QDomDocument>
-#include <QFile>
 
 namespace openstudio{
 
   BCLXML::BCLXML(const BCLXMLType& bclXMLType)
     : m_bclXMLType(bclXMLType)
   {
-    m_uid = removeBraces(UUID::createUuid());
-    m_versionId = removeBraces(UUID::createUuid());
+    m_uid = removeBraces(openstudio::createUUID());
+    m_versionId = removeBraces(openstudio::createUUID());
+    m_versionModified = DateTime::nowUTC().toISO8601();
   }
 
   BCLXML::BCLXML(const openstudio::path& xmlPath):
-    m_path(boost::filesystem::system_complete(xmlPath))
+    m_path(openstudio::filesystem::system_complete(xmlPath))
   {
-    if (!boost::filesystem::exists(xmlPath) || !boost::filesystem::is_regular_file(xmlPath)){
+    if (!openstudio::filesystem::exists(xmlPath) || !openstudio::filesystem::is_regular_file(xmlPath)){
       LOG_AND_THROW("'" << toString(xmlPath) << "' does not exist");
     }
 
     QDomDocument bclXML("bclXML");
-    QFile file(toQString(m_path));
-    bool opened = file.open(QIODevice::ReadOnly | QIODevice::Text);
-    if (opened){
-      bclXML.setContent(&file);
+    openstudio::filesystem::ifstream file(m_path);
+    if (file.is_open()){
+      bclXML.setContent(openstudio::filesystem::read_as_QByteArray(file));
       file.close();
     }else{
       file.close();
@@ -69,19 +81,88 @@ namespace openstudio{
       }
     }
 
-    m_name = decodeString(element.firstChildElement("name").firstChild().nodeValue().replace("_", " ").toStdString());
+    // get schema version to see if we need to upgrade anything
+    // added in schema version 3
+    VersionString startingVersion("2.0");
+    if (!element.firstChildElement("schema_version").isNull()){
+      try{
+        startingVersion = VersionString(element.firstChildElement("schema_version").firstChild().nodeValue().toStdString());
+      } catch (const std::exception&){
+      }
+    }
+
+    // added in schema version 3
+    if (!element.firstChildElement("error").isNull()){
+      m_error = decodeString(element.firstChildElement("error").firstChild().nodeValue().toStdString());
+    }
+
+    m_name = decodeString(element.firstChildElement("name").firstChild().nodeValue().toStdString());
 
     m_uid = element.firstChildElement("uid").firstChild().nodeValue().toStdString();
+
     m_versionId = element.firstChildElement("version_id").firstChild().nodeValue().toStdString();
-    
+
+    if (m_name.empty() || m_uid.empty() || m_versionId.empty()){
+      LOG_AND_THROW("'" << toString(xmlPath) << "' is not a correct BCL XML");
+    }
+
+    if (element.firstChildElement("version_modified").isNull()){
+      m_versionModified = "";
+    } else {
+      m_versionModified = element.firstChildElement("version_modified").firstChild().nodeValue().toStdString();
+      if (!DateTime::fromISO8601(m_versionModified)){
+        // not an allowable date time
+        m_versionModified = "";
+      }
+    }
+
+    if (m_bclXMLType == BCLXMLType::MeasureXML){
+      // added in schema version 3
+      if (element.firstChildElement("class_name").isNull()){
+        m_className = "";
+      } else {
+        m_className = decodeString(element.firstChildElement("class_name").firstChild().nodeValue().toStdString());
+      }
+    }
+
+    // added in schema version 3
+    if (element.firstChildElement("display_name").isNull()){
+      // use name
+      m_displayName = decodeString(element.firstChildElement("name").firstChild().nodeValue().toStdString());
+    }else{
+      m_displayName = decodeString(element.firstChildElement("display_name").firstChild().nodeValue().toStdString());
+    }
+
     m_description = decodeString(element.firstChildElement("description").firstChild().nodeValue().toStdString());
 
     if (m_bclXMLType == BCLXMLType::MeasureXML){
       m_modelerDescription = decodeString(element.firstChildElement("modeler_description").firstChild().nodeValue().toStdString());
     }
 
-    if (m_name.empty() || m_uid.empty() || m_versionId.empty()){
-      LOG_AND_THROW("'" << toString(xmlPath) << "' is not a correct BCL XML");
+    if (m_bclXMLType == BCLXMLType::MeasureXML){
+      QDomElement argumentElement = element.firstChildElement("arguments").firstChildElement("argument");
+      while (!argumentElement.isNull()){
+        if (argumentElement.hasChildNodes()){
+          try{
+            m_arguments.push_back(BCLMeasureArgument(argumentElement));
+          } catch (const std::exception&){
+            LOG(Error, "Bad argument in xml");
+          }
+        }
+        argumentElement = argumentElement.nextSiblingElement("argument");
+      }
+
+      QDomElement outputElement = element.firstChildElement("outputs").firstChildElement("output");
+      while (!outputElement.isNull()){
+        if (outputElement.hasChildNodes()){
+          try{
+            m_outputs.push_back(BCLMeasureOutput(outputElement));
+          } catch (const std::exception&){
+            LOG(Error, "Bad output in xml");
+          }
+        }
+        outputElement = outputElement.nextSiblingElement("output");
+      }
     }
 
     QDomElement fileElement = element.firstChildElement("files").firstChildElement("file");
@@ -90,10 +171,37 @@ namespace openstudio{
 
         std::string softwareProgram;
         std::string softwareProgramVersion;
+        boost::optional<VersionString> minCompatibleVersion;
+        boost::optional<VersionString> maxCompatibleVersion;
         QDomElement versionElement = fileElement.firstChildElement("version");
         if (!versionElement.isNull()){
           softwareProgram = versionElement.firstChildElement("software_program").firstChild().nodeValue().toStdString();
           softwareProgramVersion = versionElement.firstChildElement("identifier").firstChild().nodeValue().toStdString();
+        
+          // added in schema version 3
+          QDomElement minCompatibleVersionElement = versionElement.firstChildElement("min_compatible");
+          if (minCompatibleVersionElement.isNull()){
+            try{
+              // if minCompatibleVersion not explicitly set, assume softwareProgramVersion is min
+              minCompatibleVersion = VersionString(softwareProgramVersion);
+            } catch (const std::exception&){
+            }
+          }else{
+            try{
+              minCompatibleVersion = VersionString(minCompatibleVersionElement.firstChild().nodeValue().toStdString());
+            } catch (const std::exception&){
+            }
+          }
+
+          // added in schema version 3
+          QDomElement maxCompatibleVersionElement = versionElement.firstChildElement("max_compatible");
+          if (!maxCompatibleVersionElement.isNull()){
+            try{
+              maxCompatibleVersion = VersionString(maxCompatibleVersionElement.firstChild().nodeValue().toStdString());
+            } catch (const std::exception&){
+            }
+          }
+
         }
         std::string fileName = fileElement.firstChildElement("filename").firstChild().nodeValue().toStdString();
         //std::string fileType = fileElement.firstChildElement("filetype").firstChild().nodeValue().toStdString();
@@ -114,6 +222,12 @@ namespace openstudio{
         BCLFileReference file(path);
         file.setSoftwareProgram(softwareProgram);
         file.setSoftwareProgramVersion(softwareProgramVersion);
+        if (minCompatibleVersion){
+          file.setMinCompatibleVersion(*minCompatibleVersion);
+        }
+        if (maxCompatibleVersion){
+          file.setMaxCompatibleVersion(*maxCompatibleVersion);
+        }
         file.setUsageType(usageType);
         file.setChecksum(checksum);
 
@@ -190,6 +304,14 @@ namespace openstudio{
       m_tags.push_back(tagElement.firstChild().nodeValue().toStdString());
       tagElement = tagElement.nextSiblingElement("tag");
     }
+
+    // added in schema version 3
+    if (element.firstChildElement("xml_checksum").isNull()){
+      // DLM: keep this empty for now
+      //m_xmlChecksum = computeXMLChecksum();
+    } else{
+      m_xmlChecksum = element.firstChildElement("xml_checksum").firstChild().nodeValue().toStdString();
+    }
   }
 
   BCLXML::~BCLXML()
@@ -236,9 +358,33 @@ namespace openstudio{
     return m_versionId;
   }
 
+  boost::optional<DateTime> BCLXML::versionModified() const
+  {
+    boost::optional<DateTime> result;
+    if (!m_versionModified.empty()){
+      result = DateTime::fromISO8601(m_versionModified);
+    }
+    return result;
+  }
+
+  std::string BCLXML::xmlChecksum() const
+  {
+    return m_xmlChecksum;
+  }
+
   std::string BCLXML::name() const
   {
     return m_name;
+  }
+
+  std::string BCLXML::displayName() const
+  {
+    return m_displayName;
+  }
+
+  std::string BCLXML::className() const
+  {
+    return m_className;
   }
 
   std::string BCLXML::description() const
@@ -249,6 +395,16 @@ namespace openstudio{
   std::string BCLXML::modelerDescription() const
   {
     return m_modelerDescription;
+  }
+
+  std::vector<BCLMeasureArgument> BCLXML::arguments() const
+  {
+    return m_arguments;
+  }
+
+  std::vector<BCLMeasureOutput> BCLXML::outputs() const
+  {
+    return m_outputs;
   }
 
   std::vector<BCLFileReference> BCLXML::files() const
@@ -272,14 +428,15 @@ namespace openstudio{
     return m_attributes;
   }
 
-  boost::optional<Attribute> BCLXML::getAttribute(const std::string& name) const
+  std::vector<Attribute> BCLXML::getAttributes(const std::string& name) const
   {
+    std::vector<Attribute> result;
     for (const Attribute& attribute : m_attributes) {
       if (attribute.name() == name){
-        return attribute;
+        result.push_back(attribute);
       }
     }
-    return boost::none;
+    return result;
   }
 
   std::vector<std::string> BCLXML::tags() const
@@ -297,10 +454,45 @@ namespace openstudio{
     return m_path.parent_path();
   }
 
+  boost::optional<std::string> BCLXML::error() const
+  {
+    return m_error;
+  }
+
+  void BCLXML::resetXMLChecksum()
+  {
+    incrementVersionId();
+    m_xmlChecksum = "00000000";
+  }
+
+  void BCLXML::setError(const std::string& error)
+  {
+    incrementVersionId();
+    m_error = escapeString(error);
+  }
+
+  void BCLXML::resetError()
+  {
+    incrementVersionId();
+    m_error.reset();
+  }
+
   void BCLXML::setName(const std::string& name)
   {
     incrementVersionId();
     m_name = escapeString(name);
+  }
+
+  void BCLXML::setDisplayName(const std::string& displayName)
+  {
+    incrementVersionId();
+    m_displayName = escapeString(displayName);
+  }
+
+  void BCLXML::setClassName(const std::string& className)
+  {
+    incrementVersionId();
+    m_className = escapeString(className);
   }
 
   void BCLXML::setDescription(const std::string& description)
@@ -315,6 +507,18 @@ namespace openstudio{
     m_modelerDescription = escapeString(description);
   }
 
+  void BCLXML::setArguments(const std::vector<BCLMeasureArgument>& arguments)
+  {
+    incrementVersionId();
+    m_arguments = arguments;
+  }
+
+  void BCLXML::setOutputs(const std::vector<BCLMeasureOutput>& outputs)
+  {
+    incrementVersionId();
+    m_outputs = outputs;
+  }
+
   void BCLXML::addFile(const BCLFileReference& file)
   {
     removeFile(file.path());
@@ -323,11 +527,11 @@ namespace openstudio{
     m_files.push_back(file);
   }
 
-  bool BCLXML::hasFile(const openstudio::path& path)
+  bool BCLXML::hasFile(const openstudio::path& path) const
   {
     bool result = false;
 
-    openstudio::path test = boost::filesystem::system_complete(path);
+    openstudio::path test = openstudio::filesystem::system_complete(path);
 
     for (const BCLFileReference& file : m_files) {
       if (file.path() == test){
@@ -343,7 +547,7 @@ namespace openstudio{
   {
     bool result = false;
 
-    openstudio::path test = boost::filesystem::system_complete(path);
+    openstudio::path test = openstudio::filesystem::system_complete(path);
 
     std::vector<BCLFileReference> newFiles;
     for (const BCLFileReference& file : m_files) {
@@ -370,13 +574,11 @@ namespace openstudio{
 
   void BCLXML::addAttribute(const Attribute& attribute)
   {
-    removeAttribute(attribute.name());
-
     incrementVersionId();
     m_attributes.push_back(attribute);
   }
 
-  bool BCLXML::removeAttribute(const std::string& name)
+  bool BCLXML::removeAttributes(const std::string& name)
   {
     bool result = false;
 
@@ -384,10 +586,10 @@ namespace openstudio{
     for (const Attribute& attribute : m_attributes) {
       if (attribute.name() == name){
         result = true;
-      }else{
+      } else{
         newAttributes.push_back(attribute);
       }
-    } 
+    }
 
     if (result == true){
       incrementVersionId();
@@ -449,7 +651,17 @@ namespace openstudio{
       return false;
     }
 
-    QDomElement element = doc.createElement("name");
+    QDomElement element = doc.createElement("schema_version");
+    docElement.appendChild(element);
+    element.appendChild(doc.createTextNode("3.0"));
+
+    if (m_error){
+      element = doc.createElement("error");
+      docElement.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(escapeString(*m_error))));
+    }
+
+    element = doc.createElement("name");
     docElement.appendChild(element);
     element.appendChild(doc.createTextNode(toQString(escapeString(m_name))));
 
@@ -461,6 +673,26 @@ namespace openstudio{
     docElement.appendChild(element);
     element.appendChild(doc.createTextNode(toQString(m_versionId)));
 
+    if (!m_versionModified.empty()){
+      element = doc.createElement("version_modified");
+      docElement.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(m_versionModified)));
+    }
+
+    element = doc.createElement("xml_checksum");
+    docElement.appendChild(element);
+    element.appendChild(doc.createTextNode(toQString(m_xmlChecksum)));
+
+    if (m_bclXMLType == BCLXMLType::MeasureXML){
+      element = doc.createElement("class_name");
+      docElement.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(m_className)));
+    }
+
+    element = doc.createElement("display_name");
+    docElement.appendChild(element);
+    element.appendChild(doc.createTextNode(toQString(m_displayName)));
+
     element = doc.createElement("description");
     docElement.appendChild(element);
     element.appendChild(doc.createTextNode(toQString(escapeString(m_description))));
@@ -471,21 +703,40 @@ namespace openstudio{
       element.appendChild(doc.createTextNode(toQString(escapeString(m_modelerDescription))));
     }
 
+    if (m_bclXMLType == BCLXMLType::MeasureXML){
+      element = doc.createElement("arguments");
+      docElement.appendChild(element);
+      for (const BCLMeasureArgument& argument : m_arguments){
+        QDomElement argumentElement = doc.createElement("argument");
+        element.appendChild(argumentElement);
+        argument.writeValues(doc, argumentElement);
+      }
+
+      element = doc.createElement("outputs");
+      docElement.appendChild(element);
+      for (const BCLMeasureOutput& output : m_outputs){
+        QDomElement outputElement = doc.createElement("output");
+        element.appendChild(outputElement);
+        output.writeValues(doc, outputElement);
+      }
+    }
+
     // TODO: write provenances
     element = doc.createElement("provenances");
     docElement.appendChild(element);
 
     // write tags
     element = doc.createElement("tags");
+    docElement.appendChild(element);
     for (const std::string& tag : m_tags) {
       QDomElement tagElement = doc.createElement("tag");
       element.appendChild(tagElement);
       tagElement.appendChild(doc.createTextNode(toQString(tag)));
     }
-    docElement.appendChild(element);
 
     // write attributes
     element = doc.createElement("attributes");
+    docElement.appendChild(element);
     for (const Attribute& attribute : m_attributes) {
 
       std::string value;
@@ -554,56 +805,23 @@ namespace openstudio{
         unitsElement.appendChild(doc.createTextNode(toQString(*units)));
       }
     }
-    docElement.appendChild(element);
 
     // write files
     element = doc.createElement("files");
+    docElement.appendChild(element);
     for (const BCLFileReference& file : m_files) {
-
       QDomElement fileElement = doc.createElement("file");
       element.appendChild(fileElement);
-
-      if (file.usageType() == "script" && !file.softwareProgram().empty() && !file.softwareProgramVersion().empty()){
-        QDomElement versionElement = doc.createElement("version");
-        fileElement.appendChild(versionElement);
-
-        QDomElement softwareProgramElement = doc.createElement("software_program");
-        versionElement.appendChild(softwareProgramElement);
-        softwareProgramElement.appendChild(doc.createTextNode(toQString(file.softwareProgram())));
-
-        QDomElement softwareProgramVersionElement = doc.createElement("identifier");
-        versionElement.appendChild(softwareProgramVersionElement);
-        softwareProgramVersionElement.appendChild(doc.createTextNode(toQString(file.softwareProgramVersion())));
-      }
-
-      QDomElement fileNameElement = doc.createElement("filename");
-      fileElement.appendChild(fileNameElement);
-      fileNameElement.appendChild(doc.createTextNode(toQString(file.fileName())));
-
-      QDomElement fileTypeElement = doc.createElement("filetype");
-      fileElement.appendChild(fileTypeElement);
-      fileTypeElement.appendChild(doc.createTextNode(toQString(file.fileType())));
-
-      QDomElement usageTypeElement = doc.createElement("usage_type");
-      fileElement.appendChild(usageTypeElement);
-      usageTypeElement.appendChild(doc.createTextNode(toQString(file.usageType())));
-
-      QDomElement checksumElement = doc.createElement("checksum");
-      fileElement.appendChild(checksumElement);
-      checksumElement.appendChild(doc.createTextNode(toQString(file.checksum())));
+      file.writeValues(doc, fileElement);
     }
-    docElement.appendChild(element);
 
     // write to disk
-    QFile file(toQString(m_path));
-    bool opened = file.open(QIODevice::WriteOnly | QIODevice::Text);
-    if (!opened){
-      file.close();
+    openstudio::filesystem::ofstream file(m_path);
+    if (!file.is_open()){
       return false;
     }
 
-    QTextStream textStream(&file);
-    textStream << doc.toString(2);
+    openstudio::filesystem::write(file, doc.toString(2));
     file.close();
     return true;
   }
@@ -611,19 +829,123 @@ namespace openstudio{
   bool BCLXML::saveAs(const openstudio::path& xmlPath)
   {
     incrementVersionId();
-    m_path = boost::filesystem::system_complete(xmlPath);
+    m_path = openstudio::filesystem::system_complete(xmlPath);
     return save();
   }
 
   void BCLXML::changeUID()
   {
-    m_uid = removeBraces(UUID::createUuid());
+    m_uid = removeBraces(openstudio::createUUID());
+    // DLM: should this call incrementVersionId() ?
   }
 
   void BCLXML::incrementVersionId()
   {
-    m_versionId = removeBraces(UUID::createUuid());
+    m_versionId = removeBraces(openstudio::createUUID());
+    m_versionModified = DateTime::nowUTC().toISO8601();
   }
 
+  bool BCLXML::checkForUpdatesXML()
+  {
+    std::string newChecksum = computeXMLChecksum();
+
+    if (m_xmlChecksum.empty()){
+      // we are unsure if this is a real change or update from version 2
+      // set this here and return false
+      m_xmlChecksum = newChecksum;
+      return false;
+    }
+
+    if (m_xmlChecksum != newChecksum){
+      incrementVersionId();
+      m_xmlChecksum = newChecksum;
+      return true;
+    }
+
+    return false;
+  }
+
+  void printAttributeForChecksum(std::ostream& os, const Attribute& attribute, const std::string& tabs)
+  {
+    if (attribute.valueType() == AttributeValueType::AttributeVector){
+      for (const Attribute& child : attribute.valueAsAttributeVector()){
+        printAttributeForChecksum(os, child, tabs + "  ");
+      }
+    } else{
+      os << tabs << "Name: " << attribute.name() << std::endl;
+      if (attribute.displayName()){
+        os << tabs << "Display Name: " << attribute.displayName().get() << std::endl;
+      }
+      os << tabs << "Value Type: " << attribute.valueType().valueName() << std::endl;
+      os << tabs << "Value: " << attribute.toString() << std::endl;
+      if (attribute.units()){
+        os << tabs << "Units: " << attribute.units().get() << std::endl;
+      }
+      os << std::endl;
+    }
+  }
+
+  std::string BCLXML::computeXMLChecksum() const
+  {
+    // DLM: CHANGING THE IMPLEMENTATION OF THIS FUNCTION WILL CAUSE 
+    // CHECKSUMS TO BE COMPUTED DIFFERENTLY
+    // WE WANT TO AVOID FIGHTING WHERE DIFFERENT VERSIONS OF OPENSTUDIO
+    // COMPUTE THE CHECKSUM IN DIFFERENT WAYS
+    std::stringstream ss;
+
+    // will be picked up when Ruby file changes
+    //ss << "Name: " << m_name << std::endl;
+    
+    // will be picked up when Ruby file changes
+    //ss << "Display Name: " << m_displayName << std::endl;
+
+    // will be picked up when Ruby file changes
+    //ss << "Class Name: " << m_className << std::endl;
+
+    // not managed manually
+    //ss << m_uid;
+    //ss << m_versionId;
+    //ss << m_xmlChecksum;
+
+    // will be picked up when Ruby file changes
+    //ss << "Description: " << m_description << std::endl;
+
+    // will be picked up when Ruby file changes
+    //ss << "Modeler Description: " << m_modelerDescription << std::endl;
+
+    // will be picked up when Ruby file changes
+    //ss << "Arguments: " << std::endl;
+    //for (const BCLMeasureArgument& argument : m_arguments){
+    //  ss << argument << std::endl;
+    //}
+
+    // will be picked up when checkForUpdatesFiles
+    //ss << "Files: " << std::endl;
+    //for (const BCLFileReference& file : m_files){
+    //  ss << file << std::endl;
+    //}
+
+    // attributes are edited in the xml
+    ss << "Attributes: " << std::endl;
+    for (const Attribute& attribute : m_attributes){
+      //ss << attribute; // can't use this because attributes uuid are regenerated on each load
+
+      // DLM: in the end just create a new method that won't change
+      printAttributeForChecksum(ss, attribute, "  ");
+    }
+    //toJSON(m_attributes, ss); // can't use this because it writes out the openstudio version
+    //ss << toJSONWithoutMetadata(m_attributes); // don't use this because it may change
+
+    // tags are edited in the xml
+    ss << "Tags: " << std::endl;
+    for (const std::string& tag : m_tags){
+      ss << "  " << tag << std::endl;
+    }
+
+    //std::cout << "Checksum computed on:" << std::endl;
+    //std::cout << ss.str() << std::endl;
+
+    return checksum(ss);
+  }
 
 } // openstudio

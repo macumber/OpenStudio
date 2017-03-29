@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -42,6 +51,8 @@
 #include "../FFactorGroundFloorConstruction_Impl.hpp"
 #include "../WindowDataFile.hpp"
 #include "../WindowDataFile_Impl.hpp"
+#include "../StandardsInformationConstruction.hpp"
+#include "../StandardsInformationConstruction_Impl.hpp"
 
 #include "../Material.hpp"
 #include "../Material_Impl.hpp"
@@ -49,6 +60,7 @@
 #include "../AirWallMaterial.hpp"
 #include "../StandardOpaqueMaterial.hpp"
 #include "../StandardOpaqueMaterial_Impl.hpp"
+#include "../StandardGlazing.hpp"
 #include "../Space.hpp"
 #include "../Space_Impl.hpp"
 #include "../Surface.hpp"
@@ -62,6 +74,7 @@
 #include <utilities/idd/OS_Construction_FieldEnums.hxx>
 #include <utilities/idd/OS_Material_FieldEnums.hxx>
 #include <utilities/idd/OS_Material_AirGap_FieldEnums.hxx>
+#include <utilities/idd/IddEnums.hxx>
 
 using namespace openstudio;
 using namespace openstudio::model;
@@ -337,30 +350,56 @@ TEST_F(ModelFixture, Construction_AddObjects) {
 
 TEST_F(ModelFixture, Construction_Clone)
 {
-  Model model;
+  Model library;
 
   // Create some materials
-  StandardOpaqueMaterial exterior(model);
-  AirGap air(model);
-  StandardOpaqueMaterial interior(model);
+  StandardOpaqueMaterial exterior(library);
+  AirGap air(library);
+  StandardOpaqueMaterial interior(library);
 
   OpaqueMaterialVector layers;
   layers.push_back(exterior);
   layers.push_back(air);
   layers.push_back(interior);
 
-  EXPECT_EQ(static_cast<unsigned>(3), model.getModelObjects<Material>().size());
+  EXPECT_EQ(static_cast<unsigned>(3), library.getModelObjects<Material>().size());
 
   Construction construction(layers);
   ASSERT_EQ(static_cast<unsigned>(3), construction.layers().size());
 
-  ModelObject clone = construction.clone(model);
+  // Clone into same model
+  ModelObject clone = construction.clone(library);
 
-  EXPECT_EQ(static_cast<unsigned>(3), model.getModelObjects<Material>().size());
+  // Material ResourceObject instances are shared resources so they have not been cloned
+  EXPECT_EQ(static_cast<unsigned>(3), library.getModelObjects<Material>().size());
 
+  // New handle for cloned construction
   EXPECT_FALSE(clone.handle() == construction.handle());
   ASSERT_TRUE(clone.optionalCast<Construction>());
+
   ASSERT_EQ(static_cast<unsigned>(3), clone.cast<Construction>().layers().size());
+
+  // Clone into a differnt model
+  Model model;
+
+  auto clone2 = construction.clone(model).cast<Construction>();
+  EXPECT_EQ(static_cast<unsigned>(3), model.getModelObjects<Material>().size());
+
+  EXPECT_EQ(static_cast<unsigned>(1), model.getModelObjects<Construction>().size());
+
+  // Make sure materials are still hooked up
+  ASSERT_EQ(static_cast<unsigned>(3), clone2.cast<Construction>().layers().size());
+
+  // Clone again
+  auto clone3 = construction.clone(model).cast<Construction>();
+  EXPECT_EQ(static_cast<unsigned>(3), model.getModelObjects<Material>().size());
+
+  EXPECT_EQ(static_cast<unsigned>(2), model.getModelObjects<Construction>().size());
+
+  // Make sure materials are still hooked up
+  ASSERT_EQ(static_cast<unsigned>(3), clone3.cast<Construction>().layers().size());
+
+  EXPECT_FALSE(clone2.handle() == clone3.handle());
 }
 
 TEST_F(ModelFixture, DuplicateMaterialName)
@@ -582,6 +621,107 @@ TEST_F(ModelFixture, Construction_NetArea) {
   EXPECT_DOUBLE_EQ(12.5, cost2->totalCost());
 }
 
+TEST_F(ModelFixture, Construction_NetArea_InteriorWall) {
+  Model model;
+
+  Construction construction1(model);
+  Construction construction2(model);
+  EXPECT_DOUBLE_EQ(0.0, construction1.getNetArea());
+  EXPECT_DOUBLE_EQ(0.0, construction2.getNetArea());
+
+  // add costs
+  boost::optional<LifeCycleCost> cost1 = LifeCycleCost::createLifeCycleCost("Brick", construction1, 3.0, "CostPerArea", "Construction");
+  ASSERT_TRUE(cost1);
+  boost::optional<LifeCycleCost> cost2 = LifeCycleCost::createLifeCycleCost("Glass", construction2, 5.0, "CostPerArea", "Construction");
+  ASSERT_TRUE(cost2);
+  EXPECT_DOUBLE_EQ(0, cost1->totalCost());
+  EXPECT_DOUBLE_EQ(0, cost2->totalCost());
+
+  Building building = model.getUniqueModelObject<Building>();
+  DefaultSurfaceConstructions defaultExteriorSurfaceConstructions(model);
+  DefaultSurfaceConstructions defaultInteriorSurfaceConstructions(model);
+  DefaultSubSurfaceConstructions defaultExteriorSubSurfaceConstructions(model);
+  DefaultSubSurfaceConstructions defaultInteriorSubSurfaceConstructions(model);
+  DefaultConstructionSet defaultConstructionSet(model);
+  defaultConstructionSet.setDefaultExteriorSurfaceConstructions(defaultExteriorSurfaceConstructions);
+  defaultConstructionSet.setDefaultInteriorSurfaceConstructions(defaultInteriorSurfaceConstructions);
+  defaultConstructionSet.setDefaultExteriorSubSurfaceConstructions(defaultExteriorSubSurfaceConstructions);
+  defaultConstructionSet.setDefaultInteriorSubSurfaceConstructions(defaultInteriorSubSurfaceConstructions);
+  building.setDefaultConstructionSet(defaultConstructionSet);
+
+  Space space(model);
+
+  Point3dVector points;
+  points.push_back(Point3d(0, 0, 1));
+  points.push_back(Point3d(0, 0, 0));
+  points.push_back(Point3d(0, 1, 0));
+  points.push_back(Point3d(0, 1, 1));
+
+  Surface surface1(points, model);
+  surface1.setSpace(space);
+  EXPECT_EQ("Wall", surface1.surfaceType());
+  EXPECT_EQ("Outdoors", surface1.outsideBoundaryCondition());
+  EXPECT_DOUBLE_EQ(1.0, surface1.netArea());
+
+  points.clear();
+  points.push_back(Point3d(0, 1, 1));
+  points.push_back(Point3d(0, 1, 0));
+  points.push_back(Point3d(0, 0, 0));
+  points.push_back(Point3d(0, 0, 1));
+
+  Surface surface2(points, model);
+  surface2.setSpace(space);
+  EXPECT_EQ("Wall", surface2.surfaceType());
+  EXPECT_EQ("Outdoors", surface2.outsideBoundaryCondition());
+  EXPECT_DOUBLE_EQ(1.0, surface2.netArea());
+
+  EXPECT_DOUBLE_EQ(0.0, construction1.getNetArea());
+  EXPECT_DOUBLE_EQ(0.0, construction2.getNetArea());
+  EXPECT_DOUBLE_EQ(0, cost1->totalCost());
+  EXPECT_DOUBLE_EQ(0, cost2->totalCost());
+
+  defaultExteriorSurfaceConstructions.setWallConstruction(construction1);
+  ASSERT_TRUE(surface1.construction());
+  ASSERT_TRUE(surface2.construction());
+  EXPECT_EQ(surface1.construction()->handle(), construction1.handle());
+  EXPECT_EQ(surface2.construction()->handle(), construction1.handle());
+  EXPECT_DOUBLE_EQ(2.0, construction1.getNetArea());
+  EXPECT_DOUBLE_EQ(0.0, construction2.getNetArea());
+  EXPECT_DOUBLE_EQ(6.0, cost1->totalCost());
+  EXPECT_DOUBLE_EQ(0, cost2->totalCost());
+
+  surface1.setConstruction(construction1);
+  surface2.setConstruction(construction2);
+  ASSERT_TRUE(surface1.construction());
+  ASSERT_TRUE(surface2.construction());
+  EXPECT_EQ(surface1.construction()->handle(), construction1.handle());
+  EXPECT_EQ(surface2.construction()->handle(), construction2.handle());
+  EXPECT_DOUBLE_EQ(1.0, construction1.getNetArea());
+  EXPECT_DOUBLE_EQ(1.0, construction2.getNetArea());
+  EXPECT_DOUBLE_EQ(3.0, cost1->totalCost());
+  EXPECT_DOUBLE_EQ(5.0, cost2->totalCost());
+
+  surface1.setAdjacentSurface(surface2);
+  ASSERT_TRUE(surface1.construction());
+  ASSERT_TRUE(surface2.construction());
+  EXPECT_EQ(surface1.construction()->handle(), construction1.handle());
+  EXPECT_EQ(surface2.construction()->handle(), construction2.handle());
+  EXPECT_DOUBLE_EQ(1.0, construction1.getNetArea());
+  EXPECT_DOUBLE_EQ(1.0, construction2.getNetArea());
+  EXPECT_DOUBLE_EQ(3.0, cost1->totalCost());
+  EXPECT_DOUBLE_EQ(5.0, cost2->totalCost());
+
+  surface2.setConstruction(construction1);
+  ASSERT_TRUE(surface1.construction());
+  ASSERT_TRUE(surface2.construction());
+  EXPECT_EQ(surface1.construction()->handle(), construction1.handle());
+  EXPECT_EQ(surface2.construction()->handle(), construction1.handle());
+  EXPECT_DOUBLE_EQ(1.0, construction1.getNetArea());
+  EXPECT_DOUBLE_EQ(0.0, construction2.getNetArea());
+  EXPECT_DOUBLE_EQ(3.0, cost1->totalCost());
+  EXPECT_DOUBLE_EQ(0.0, cost2->totalCost());
+}
+
 TEST_F(ModelFixture, Construction_NetArea_SubSurface) {
   Model model;
 
@@ -681,4 +821,191 @@ TEST_F(ModelFixture, Construction_EnsureUniqueLayers)
   EXPECT_NE(construction1.layers()[1].handle(), construction2.layers()[1].handle());
   EXPECT_NE(construction1.layers()[2].handle(), construction2.layers()[2].handle());
 
+}
+
+TEST_F(ModelFixture, Construction_StandardsInformationConstruction)
+{
+
+  EXPECT_FALSE(StandardsInformationConstruction::standardPerturbableLayerTypeValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationTypeValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationAssemblyContextValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationNumberOfPanesValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationFrameTypeValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationDividerTypeValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationTintValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::fenestrationGasFillValues().empty());
+  EXPECT_FALSE(StandardsInformationConstruction::intendedSurfaceTypeValues().empty());
+
+  Model model;
+
+  Construction construction(model);
+  EXPECT_EQ(0, model.getModelObjects<StandardsInformationConstruction>().size());
+
+  StandardsInformationConstruction tmp = construction.standardsInformation();
+  EXPECT_EQ(1u, model.getModelObjects<StandardsInformationConstruction>().size());
+
+  StandardsInformationConstruction info = construction.standardsInformation();
+  EXPECT_EQ(1u, model.getModelObjects<StandardsInformationConstruction>().size());
+  EXPECT_EQ(toString(info.handle()), toString(tmp.handle()));
+  EXPECT_EQ(toString(construction.handle()), toString(info.construction().handle()));
+
+  EXPECT_FALSE(info.intendedSurfaceType());
+  EXPECT_TRUE(info.suggestedStandardsConstructionTypes().empty());
+
+  EXPECT_TRUE(info.setIntendedSurfaceType("ExteriorWall"));
+  ASSERT_TRUE(info.intendedSurfaceType());
+  EXPECT_EQ("ExteriorWall", info.intendedSurfaceType().get());
+  EXPECT_FALSE(info.suggestedStandardsConstructionTypes().empty());
+
+  EXPECT_FALSE(info.constructionStandard());
+  EXPECT_TRUE(info.suggestedConstructionStandardSources().empty());
+
+  info.setConstructionStandard("CEC Title24-2013");
+  ASSERT_TRUE(info.constructionStandard());
+  EXPECT_EQ("CEC Title24-2013", info.constructionStandard().get());
+ // EXPECT_FALSE(info.suggestedConstructionStandardSources().empty());
+
+  construction.remove();
+  EXPECT_EQ(0, model.getModelObjects<StandardsInformationConstruction>().size());
+
+}
+
+TEST_F(ModelFixture, Construction_NumLayers)
+{
+  // from E+ constructions can have up to 10 layers total, 8 for windows
+  Model model;
+
+  // Create some materials
+  StandardOpaqueMaterial exterior(model);
+  AirGap air(model);
+  StandardOpaqueMaterial interior(model);
+  StandardGlazing glazing(model);
+
+  {
+    OpaqueMaterialVector layers;
+
+    EXPECT_THROW({ Construction construction(layers); }, openstudio::Exception);
+  }
+
+  {
+    OpaqueMaterialVector layers;
+    layers.push_back(exterior); // 1
+    layers.push_back(exterior); // 2
+    layers.push_back(exterior); // 3
+    layers.push_back(exterior); // 4
+    layers.push_back(exterior); // 5
+    layers.push_back(air);      // 6
+    layers.push_back(interior); // 7
+    layers.push_back(interior); // 8
+    layers.push_back(interior); // 9
+    layers.push_back(interior); // 10
+
+    EXPECT_NO_THROW({ Construction construction(layers); });
+
+    Construction construction2(model);
+    EXPECT_TRUE(construction2.setLayers(castVector<Material>(layers)));
+    EXPECT_EQ(10, construction2.layers().size());
+  }
+
+  {
+    OpaqueMaterialVector layers;
+    layers.push_back(exterior); // 1
+    layers.push_back(exterior); // 2
+    layers.push_back(exterior); // 3
+    layers.push_back(exterior); // 4
+    layers.push_back(exterior); // 5
+    layers.push_back(air);      // 6
+    layers.push_back(interior); // 7
+    layers.push_back(interior); // 8
+    layers.push_back(interior); // 9
+    layers.push_back(interior); // 10
+    layers.push_back(interior); // 11
+
+    EXPECT_THROW({ Construction construction(layers); }, openstudio::Exception);
+
+    Construction construction2(model);
+    EXPECT_FALSE(construction2.setLayers(castVector<Material>(layers)));
+    EXPECT_EQ(0, construction2.layers().size());
+  }
+
+  {
+    Construction construction(model);
+
+    OpaqueMaterialVector layers;
+    EXPECT_TRUE(construction.setLayers(castVector<Material>(layers)));
+    EXPECT_EQ(0, construction.layers().size());
+
+    for (unsigned i = 0; i < 12; ++i){
+      bool test = construction.insertLayer(i, exterior);
+      if (i < 10){
+        EXPECT_TRUE(test);
+        EXPECT_EQ(i + 1, construction.layers().size());
+      } else{
+        EXPECT_FALSE(test);
+        EXPECT_EQ(10u, construction.layers().size());
+      }
+    }
+  }
+
+  {
+   FenestrationMaterialVector layers;
+
+    EXPECT_THROW({ Construction construction(layers); }, openstudio::Exception);
+  }
+
+  {
+    FenestrationMaterialVector layers;
+    layers.push_back(glazing); // 1
+    layers.push_back(glazing); // 2
+    layers.push_back(glazing); // 3
+    layers.push_back(glazing); // 4
+    layers.push_back(glazing); // 5
+    layers.push_back(glazing); // 6
+    layers.push_back(glazing); // 7
+    layers.push_back(glazing); // 8
+
+    EXPECT_NO_THROW({ Construction construction(layers); });
+
+    Construction construction2(model);
+    EXPECT_TRUE(construction2.setLayers(castVector<Material>(layers)));
+    EXPECT_EQ(8, construction2.layers().size());
+  }
+
+  {
+    FenestrationMaterialVector layers;
+    layers.push_back(glazing); // 1
+    layers.push_back(glazing); // 2
+    layers.push_back(glazing); // 3
+    layers.push_back(glazing); // 4
+    layers.push_back(glazing); // 5
+    layers.push_back(glazing); // 6
+    layers.push_back(glazing); // 7
+    layers.push_back(glazing); // 8
+    layers.push_back(glazing); // 9
+
+    EXPECT_THROW({ Construction construction(layers); }, openstudio::Exception);
+
+    Construction construction2(model);
+    EXPECT_FALSE(construction2.setLayers(castVector<Material>(layers)));
+    EXPECT_EQ(0, construction2.layers().size());
+  }
+
+  {
+    Construction construction(model);
+
+    FenestrationMaterialVector layers;
+    EXPECT_TRUE(construction.setLayers(castVector<Material>(layers)));
+    EXPECT_EQ(0, construction.layers().size());
+
+    for (unsigned i = 0; i < 10; ++i){
+      bool test = construction.insertLayer(i, glazing);
+      if (i < 8){
+        EXPECT_TRUE(test);
+        EXPECT_EQ(i+1, construction.layers().size());
+      } else{
+        EXPECT_FALSE(test);
+        EXPECT_EQ(8u, construction.layers().size());
+      }
+    }
+  }
 }

@@ -21,14 +21,13 @@ public class TestOpenStudio
     System.loadLibrary("OpenStudioOSVersion_java");
     System.loadLibrary("OpenStudioProject_java");
     System.loadLibrary("OpenStudioRadiance_java");
-    System.loadLibrary("OpenStudioRuleset_java");
+    System.loadLibrary("OpenStudioMeasure_java");
     System.loadLibrary("OpenStudioRunManager_java");
     System.loadLibrary("OpenStudioSDD_java");
     System.loadLibrary("OpenStudioUtilitiesBCL_java");
     System.loadLibrary("OpenStudioUtilitiesCloud_java");
     System.loadLibrary("OpenStudioUtilitiesCore_java");
     System.loadLibrary("OpenStudioUtilitiesData_java");
-    System.loadLibrary("OpenStudioUtilitiesDocument_java");
     System.loadLibrary("OpenStudioUtilitiesEconomics_java");
     System.loadLibrary("OpenStudioUtilitiesFileTypes_java");
     System.loadLibrary("OpenStudioUtilitiesGeometry_java");

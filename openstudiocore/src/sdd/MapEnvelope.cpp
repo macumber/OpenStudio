@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "ReverseTranslator.hpp"
 #include "ForwardTranslator.hpp"
@@ -31,6 +40,8 @@
 #include "../model/AirGap_Impl.hpp"
 #include "../model/StandardOpaqueMaterial.hpp"
 #include "../model/StandardOpaqueMaterial_Impl.hpp"
+#include "../model/ConstructionWithInternalSource.hpp"
+#include "../model/ConstructionWithInternalSource_Impl.hpp"
 #include "../model/FFactorGroundFloorConstruction.hpp"
 #include "../model/FFactorGroundFloorConstruction_Impl.hpp"
 #include "../model/CFactorUndergroundWallConstruction.hpp"
@@ -41,6 +52,10 @@
 #include "../model/ModelPartitionMaterial_Impl.hpp"
 #include "../model/SimpleGlazing.hpp"
 #include "../model/SimpleGlazing_Impl.hpp"
+#include "../model/StandardsInformationConstruction.hpp"
+#include "../model/StandardsInformationConstruction_Impl.hpp"
+#include "../model/StandardsInformationMaterial.hpp"
+#include "../model/StandardsInformationMaterial_Impl.hpp"
 
 #include "../utilities/units/QuantityConverter.hpp"
 #include "../utilities/units/IPUnit.hpp"
@@ -49,7 +64,6 @@
 #include "../utilities/units/WhUnit.hpp"
 #include "../utilities/core/Assert.hpp"
 
-#include <QFile>
 #include <QDomDocument>
 #include <QDomElement>
 
@@ -61,16 +75,23 @@ namespace sdd {
     boost::optional<openstudio::model::ModelObject> result;
 
     QDomElement nameElement = element.firstChildElement("Name");
-    OS_ASSERT(!nameElement.isNull()); // what type of error handling do we want?
+    std::string name;
+    if (nameElement.isNull()){
+      LOG(Error, "ConsAssm element 'Name' is empty.")
+    } else{
+      name = escapeName(nameElement.text());
+    }
 
     QDomElement specificationElement = element.firstChildElement("SpecMthd");
-    OS_ASSERT(!specificationElement.isNull()); // what type of error handling do we want?
+    if (specificationElement.isNull()){
+      LOG(Error, "ConsAssm element 'SpecMthd' is empty for construction named '" << name << "'. Construction will not be created");
+      return boost::none;
+    }
 
-    if (specificationElement.text() == "Layers" ||
-        specificationElement.text() == "UFactor" ){ // temp code
+    if (specificationElement.text() == "Layers"){
 
       openstudio::model::Construction construction(model);
-      construction.setName(escapeName(nameElement.text()));
+      construction.setName(name);
 
       std::vector<model::Material> materials;
       QDomNodeList materialElements = element.elementsByTagName("MatRef");
@@ -81,22 +102,31 @@ namespace sdd {
         if( ! material )
         {
           LOG(Error,"Construction: " << construction.name().get() << " references material: " << materialName << " that is not defined.");
+        
+          // DLM: what to do?  Remove the construction?
+        } else{
+          materials.push_back(*material);
         }
-        OS_ASSERT(material); // what type of error handling do we want?
-        materials.push_back(*material);
       }
 
       bool test = construction.setLayers(materials);
-      OS_ASSERT(test); // what type of error handling do we want?
+      if (!test){
+        LOG(Error, "Failed to set material layers for Construction: " << construction.name().get() << ".");
+
+        // DLM: what to do?  Remove the construction?
+      }
 
       bool wasFastNaming = model.fastNaming();
       model.setFastNaming(false);
 
+      unsigned n = (unsigned) materials.size();
       construction.ensureUniqueLayers();
+      materials = construction.layers(); // DLM: get materials again in case new ones were cloned
+
+      OS_ASSERT(n == materials.size());
  
       model.setFastNaming(wasFastNaming);
 
-      unsigned n = materials.size();
 
       if (n > 0){
 
@@ -151,33 +181,36 @@ namespace sdd {
           }
         }
 
-        if (materials[n-1].optionalCast<model::StandardOpaqueMaterial>()){
-          model::StandardOpaqueMaterial intMaterial = materials[n-1].cast<model::StandardOpaqueMaterial>();
-      
-          if (!intThrmlAbsElement.isNull()){
-            intMaterial.setThermalAbsorptance(intThrmlAbsElement.text().toDouble());
-          }
+        // DLM: if only one layer use properties from exterior material
+        if (n > 1){
+          if (materials[n - 1].optionalCast<model::StandardOpaqueMaterial>()){
+            model::StandardOpaqueMaterial intMaterial = materials[n - 1].cast<model::StandardOpaqueMaterial>();
 
-          if (!intSolAbsElement.isNull()){
-            intMaterial.setSolarAbsorptance(intSolAbsElement.text().toDouble());
-          }
-            
-          if (!intVisAbsElement.isNull()){
-            intMaterial.setVisibleAbsorptance(intVisAbsElement.text().toDouble());
-          }
-        }else if (materials[n-1].optionalCast<model::MasslessOpaqueMaterial>()){
-          model::MasslessOpaqueMaterial intMaterial = materials[n-1].cast<model::MasslessOpaqueMaterial>();
-          
-          if (!intThrmlAbsElement.isNull()){
-            intMaterial.setThermalAbsorptance(intThrmlAbsElement.text().toDouble());
-          }
+            if (!intThrmlAbsElement.isNull()){
+              intMaterial.setThermalAbsorptance(intThrmlAbsElement.text().toDouble());
+            }
 
-          if (!intSolAbsElement.isNull()){
-            intMaterial.setSolarAbsorptance(intSolAbsElement.text().toDouble());
-          }
-            
-          if (!intVisAbsElement.isNull()){
-            intMaterial.setVisibleAbsorptance(intVisAbsElement.text().toDouble());
+            if (!intSolAbsElement.isNull()){
+              intMaterial.setSolarAbsorptance(intSolAbsElement.text().toDouble());
+            }
+
+            if (!intVisAbsElement.isNull()){
+              intMaterial.setVisibleAbsorptance(intVisAbsElement.text().toDouble());
+            }
+          } else if (materials[n - 1].optionalCast<model::MasslessOpaqueMaterial>()){
+            model::MasslessOpaqueMaterial intMaterial = materials[n - 1].cast<model::MasslessOpaqueMaterial>();
+
+            if (!intThrmlAbsElement.isNull()){
+              intMaterial.setThermalAbsorptance(intThrmlAbsElement.text().toDouble());
+            }
+
+            if (!intSolAbsElement.isNull()){
+              intMaterial.setSolarAbsorptance(intSolAbsElement.text().toDouble());
+            }
+
+            if (!intVisAbsElement.isNull()){
+              intMaterial.setVisibleAbsorptance(intVisAbsElement.text().toDouble());
+            }
           }
         }
       }
@@ -189,11 +222,15 @@ namespace sdd {
       // DLM: per input from David Reddy this construction will be cloned 
       // for each surface that uses it and height set per surface
       // 
-      openstudio::model::CFactorUndergroundWallConstruction construction(model);
-      construction.setName(escapeName(nameElement.text()));
 
-      QDomElement cFactorElement = element.firstChildElement("CFactor"); 
-      OS_ASSERT(!cFactorElement.isNull());
+      QDomElement cFactorElement = element.firstChildElement("CFactor");
+      if (cFactorElement.isNull()){
+        LOG(Error, "ConsAssm required element 'CFactor' is empty for construction named '" << name << "'. Construction will not be created");
+        return boost::none;
+      }
+
+      openstudio::model::CFactorUndergroundWallConstruction construction(model);
+      construction.setName(name);
 
       // sdd units = Btu/(hr*ft^2*F), os units = W/(m^2*K) 
       Quantity cFactorIP(cFactorElement.text().toDouble(), BTUUnit(BTUExpnt(1,-2,-1,-1)));
@@ -208,12 +245,15 @@ namespace sdd {
 
       // DLM: per input from David Reddy this construction will be cloned 
       // for each surface that uses it and area and perimeter set per surface
-      // 
-      openstudio::model::FFactorGroundFloorConstruction construction(model);
-      construction.setName(escapeName(nameElement.text()));
 
-      QDomElement fFactorElement = element.firstChildElement("FFactor"); 
-      OS_ASSERT(!fFactorElement.isNull());
+      QDomElement fFactorElement = element.firstChildElement("FFactor");
+      if (fFactorElement.isNull()){
+        LOG(Error, "ConsAssm required element 'FFactor' is empty for construction named '" << name << "'. Construction will not be created");
+        return boost::none;
+      }
+
+      openstudio::model::FFactorGroundFloorConstruction construction(model);
+      construction.setName(name);
             
       // sdd units = Btu/(hr*ft*F), os units = W/(m*K)
       Quantity fFactorIP(fFactorElement.text().toDouble(), BTUUnit(BTUExpnt(1,-1,-1,-1)));
@@ -244,7 +284,14 @@ namespace sdd {
     UnitSystem whSys(UnitSystem::Wh);
 
     QDomElement nameElement = element.firstChildElement("Name");
-    QDomElement uFactorElement = element.firstChildElement("UFactor"); // Btu/h-ft2-F
+    QDomElement uFactorElement = element.firstChildElement("UFactorSim"); // Btu/h-ft2-F
+
+    if (nameElement.isNull()){
+      LOG(Error, "DrCons element 'Name' is empty.  Construction will not be created.");
+    }
+    if (uFactorElement.isNull()){
+      LOG(Error, "DrCons element 'UFactorSim' is empty.  Construction will not be created.");
+    }
 
     if (!nameElement.isNull() && !uFactorElement.isNull()){
       
@@ -256,6 +303,13 @@ namespace sdd {
 
       // m^2-K/W
       double rValueSI = 1.0 / uFactorWh->value();
+
+      // 5.6783 hr-ft2-F/Btu = 1 m^2-K/W
+      const double intFilmRValueSI = 0.170/5.6783; // 0.170 hr-ft2-F/Btu
+      const double extFilmRValueSI = 0.680/5.6783; // 0.680 hr-ft2-F/Btu
+
+      // if total rvalue is less than sum of interior and exterior film rvalue, surface coefficients will be added to door separately
+      rValueSI = std::max(rValueSI - intFilmRValueSI - extFilmRValueSI, 0.001);
 
       std::string name = escapeName(nameElement.text());
 
@@ -273,6 +327,7 @@ namespace sdd {
 
       return construction;
     }
+
     return boost::none;
   }
 
@@ -288,8 +343,21 @@ namespace sdd {
 
     QDomElement nameElement = element.firstChildElement("Name");
     QDomElement shgcElement = element.firstChildElement("SHGC"); // unitless
-    QDomElement uFactorElement = element.firstChildElement("UFactor"); // Btu/h-ft2-F
+    QDomElement uFactorElement = element.firstChildElement("UFactorSim"); // Btu/h-ft2-F
     QDomElement vtElement = element.firstChildElement("VT"); // unitless
+
+    if (nameElement.isNull()){
+      LOG(Error, "FenCons element 'Name' is empty.  Construction will not be created.");
+    }
+    if (shgcElement.isNull()){
+      LOG(Error, "FenCons element 'SHGC' is empty.  Construction will not be created.");
+    }
+    if (uFactorElement.isNull()){
+      LOG(Error, "FenCons element 'UFactorSim' is empty.  Construction will not be created.");
+    }
+    if (vtElement.isNull()){
+      LOG(Error, "FenCons element 'VT' is empty.  Construction will not be created.");
+    }
 
     if (!nameElement.isNull() && !shgcElement.isNull() && !uFactorElement.isNull() && !vtElement.isNull()){
       
@@ -341,6 +409,13 @@ namespace sdd {
     //QDomElement visibleAbsorptanceElement = element.firstChildElement("VisAbs"); // 0-1
     QDomElement rValueElement = element.firstChildElement("RVal"); // hr*ft2*degF/Btu
 
+    if (nameElement.isNull()){
+      LOG(Error, "Mat element 'Name' is empty.  Material will not be created.");
+      return boost::none;
+    }
+
+    std::string name = escapeName(nameElement.text());
+
     /*
     OS:Material
       Name - required
@@ -357,7 +432,7 @@ namespace sdd {
       
       openstudio::model::StandardOpaqueMaterial material(model);
 
-      material.setName(escapeName(nameElement.text()));
+      material.setName(name);
 
       // DLM: set on construction
       //std::string roughness = "MediumRough";
@@ -427,7 +502,7 @@ namespace sdd {
       
       openstudio::model::MasslessOpaqueMaterial material(model);
 
-      material.setName(escapeName(nameElement.text()));
+      material.setName(name);
 
       // DLM: set on construction
       //std::string roughness = "MediumRough";
@@ -461,6 +536,8 @@ namespace sdd {
       return material;
     }
 
+    LOG(Error, "Material named '" << name << "' could not be created.")
+
     return boost::none;
   }
 
@@ -468,8 +545,18 @@ namespace sdd {
   {
     QDomElement result;
     
-    if (constructionBase.optionalCast<model::Construction>()){
-      model::Construction construction = constructionBase.cast<model::Construction>();
+    if (constructionBase.optionalCast<model::LayeredConstruction>()){
+      model::LayeredConstruction construction = constructionBase.cast<model::LayeredConstruction>();
+      model::StandardsInformationConstruction info = constructionBase.standardsInformation();
+
+      bool heated = false;
+      if (construction.optionalCast<model::Construction>()){
+        heated = false;
+      } else if (construction.optionalCast<model::ConstructionWithInternalSource>()){
+        heated = true;
+      } else {
+        return boost::none;
+      }
 
       // check if any layer has not been translated, constructions using simple glazing material will
       // be skipped here because the simple glazing material is not recorded as mapped
@@ -488,12 +575,65 @@ namespace sdd {
       result.appendChild(nameElement);
       nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
+      // DLM: prescribed, not input
       // specification method
-      QDomElement specMthdElement = doc.createElement("SpecMthd");
-      result.appendChild(specMthdElement);
-      specMthdElement.appendChild(doc.createTextNode("Layers"));
+      //QDomElement specMthdElement = doc.createElement("SpecMthd");
+      //result.appendChild(specMthdElement);
+      //specMthdElement.appendChild(doc.createTextNode("Layers"));
 
-      unsigned n = layers.size();
+      // SDD:
+      // CompatibleSurfType - required, done
+      // ExtSolAbs - optional, done
+      // ExtThrmlAbs - optional, done
+      // ExtVisAbs - optional, done
+      // IntSolAbs - optional, done
+      // IntThrmlAbs - optional, done
+      // IntVisAbs - optional, done
+      // SlabType - optional, skipping until we better handle slabs
+      // SlabInsOrientation - optional, skipping until we better handle slabs
+      // SlabInsThrmlR - optional, skipping until we better handle slabs
+      // FieldAppliedCoating - optional, skipping
+      // CRRCInitialRefl - optional, skipping
+      // CRRCAgedRefl - optional, skipping
+      // CRRCInitialEmittance - optional, skipping
+      // CRRCAgedEmittance - optional, skipping
+      // CRRCInitialSRI - optional, skipping
+      // CRRCAgedSRI - optional, skipping
+      // CRRCProdID - optional, skipping
+
+      boost::optional<std::string> compatibleSurfType;
+      boost::optional<std::string> intendedSurfaceType = info.intendedSurfaceType();
+      if (intendedSurfaceType){
+        if (istringEqual("ExteriorWall", *intendedSurfaceType)){
+          compatibleSurfType = "ExteriorWall";
+        } else if (istringEqual("AtticRoof", *intendedSurfaceType) ||
+                   istringEqual("ExteriorRoof", *intendedSurfaceType)){
+          compatibleSurfType = "Roof";
+        } else if (istringEqual("ExteriorFloor", *intendedSurfaceType)){
+          compatibleSurfType = "ExteriorFloor";
+        } else if (istringEqual("GroundContactWall", *intendedSurfaceType)){
+          compatibleSurfType = "UndergroundWall";
+        } else if (istringEqual("GroundContactFloor", *intendedSurfaceType)){
+          compatibleSurfType = "UndergroundFloor";
+        } else if (istringEqual("InteriorWall", *intendedSurfaceType)){
+          compatibleSurfType = "InteriorWall";
+        } else if (istringEqual("InteriorCeiling", *intendedSurfaceType)){
+          compatibleSurfType = "Ceiling";
+        } else if (istringEqual("InteriorFloor", *intendedSurfaceType)){
+          compatibleSurfType = "InteriorFloor";
+        } else{
+          // DLM: warn?
+        }
+      }
+      if (compatibleSurfType){
+        QDomElement compatibleSurfTypeElement = doc.createElement("CompatibleSurfType");
+        result.appendChild(compatibleSurfTypeElement);
+        compatibleSurfTypeElement.appendChild(doc.createTextNode(toQString(*compatibleSurfType)));
+      } else{
+        // DLM: warn?
+      }
+
+      unsigned n = (unsigned) layers.size();
       if (n > 0){
 
         std::string extRoughness;
@@ -523,61 +663,68 @@ namespace sdd {
           intSolarAbsorptance = intMaterial.solarAbsorptance();
           intThermalAbsorptance = intMaterial.thermalAbsorptance();
           intVisibleAbsorptance = intMaterial.visibleAbsorptance();
-        }else if (layers[0].optionalCast<model::MasslessOpaqueMaterial>()){
+        }else if (layers[n-1].optionalCast<model::MasslessOpaqueMaterial>()){
           model::MasslessOpaqueMaterial intMaterial = layers[n-1].cast<model::MasslessOpaqueMaterial>();
           intSolarAbsorptance = intMaterial.solarAbsorptance();
           intThermalAbsorptance = intMaterial.thermalAbsorptance();
           intVisibleAbsorptance = intMaterial.visibleAbsorptance();
         }
 
+        // DLM: Not input
         // ext roughness
-        if (!extRoughness.empty()){
-          QDomElement roughnessElement = doc.createElement("ExtRoughness");
-          result.appendChild(roughnessElement);
-          roughnessElement.appendChild(doc.createTextNode(toQString(extRoughness)));
-        }
+        //if (!extRoughness.empty()){
+        //  QDomElement roughnessElement = doc.createElement("ExtRoughness");
+        //  result.appendChild(roughnessElement);
+        //  roughnessElement.appendChild(doc.createTextNode(toQString(extRoughness)));
+        //}
 
+        // DLM: Not input
         // ext solarAbsorptance
-        if (extSolarAbsorptance){
-          QDomElement solarAbsorptanceElement = doc.createElement("ExtSolAbs"); 
-          result.appendChild(solarAbsorptanceElement);
-          solarAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*extSolarAbsorptance)));
-        }
+        //if (extSolarAbsorptance){
+        //  QDomElement solarAbsorptanceElement = doc.createElement("ExtSolAbs"); 
+        //  result.appendChild(solarAbsorptanceElement);
+        //  solarAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*extSolarAbsorptance)));
+        //}
 
+        // DLM: Not input
         // ext thermalAbsorptance
-        if (extThermalAbsorptance){
-          QDomElement thermalAbsorptanceElement = doc.createElement("ExtThrmlAbs");
-          result.appendChild(thermalAbsorptanceElement);
-          thermalAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*extThermalAbsorptance)));
-        }
+        //if (extThermalAbsorptance){
+        //  QDomElement thermalAbsorptanceElement = doc.createElement("ExtThrmlAbs");
+        //  result.appendChild(thermalAbsorptanceElement);
+        //  thermalAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*extThermalAbsorptance)));
+        //}
 
+        // DLM: Not input
         // ext visibleAbsorptance
-        if (extVisibleAbsorptance){
-          QDomElement visibleAbsorptanceElement = doc.createElement("ExtVisAbs");
-          result.appendChild(visibleAbsorptanceElement);
-          visibleAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*extVisibleAbsorptance)));
-        }
+        //if (extVisibleAbsorptance){
+        //  QDomElement visibleAbsorptanceElement = doc.createElement("ExtVisAbs");
+        //  result.appendChild(visibleAbsorptanceElement);
+        //  visibleAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*extVisibleAbsorptance)));
+        //}
 
+        // DLM: Not input
         // int solarAbsorptance
-        if (intSolarAbsorptance){
-          QDomElement solarAbsorptanceElement = doc.createElement("IntSolAbs"); 
-          result.appendChild(solarAbsorptanceElement);
-          solarAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*intSolarAbsorptance)));
-        }
+        //if (intSolarAbsorptance){
+        //  QDomElement solarAbsorptanceElement = doc.createElement("IntSolAbs"); 
+        //  result.appendChild(solarAbsorptanceElement);
+        //  solarAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*intSolarAbsorptance)));
+        //}
 
+        // DLM: Not input
         // int thermalAbsorptance
-        if (intThermalAbsorptance){
-          QDomElement thermalAbsorptanceElement = doc.createElement("IntThrmlAbs");
-          result.appendChild(thermalAbsorptanceElement);
-          thermalAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*intThermalAbsorptance)));
-        }
+        //if (intThermalAbsorptance){
+        //  QDomElement thermalAbsorptanceElement = doc.createElement("IntThrmlAbs");
+        //  result.appendChild(thermalAbsorptanceElement);
+        //  thermalAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*intThermalAbsorptance)));
+        //}
 
+        // DLM: Not input
         // int visibleAbsorptance
-        if (intVisibleAbsorptance){
-          QDomElement visibleAbsorptanceElement = doc.createElement("IntVisAbs");
-          result.appendChild(visibleAbsorptanceElement);
-          visibleAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*intVisibleAbsorptance)));
-        }
+        //if (intVisibleAbsorptance){
+        //  QDomElement visibleAbsorptanceElement = doc.createElement("IntVisAbs");
+        //  result.appendChild(visibleAbsorptanceElement);
+        //  visibleAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*intVisibleAbsorptance)));
+        //}
       }
 
       for (const model::Material& material : layers){
@@ -592,6 +739,7 @@ namespace sdd {
       m_translatedObjects[construction.handle()] = result;
 
     }else if (constructionBase.optionalCast<model::FFactorGroundFloorConstruction>()){
+      // DLM: I think this is out of date
       model::FFactorGroundFloorConstruction construction =  constructionBase.cast<model::FFactorGroundFloorConstruction>();
 
       result = doc.createElement("ConsAssm");
@@ -602,21 +750,22 @@ namespace sdd {
       result.appendChild(nameElement);
       nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
+      // DLM: prescribed, not input
       // specification method
-      QDomElement specMthdElement = doc.createElement("SpecMthd");
-      result.appendChild(specMthdElement);
-      specMthdElement.appendChild(doc.createTextNode("FFactor"));
+      //QDomElement specMthdElement = doc.createElement("SpecMthd");
+      //result.appendChild(specMthdElement);
+      //specMthdElement.appendChild(doc.createTextNode("FFactor"));
 
+      // DLM: not input
       // specification method
-      QDomElement fFactorElement = doc.createElement("FFactor");
-      result.appendChild(fFactorElement);
-
-      // sdd units = Btu/(hr*ft*F), os units = W/(m*K)
-      Quantity fFactorSI(construction.fFactor(), WhUnit(WhExpnt(1,0,-1,-1)));
-      OptionalQuantity fFactorIP = QuantityConverter::instance().convert(fFactorSI, UnitSystem(UnitSystem::BTU));
-      OS_ASSERT(fFactorIP);
-      OS_ASSERT(fFactorIP->units() == BTUUnit(BTUExpnt(1,-1,-1,-1)));
-      fFactorElement.appendChild(doc.createTextNode(QString::number(fFactorIP->value())));
+      //QDomElement fFactorElement = doc.createElement("FFactor");
+      //result.appendChild(fFactorElement);
+      //// sdd units = Btu/(hr*ft*F), os units = W/(m*K)
+      //Quantity fFactorSI(construction.fFactor(), WhUnit(WhExpnt(1,0,-1,-1)));
+      //OptionalQuantity fFactorIP = QuantityConverter::instance().convert(fFactorSI, UnitSystem(UnitSystem::BTU));
+      //OS_ASSERT(fFactorIP);
+      //OS_ASSERT(fFactorIP->units() == BTUUnit(BTUExpnt(1,-1,-1,-1)));
+      //fFactorElement.appendChild(doc.createTextNode(QString::number(fFactorIP->value())));
 
       // DLM: cannot write out
       //<IntSolAbs>0.7</IntSolAbs>
@@ -628,6 +777,7 @@ namespace sdd {
       m_translatedObjects[construction.handle()] = result;
 
     }else if (constructionBase.optionalCast<model::CFactorUndergroundWallConstruction>()){
+      // DLM: I think this is out of date
       model::CFactorUndergroundWallConstruction construction =  constructionBase.cast<model::CFactorUndergroundWallConstruction>();
 
       result = doc.createElement("ConsAssm");
@@ -638,21 +788,22 @@ namespace sdd {
       result.appendChild(nameElement);
       nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
+      // DLM: prescribed, not input
       // specification method
-      QDomElement specMthdElement = doc.createElement("SpecMthd");
-      result.appendChild(specMthdElement);
-      specMthdElement.appendChild(doc.createTextNode("CFactor"));
+      //QDomElement specMthdElement = doc.createElement("SpecMthd");
+      //result.appendChild(specMthdElement);
+      //specMthdElement.appendChild(doc.createTextNode("CFactor"));
 
+      // DLM: not input
       // specification method
-      QDomElement cFactorElement = doc.createElement("CFactor");
-      result.appendChild(cFactorElement);
-
-      // sdd units = Btu/(hr*ft^2*F), os units = W/(m^2*K)
-      Quantity cFactorSI(construction.cFactor(), WhUnit(WhExpnt(1,0,-2,-1)));
-      OptionalQuantity cFactorIP = QuantityConverter::instance().convert(cFactorSI, UnitSystem(UnitSystem::BTU));
-      OS_ASSERT(cFactorIP);
-      OS_ASSERT(cFactorIP->units() == BTUUnit(BTUExpnt(1,-2,-1,-1)));
-      cFactorElement.appendChild(doc.createTextNode(QString::number(cFactorIP->value())));
+      //QDomElement cFactorElement = doc.createElement("CFactor");
+      //result.appendChild(cFactorElement);
+      //// sdd units = Btu/(hr*ft^2*F), os units = W/(m^2*K)
+      //Quantity cFactorSI(construction.cFactor(), WhUnit(WhExpnt(1,0,-2,-1)));
+      //OptionalQuantity cFactorIP = QuantityConverter::instance().convert(cFactorSI, UnitSystem(UnitSystem::BTU));
+      //OS_ASSERT(cFactorIP);
+      //OS_ASSERT(cFactorIP->units() == BTUUnit(BTUExpnt(1,-2,-1,-1)));
+      //cFactorElement.appendChild(doc.createTextNode(QString::number(cFactorIP->value())));
 
       // DLM: cannot write out
       //<IntSolAbs>0.7</IntSolAbs>
@@ -679,6 +830,7 @@ namespace sdd {
 
     if (constructionBase.optionalCast<model::Construction>()){
       model::Construction construction = constructionBase.cast<model::Construction>();
+      model::StandardsInformationConstruction info = constructionBase.standardsInformation();
 
       result = doc.createElement("DrCons");
       
@@ -688,34 +840,70 @@ namespace sdd {
       result->appendChild(nameElement);
       nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
-      // can only get UFactor for special cases
-      bool foundUFactor = false;
+      // SDD:
+      // Type - required, skipping
+      // CertificationMthd - required, defaulted to NFRC unless missing performance data
+      // UFactor - optional, done
+      // Open - optional, done
 
+      boost::optional<std::string> type;
+      boost::optional<std::string> certificationMthd = std::string("NFRCRated");
+      boost::optional<double> uFactor;
+      boost::optional<std::string> open;
+
+      // can only get UFactor for special cases
       std::vector<model::Material> layers = construction.layers();
       if (layers.size() == 1){
         if (layers[0].optionalCast<model::MasslessOpaqueMaterial>()){
 
           model::MasslessOpaqueMaterial material = layers[0].cast<model::MasslessOpaqueMaterial>();
 
-          // UFactor
           // os units = W/m2-K, sdd units = Btu/(hr*f2t*F)
-          double uFactor = material.thermalConductance();
-          Quantity uFactorSI(uFactor, WhUnit(WhExpnt(1,0,-2,-1)));
+          Quantity uFactorSI(material.thermalConductance(), WhUnit(WhExpnt(1, 0, -2, -1)));
           OptionalQuantity uFactorIP = QuantityConverter::instance().convert(uFactorSI, btuSys);
           OS_ASSERT(uFactorIP);
           OS_ASSERT(uFactorIP->units() == BTUUnit(BTUExpnt(1,-2,-1,-1)));
-          QDomElement uFactorElement = doc.createElement("UFactor");
-          result->appendChild(uFactorElement);
-          uFactorElement.appendChild(doc.createTextNode(QString::number(uFactorIP->value())));
-
-          foundUFactor = true;
+          uFactor = uFactorIP->value();
         }
       }
 
-      //if (!foundUFactor){
-      //  //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
-      //  //LOG(Error, "Could not calculate UFactor for DrCons '" << name << "'");
-      //}
+      if (!uFactor){
+        certificationMthd.reset();
+      }
+
+      boost::optional<std::string> fenestrationType = info.fenestrationType();
+      if (fenestrationType){
+        if (istringEqual("Swinging Door", *fenestrationType)){
+          open = "Swinging";
+        } else if (istringEqual("Non-Swinging Door", *fenestrationType)){
+          open = "NonSwinging";
+        }
+      }
+
+      // write the xml
+      if (type){
+        QDomElement typeElement = doc.createElement("Type");
+        result->appendChild(typeElement);
+        typeElement.appendChild(doc.createTextNode(toQString(*type)));
+      }
+      if (certificationMthd){
+        QDomElement certificationMthdElement = doc.createElement("CertificationMthd");
+        result->appendChild(certificationMthdElement);
+        certificationMthdElement.appendChild(doc.createTextNode(toQString(*certificationMthd)));
+      }
+      if (uFactor){
+        QDomElement uFactorElement = doc.createElement("UFactor");
+        result->appendChild(uFactorElement);
+        uFactorElement.appendChild(doc.createTextNode(QString::number(*uFactor)));
+      } else{
+        //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
+        //LOG(Error, "Could not calculate UFactor for DrCons '" << name << "'");
+      }
+      if (open){
+        QDomElement openElement = doc.createElement("Open");
+        result->appendChild(openElement);
+        openElement.appendChild(doc.createTextNode(toQString(*open)));
+      }
 
       // mark the construction as translated, not the material
       m_translatedObjects[construction.handle()] = result.get();
@@ -733,6 +921,7 @@ namespace sdd {
 
     if (constructionBase.optionalCast<model::Construction>()){
       model::Construction construction = constructionBase.cast<model::Construction>();
+      model::StandardsInformationConstruction info = constructionBase.standardsInformation();
 
       result = doc.createElement("FenCons");
       
@@ -742,54 +931,264 @@ namespace sdd {
       result->appendChild(nameElement);
       nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
-      // can only get SHGC, TVis, UFactor for special cases
-      bool foundUFactor = false;
-      bool foundVT = false;
+      // SDD:
+      // FenType - required, done
+      // FenProdType - optional, done
+      // AssmContext - required, done
+      // CertificationMthd - required, defaulted to NFRCRated unless field fabricated or missing performance data, might be incorrect?
+      // SkyltGlz - optional, done
+      // SkyltCurb - optional, done
+      // OperableWinConfiguration - optional, skipping
+      // GreenhouseGardenWin - optional, skipping
+      // FenFrm - optional, done
+      // FenPanes - optional, done
+      // GlzTint - optional, done
+      // WinDivider - optional, done
+      // Diffusing - optional, skipping
+      // SHGC - optional, done
+      // SHGCCOG - optional, not supported
+      // UFactor - optional, done
+      // UFactorCOG - optional, not supported
+      // VT - optional, done
+      // VTCOG - optional, not supported
 
+      
+      boost::optional<std::string> fenestrationType = info.fenestrationType();
+      boost::optional<std::string> fenType;
+      boost::optional<std::string> fenProdType;
+      boost::optional<std::string> skyltGlz;
+      boost::optional<std::string> skyltCurb;
+      boost::optional<std::string> operableWinConfiguration;
+      boost::optional<std::string> glzTint;
+      if (fenestrationType){
+        if (istringEqual("Glass Skylight with Curb", *fenestrationType)){
+          fenType = "Skylight";
+          skyltGlz = "Glass";
+          skyltCurb = "CurbMounted";
+        } else if (istringEqual("Plastic Skylight with Curb", *fenestrationType)){
+          fenType = "Skylight";
+          skyltGlz = "Plastic";
+          skyltCurb = "CurbMounted";
+        } else if (istringEqual("Glass Skylight without Curb", *fenestrationType)){
+          fenType = "Skylight";
+          skyltGlz = "Glass";
+          skyltCurb = "DeckMounted";
+        } else if (istringEqual("Plastic Skylight without Curb", *fenestrationType)){
+          fenType = "Skylight";
+          skyltGlz = "Plastic";
+          skyltCurb = "DeckMounted";
+        } else{
+          fenType = "VerticalFenestration";
+
+          if (istringEqual("Fixed Window", *fenestrationType)){
+            fenProdType = "FixedWindow";
+          } else if (istringEqual("Operable Window", *fenestrationType)){
+            fenProdType = "OperableWindow";
+            
+            // DLM: todo set operableWinConfiguration
+            //operableWinConfiguration = "CasementAwning" or "Sliding"
+          } else if (istringEqual("Curtain Wall", *fenestrationType)){
+            fenProdType = "CurtainWall";
+          } else if (istringEqual("Glazed Door", *fenestrationType)){
+            fenProdType = "GlazedDoor";
+          } else {
+            // 'Swinging Door' or 'Non-Swinging Door'
+            // These should have been grouped with door constructions, potentially warn
+          }
+
+          boost::optional<std::string> fenestrationTint = info.fenestrationTint();
+          if (fenestrationTint){
+            if (istringEqual("Clear", *fenestrationTint)){
+              glzTint = "ClearGlazing";
+            } else{
+              glzTint = "TintedGlazing";
+            }
+          }
+        }
+      }
+
+      boost::optional<std::string> assmContext;
+      boost::optional<std::string> certificationMthd = std::string("NFRCRated"); // default
+      boost::optional<std::string> fenestrationAssemblyContext = info.fenestrationAssemblyContext();
+      if (fenestrationAssemblyContext){
+        if (istringEqual("Manufactured", *fenestrationAssemblyContext)){
+          assmContext = "Manufactured";
+        } else if (istringEqual("Field Fabricated", *fenestrationAssemblyContext)){
+          assmContext = "FieldFabricated";
+          certificationMthd = "CECDefaultPerformance"; // right?
+        } else if (istringEqual("Site Built", *fenestrationAssemblyContext)){
+          assmContext = "SiteBuilt";
+        }
+      }
+      
+      boost::optional<std::string> greenhouseGardenWin;
+
+      boost::optional<std::string> fenFrm;
+      boost::optional<std::string> fenestrationFrameType = info.fenestrationFrameType();
+      if (fenestrationFrameType){
+        if (istringEqual("Metal Framing", *fenestrationFrameType)){
+          fenFrm = "MetalFraming";
+        } else if (istringEqual("Metal Framing with Thermal Break", *fenestrationFrameType)){
+          fenFrm = "MetalFramingWithThermalBreak";
+        } else if (istringEqual("Non-Metal Framing", *fenestrationFrameType)){
+          fenFrm = "NonMetalFraming";
+        }
+      }
+
+      boost::optional<std::string> fenPanes;
+      boost::optional<std::string> fenestrationNumberOfPanes = info.fenestrationNumberOfPanes();
+      if (fenestrationNumberOfPanes){
+        if (istringEqual("Single Pane", *fenestrationNumberOfPanes)){
+          fenPanes = "SinglePane";
+        } else if (istringEqual("Double Pane", *fenestrationNumberOfPanes)){
+          fenPanes = "DoublePane";
+        } else if (istringEqual("Triple Pane", *fenestrationNumberOfPanes)){
+          fenPanes = "DoublePane";
+        } else if (istringEqual("Quadruple Pane", *fenestrationNumberOfPanes)){
+          fenPanes = "DoublePane";
+        } else if (istringEqual("Glass Block", *fenestrationNumberOfPanes)){
+          fenPanes = "GlassBlock";
+        }
+      }
+
+      boost::optional<std::string> winDivider;
+      boost::optional<std::string> fenestrationDividerType = info.fenestrationDividerType();
+      if (fenestrationDividerType){
+        if (istringEqual("True Divided Lite", *fenestrationDividerType)){
+          winDivider = "TrueDividedLite";
+        } else if (istringEqual("Between Panes < 7/16\"", *fenestrationDividerType)){
+          winDivider = "DividerBtwnPanesLessThan7_16in";
+        } else if (istringEqual("Between Panes >= 7/16\"", *fenestrationDividerType)){
+          winDivider = "DividerBtwnPanesGreaterThanOrEqualTo7_16in";
+        }
+      }
+
+      boost::optional<std::string> diffusing;
+
+      boost::optional<double> shgc;
+      boost::optional<double> uFactor;
+      boost::optional<double> vt;
+
+      // can only get SHGC, TVis, UFactor for special cases
       std::vector<model::Material> layers = construction.layers();
       if (layers.size() == 1){
         if (layers[0].optionalCast<model::SimpleGlazing>()){
 
           model::SimpleGlazing simpleGlazing = layers[0].cast<model::SimpleGlazing>();
           
-          // SHGC
-          double shgc = simpleGlazing.solarHeatGainCoefficient();
-          QDomElement shgcElement = doc.createElement("SHGC"); 
-          result->appendChild(shgcElement);
-          shgcElement.appendChild(doc.createTextNode(QString::number(shgc)));
+          shgc = simpleGlazing.solarHeatGainCoefficient();
 
-          // UFactor
           // os units = W/m2-K, sdd units = Btu/(hr*f2t*F)
-          double uFactor = simpleGlazing.uFactor();
-          Quantity uFactorSI(uFactor, WhUnit(WhExpnt(1,0,-2,-1)));
+          Quantity uFactorSI(simpleGlazing.uFactor(), WhUnit(WhExpnt(1, 0, -2, -1)));
           OptionalQuantity uFactorIP = QuantityConverter::instance().convert(uFactorSI, btuSys);
           OS_ASSERT(uFactorIP);
           OS_ASSERT(uFactorIP->units() == BTUUnit(BTUExpnt(1,-2,-1,-1)));
-          QDomElement uFactorElement = doc.createElement("UFactor");
-          result->appendChild(uFactorElement);
-          uFactorElement.appendChild(doc.createTextNode(QString::number(uFactorIP->value())));
+          uFactor = uFactorIP->value();
 
-          foundUFactor = true;
-
-          // VT
-          boost::optional<double> vt = simpleGlazing.visibleTransmittance();
-          if (vt){
-            QDomElement vtElement = doc.createElement("VT"); 
-            result->appendChild(vtElement);
-            vtElement.appendChild(doc.createTextNode(QString::number(*vt)));
-
-            foundVT = true;
-          }
+          vt = simpleGlazing.visibleTransmittance();
         }
       }
 
-      //if (!foundUFactor){
-      //  //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
-      //  //LOG(Error, "Could not calculate SHGC, UFactor, or VT for FenCons '" << name << "'");
-      //}else if (!foundVT){
-      //  //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
-      //  LOG(Error, "Could not calculate VT for FenCons '" << name << "'");
-      //}
+      // if performance is not known use defaults if possible
+      if (!shgc || !uFactor || !vt){
+        if (fenFrm && fenPanes){
+          certificationMthd = "CECDefaultPerformance";
+        }
+      }
+
+      // write to XML
+      if (fenType){
+        QDomElement fenTypeElement = doc.createElement("FenType");
+        result->appendChild(fenTypeElement);
+        fenTypeElement.appendChild(doc.createTextNode(toQString(*fenType)));
+      }
+      if (fenProdType){
+        QDomElement fenProdTypeElement = doc.createElement("FenProdType");
+        result->appendChild(fenProdTypeElement);
+        fenProdTypeElement.appendChild(doc.createTextNode(toQString(*fenProdType)));
+      }
+      if (assmContext){
+        QDomElement assmContextElement = doc.createElement("AssmContext");
+        result->appendChild(assmContextElement);
+        assmContextElement.appendChild(doc.createTextNode(toQString(*assmContext)));
+      }
+      if (certificationMthd){
+        QDomElement certificationMthdElement = doc.createElement("CertificationMthd");
+        result->appendChild(certificationMthdElement);
+        certificationMthdElement.appendChild(doc.createTextNode(toQString(*certificationMthd)));
+      }
+      if (skyltGlz){
+        QDomElement skyltGlzElement = doc.createElement("SkyltGlz");
+        result->appendChild(skyltGlzElement);
+        skyltGlzElement.appendChild(doc.createTextNode(toQString(*skyltGlz)));
+      }
+      if (skyltCurb){
+        QDomElement skyltCurbElement = doc.createElement("SkyltCurb");
+        result->appendChild(skyltCurbElement);
+        skyltCurbElement.appendChild(doc.createTextNode(toQString(*skyltCurb)));
+      }
+      if (operableWinConfiguration){
+        QDomElement operableWinConfigurationElement = doc.createElement("OperableWinConfiguration");
+        result->appendChild(operableWinConfigurationElement);
+        operableWinConfigurationElement.appendChild(doc.createTextNode(toQString(*operableWinConfiguration)));
+      }
+      if (greenhouseGardenWin){
+        QDomElement greenhouseGardenWinElement = doc.createElement("GreenhouseGardenWin");
+        result->appendChild(greenhouseGardenWinElement);
+        greenhouseGardenWinElement.appendChild(doc.createTextNode(toQString(*greenhouseGardenWin)));
+      }
+      if (fenFrm){
+        QDomElement fenFrmElement = doc.createElement("FenFrm");
+        result->appendChild(fenFrmElement);
+        fenFrmElement.appendChild(doc.createTextNode(toQString(*fenFrm)));
+      }
+      if (fenPanes){
+        QDomElement fenPanesElement = doc.createElement("FenPanes");
+        result->appendChild(fenPanesElement);
+        fenPanesElement.appendChild(doc.createTextNode(toQString(*fenPanes)));
+      }
+      if (glzTint){
+        QDomElement glzTintElement = doc.createElement("GlzTint");
+        result->appendChild(glzTintElement);
+        glzTintElement.appendChild(doc.createTextNode(toQString(*glzTint)));
+      }
+      if (winDivider){
+        QDomElement winDividerElement = doc.createElement("WinDivider");
+        result->appendChild(winDividerElement);
+        winDividerElement.appendChild(doc.createTextNode(toQString(*winDivider)));
+      }
+      if (diffusing){
+        QDomElement diffusingElement = doc.createElement("Diffusing");
+        result->appendChild(diffusingElement);
+        diffusingElement.appendChild(doc.createTextNode(toQString(*diffusing)));
+      }
+      
+      
+
+      if (shgc){
+        QDomElement shgcElement = doc.createElement("SHGC");
+        result->appendChild(shgcElement);
+        shgcElement.appendChild(doc.createTextNode(QString::number(*shgc)));
+      } else{
+        //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
+        //LOG(Error, "Could not calculate SHGC for FenCons '" << name << "'");
+      }
+      if (uFactor){
+        QDomElement uFactorElement = doc.createElement("UFactor");
+        result->appendChild(uFactorElement);
+        uFactorElement.appendChild(doc.createTextNode(QString::number(*uFactor)));
+      } else{
+        //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
+        //LOG(Error, "Could not calculate UFactor for FenCons '" << name << "'");
+      }
+      if (vt){
+        QDomElement vtElement = doc.createElement("VT");
+        result->appendChild(vtElement);
+        vtElement.appendChild(doc.createTextNode(QString::number(*vt)));
+      } else{
+        //Do not want this logged, http://code.google.com/p/cbecc/issues/detail?id=695
+        //LOG(Error, "Could not calculate VT for FenCons '" << name << "'");
+      }
 
       // mark the construction as translated, not the material
       m_translatedObjects[construction.handle()] = result.get();
@@ -800,181 +1199,100 @@ namespace sdd {
 
   boost::optional<QDomElement> ForwardTranslator::translateMaterial(const openstudio::model::Material& material, QDomDocument& doc)
   {
-    //SIExpnt(int kg=0,int m=0,int s=0,int K=0,..)
-    //IPExpnt(int lbm=0,int ft=0,int s=0,int R=0,..)
-    //BTUExpnt(int btu=0,int ft=0,int h=0,int R=0,..)
-    //WhExpnt(int W=0,int h=0,int m=0,int K=0,..)
 
-    UnitSystem ipSys(UnitSystem::IP);
-    UnitSystem btuSys(UnitSystem::BTU);
+    if (!(material.optionalCast<model::StandardOpaqueMaterial>() ||
+          material.optionalCast<model::MasslessOpaqueMaterial>() ||
+          material.optionalCast<model::AirGap>())){
+      return boost::none;
+    }
 
-    boost::optional<QDomElement> result;
+    model::StandardsInformationMaterial info = material.standardsInformation();
 
-    if (material.optionalCast<model::StandardOpaqueMaterial>()){
-      model::StandardOpaqueMaterial standardOpaqueMaterial = material.cast<model::StandardOpaqueMaterial>();
-      result = doc.createElement("Mat");
-      m_translatedObjects[standardOpaqueMaterial.handle()] = *result;
+    QDomElement result = doc.createElement("Mat");
+    m_translatedObjects[material.handle()] = result;
 
-      // name
-      std::string name = standardOpaqueMaterial.name().get();
-      QDomElement nameElement = doc.createElement("Name");
-      result->appendChild(nameElement);
-      nameElement.appendChild(doc.createTextNode(escapeName(name)));
+    // name
+    std::string name = material.name().get();
+    QDomElement nameElement = doc.createElement("Name");
+    result.appendChild(nameElement);
+    nameElement.appendChild(doc.createTextNode(escapeName(name)));
 
-      // DLM: set in construction
-      // roughness
-      //std::string roughness = standardOpaqueMaterial.roughness();
-      //QDomElement roughnessElement = doc.createElement("Roughness");
-      //result->appendChild(roughnessElement);
-      //roughnessElement.appendChild(doc.createTextNode(toQString(roughness)));
+    // SDD:
+    // CodeCat - compulsory, done
+    // CodeItem - compulsory, done
+    // FrmMat - optional, done
+    // FrmConfig - optional, done
+    // FrmDepth - optional, done
+    // CavityIns - optional, done
+    // CavityInsOpt - optional, done
+    // CompositeMatNotes - optional, skipping
+    // HeaderIns - optional, not used
+    // CMUWt - optional, not used
+    // CMUFill - optional, not used
+    // SpandrelPanelIns - optional, not used
+    // ICCESRptNum - optional, skipping
+    // InsOutsdWtrprfMemb - optional, skipping
 
-      // DLM: set in construction
-      // thermalAbsorptance
-      //boost::optional<double> thermalAbsorptance = standardOpaqueMaterial.thermalAbsorptance();
-      //if (thermalAbsorptance){
-      //  QDomElement thermalAbsorptanceElement = doc.createElement("ThrmlAbs");
-      //  result->appendChild(thermalAbsorptanceElement);
-      //  thermalAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*thermalAbsorptance)));
-      //}
+    boost::optional<std::string> standardsCategory = info.standardsCategory();
+    if (standardsCategory && info.isCompositeMaterial()){
+      standardsCategory = "Composite";
+    }
 
-      // DLM: set in construction
-      // solarAbsorptance
-      //boost::optional<double> solarAbsorptance = standardOpaqueMaterial.solarAbsorptance();
-      //if (solarAbsorptance){
-      //  QDomElement solarAbsorptanceElement = doc.createElement("SolAbs"); 
-      //  result->appendChild(solarAbsorptanceElement);
-      //  solarAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*solarAbsorptance)));
-      //}
+    boost::optional<std::string> standardsIdentifier = info.standardsIdentifier();
+    boost::optional<std::string> compositeFramingMaterial = info.compositeFramingMaterial();
+    boost::optional<std::string> compositeFramingConfiguration = info.compositeFramingConfiguration();
+    boost::optional<std::string> compositeFramingDepth = info.compositeFramingDepth();
+    boost::optional<std::string> compositeFramingSize = info.compositeFramingSize();
+    boost::optional<std::string> compositeCavityInsulation = info.compositeCavityInsulation();
+  
+    if (standardsCategory){
+      QDomElement element = doc.createElement("CodeCat");
+      result.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(*standardsCategory)));
+    }
 
-      // DLM: set in construction
-      // visibleAbsorptance
-      //boost::optional<double> visibleAbsorptance = standardOpaqueMaterial.visibleAbsorptance();
-      //if (visibleAbsorptance){
-      //  QDomElement visibleAbsorptanceElement = doc.createElement("VisAbs");
-      //  result->appendChild(visibleAbsorptanceElement);
-      //  visibleAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*visibleAbsorptance)));
-      //}
+    if (standardsIdentifier){
+      QDomElement element = doc.createElement("CodeItem");
+      result.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(*standardsIdentifier)));
+    }
 
-      // thickness
-      // os units = m, sdd units = in
-      double thickness = standardOpaqueMaterial.thickness();
-      Quantity thicknessSI(thickness, SIUnit(SIExpnt(0,1,0)));
-      OptionalQuantity thicknessIP = QuantityConverter::instance().convert(thicknessSI, ipSys);
-      OS_ASSERT(thicknessIP);
-      OS_ASSERT(thicknessIP->units() == IPUnit(IPExpnt(0,1,0)));
-      double thicknessInches = thicknessIP->value() * 12.0;
-      QDomElement thicknessElement = doc.createElement("Thkns");
-      result->appendChild(thicknessElement);
-      thicknessElement.appendChild(doc.createTextNode(QString::number(thicknessInches)));
+    if (compositeFramingMaterial){
+      QDomElement element = doc.createElement("FrmMat");
+      result.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(*compositeFramingMaterial)));
+    }
 
-      // conductivity
-      // os units = W/m-K, sdd units = Btu/(hr*ft*F)
-      double conductivity = standardOpaqueMaterial.thermalConductivity();
-      Quantity conductivitySI(conductivity, WhUnit(WhExpnt(1,0,-1,-1)));
-      OptionalQuantity conductivityIP = QuantityConverter::instance().convert(conductivitySI, btuSys);
-      OS_ASSERT(conductivityIP);
-      OS_ASSERT(conductivityIP->units() == BTUUnit(BTUExpnt(1,-1,-1,-1)));
-      QDomElement conductivityElement = doc.createElement("ThrmlCndct");
-      result->appendChild(conductivityElement);
-      conductivityElement.appendChild(doc.createTextNode(QString::number(conductivityIP->value())));
+    if (compositeFramingConfiguration){
+      QDomElement element = doc.createElement("FrmConfig");
+      result.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(*compositeFramingConfiguration)));
+    }
 
-      // density
-      // os units = kg/m3, sdd units = lb/ft^3
-      double density = standardOpaqueMaterial.density();
-      Quantity densitySI(density, SIUnit(SIExpnt(1,-3,0)));
-      OptionalQuantity densityIP = QuantityConverter::instance().convert(densitySI, ipSys);
-      OS_ASSERT(densityIP);
-      OS_ASSERT(densityIP->units() == IPUnit(IPExpnt(1,-3,0)));
-      QDomElement densityElement = doc.createElement("Dens");
-      result->appendChild(densityElement);
-      densityElement.appendChild(doc.createTextNode(QString::number(densityIP->value())));
+    if (compositeFramingDepth){
+      QDomElement element = doc.createElement("FrmDepth");
+      result.appendChild(element);
+      element.appendChild(doc.createTextNode(toQString(*compositeFramingDepth)));
+    }
 
-      // specificHeat
-      // os units = J/kg-K, sdd units = Btu/(lb*F)
-      double specificHeat = standardOpaqueMaterial.specificHeat();
-      Quantity specificHeatSI(specificHeat, SIUnit(SIExpnt(0,2,-2,-1)));
-      OptionalQuantity specificHeatIP = QuantityConverter::instance().convert(specificHeatSI, BTUUnit(BTUExpnt(1,0,0,-1))*IPUnit(IPExpnt(-1)));
-      OS_ASSERT(specificHeatIP);
-      OS_ASSERT(specificHeatIP->units() == BTUUnit(BTUExpnt(1,0,0,-1))*IPUnit(IPExpnt(-1)));
-      QDomElement specificHeatElement = doc.createElement("SpecHt");
-      result->appendChild(specificHeatElement);
-      specificHeatElement.appendChild(doc.createTextNode(QString::number(specificHeatIP->value())));
+    if (compositeCavityInsulation){
 
-    }else if (material.optionalCast<model::MasslessOpaqueMaterial>()){
-      model::MasslessOpaqueMaterial masslessOpaqueMaterial = material.cast<model::MasslessOpaqueMaterial>();
-      result = doc.createElement("Mat");
-      m_translatedObjects[masslessOpaqueMaterial.handle()] = *result;
-
-      // name
-      std::string name = masslessOpaqueMaterial.name().get();
-      QDomElement nameElement = doc.createElement("Name");
-      result->appendChild(nameElement);
-      nameElement.appendChild(doc.createTextNode(escapeName(name)));
-
-      // DLM: set in construction
-      // roughness
-      //std::string roughness = masslessOpaqueMaterial.roughness();
-      //QDomElement roughnessElement = doc.createElement("Roughness");
-      //result->appendChild(roughnessElement);
-      //roughnessElement.appendChild(doc.createTextNode(toQString(roughness)));
-
-      // DLM: set in construction
-      // thermalAbsorptance
-      //boost::optional<double> thermalAbsorptance = masslessOpaqueMaterial.thermalAbsorptance();
-      //if (thermalAbsorptance){
-      //  QDomElement thermalAbsorptanceElement = doc.createElement("ThrmlAbs");
-      //  result->appendChild(thermalAbsorptanceElement);
-      //  thermalAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*thermalAbsorptance)));
-      //}
-
-      // DLM: set in construction
-      // solarAbsorptance
-      //boost::optional<double> solarAbsorptance = masslessOpaqueMaterial.solarAbsorptance();
-      //if (solarAbsorptance){
-      //  QDomElement solarAbsorptanceElement = doc.createElement("SolAbs"); 
-      //  result->appendChild(solarAbsorptanceElement);
-      //  solarAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*solarAbsorptance)));
-      //}
-
-      // DLM: set in construction
-      // visibleAbsorptance
-      //boost::optional<double> visibleAbsorptance = masslessOpaqueMaterial.visibleAbsorptance();
-      //if (visibleAbsorptance){
-      //  QDomElement visibleAbsorptanceElement = doc.createElement("VisAbs");
-      //  result->appendChild(visibleAbsorptanceElement);
-      //  visibleAbsorptanceElement.appendChild(doc.createTextNode(QString::number(*visibleAbsorptance)));
-      //}
-
-      // thermalResistance
-      // os units = m2-K/W, sdd units = hr*ft2*degF/Btu
-      double thermalResistance = masslessOpaqueMaterial.thermalResistance();
-      Quantity rValueWh(thermalResistance, WhUnit(WhExpnt(-1,0,2,1)));
-      OptionalQuantity rValueIP = QuantityConverter::instance().convert(rValueWh, btuSys);
-      OS_ASSERT(rValueIP);
-      OS_ASSERT(rValueIP->units() ==  BTUUnit(BTUExpnt(-1,2,1,1)));
-      QDomElement rValueElement = doc.createElement("RVal");
-      result->appendChild(rValueElement);
-      rValueElement.appendChild(doc.createTextNode(QString::number(rValueIP->value())));
-    }else if (material.optionalCast<model::AirGap>()){
-      model::AirGap airGap = material.cast<model::AirGap>();
-      result = doc.createElement("Mat");
-      m_translatedObjects[airGap.handle()] = *result;
-
-      // name
-      std::string name = airGap.name().get();
-      QDomElement nameElement = doc.createElement("Name");
-      result->appendChild(nameElement);
-      nameElement.appendChild(doc.createTextNode(escapeName(name)));
-
-      // thermalResistance
-      // os units = m2-K/W, sdd units = hr*ft2*degF/Btu
-      double thermalResistance = airGap.thermalResistance();
-      Quantity rValueWh(thermalResistance, WhUnit(WhExpnt(-1,0,2,1)));
-      OptionalQuantity rValueIP = QuantityConverter::instance().convert(rValueWh, btuSys);
-      OS_ASSERT(rValueIP);
-      OS_ASSERT(rValueIP->units() ==  BTUUnit(BTUExpnt(-1,2,1,1)));
-      QDomElement rValueElement = doc.createElement("RVal");
-      result->appendChild(rValueElement);
+      // DLM: this is a stupid switch, this should get fixed in CBECC rules
+      if (compositeFramingMaterial && istringEqual("Metal", *compositeFramingMaterial)){
+        bool isNumber;
+        QString value = toQString(*compositeCavityInsulation);
+        value.toDouble(&isNumber);
+        if (isNumber){
+          value = QString("R-") + value;
+        }
+        QDomElement element = doc.createElement("CavityInsOpt");
+        result.appendChild(element);
+        element.appendChild(doc.createTextNode(value));
+      } else {
+        QDomElement element = doc.createElement("CavityIns");
+        result.appendChild(element);
+        element.appendChild(doc.createTextNode(toQString(*compositeCavityInsulation)));
+      }
     }
 
     return result;

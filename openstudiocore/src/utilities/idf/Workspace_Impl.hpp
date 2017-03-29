@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef UTILITIES_IDF_WORKSPACE_IMPL_HPP
 #define UTILITIES_IDF_WORKSPACE_IMPL_HPP
@@ -28,10 +37,9 @@
 #include <utilities/idf/ObjectPointer.hpp>
 
 #include <utilities/idd/IddFileAndFactoryWrapper.hpp>
+#include <nano/nano_signal_slot.hpp> // Signal-Slot replacement
 
 #include <utilities/core/Logger.hpp>
-
-#include <QObject>
 
 #include <string>
 #include <ostream>
@@ -51,18 +59,17 @@ namespace detail {
 
   /** Implementation of Workspace. Maintains object handles and relationships. Locks down
    *  relationship fields in its IdfObjects if possible. */
-  class UTILITIES_API Workspace_Impl : public QObject,
-                                       public std::enable_shared_from_this<Workspace_Impl>
+  class UTILITIES_API Workspace_Impl : public std::enable_shared_from_this<Workspace_Impl>,
+                                       public Nano::Observer
   {
-    Q_OBJECT;
    public:
 
     /** @name Constructors and Destructors */
     //@{
 
     /** Default constructor. Provides access to entire IddFactory, and does not add any objects. */
-    Workspace_Impl(StrictnessLevel level = StrictnessLevel::None,
-                   IddFileType iddFileType = IddFileType::OpenStudio);
+    Workspace_Impl(StrictnessLevel level,
+                   IddFileType iddFileType);
 
     /** Construct from IdfFile. Creates independent IdfObjects, and locks down fields that function
      *  as pointers (\object-list type). Inherits IddFile from idfFile. Aims for StrictnessLevel.
@@ -432,32 +439,44 @@ namespace detail {
 
     //@}
 
-   signals:
+    //@}
+    /** @name Nano Signals */
+    //@{
 
     /// range for progress to take
-    void progressRange(int min, int max) const;
+    // void progressRange(int min, int max) const;
+    mutable Nano::Signal<void(int, int)> progressRange;
 
     /// report on progress when loading workspace, creating objects, etc
-    void progressValue(int value) const;
+    // void progressValue(int value) const;
+    mutable Nano::Signal<void(int)> progressValue;
 
     /// report caption describing what we are currently doing
-    void progressCaption(const QString& caption) const;
+    // void progressCaption(const QString& caption) const;
+    mutable Nano::Signal<void(const QString&)> progressCaption;
 
     /** Emitted on any change to this Workspace and its contents. */
-    void onChange() const;
+    // void onChange() const;
+    mutable Nano::Signal<void()> onChange;
 
     /** Send an object being deleted from the workspace. OS_ASSERT(!object.initialized())
      *  should pass, as should OS_ASSERT(object.handle().isNull()). */
-    void removeWorkspaceObject(const WorkspaceObject& object, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    // void removeWorkspaceObject(const WorkspaceObject& object, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    mutable Nano::Signal<void(const WorkspaceObject&, const openstudio::IddObjectType&, const openstudio::UUID&)> removeWorkspaceObject;
 
     // DLM: deprecate this version
-    void removeWorkspaceObject(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    // void removeWorkspaceObjectPtr(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    mutable Nano::Signal<void(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const openstudio::IddObjectType&, const openstudio::UUID&)> removeWorkspaceObjectPtr;
 
     /** Sends an object just added to the Workspace. */
-    void addWorkspaceObject(const WorkspaceObject& object, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    // void addWorkspaceObject(const WorkspaceObject& object, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    mutable Nano::Signal<void(const WorkspaceObject&, const openstudio::IddObjectType&, const openstudio::UUID&)> addWorkspaceObject;
 
     // DLM: deprecate this version
-    void addWorkspaceObject(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    // void addWorkspaceObjectPtr(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle) const;
+    mutable Nano::Signal<void(std::shared_ptr<openstudio::detail::WorkspaceObject_Impl>, const openstudio::IddObjectType&, const openstudio::UUID&)> addWorkspaceObjectPtr;
+    //@}
+
 
    public slots:
 
@@ -518,7 +537,7 @@ namespace detail {
     bool baseNamesMatch(const std::string& baseName, const std::string& objectName) const;
 
     /** Returns optional suffix integer from objectName. */
-    boost::optional<int> getNameSuffix(const std::string& objectName) const;
+    std::tuple<boost::optional<int>, std::string> getNameSuffix(const std::string& objectName) const;
 
     /** Returns objectName in with any suffix integers removed. */
     std::string getBaseName(const std::string& objectName) const;

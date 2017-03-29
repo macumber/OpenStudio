@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef UTILITIES_TIME_DATETIME_HPP
 #define UTILITIES_TIME_DATETIME_HPP
@@ -48,19 +57,28 @@ class UTILITIES_API DateTime {
   /// get the local time now
   static DateTime now();
 
-  /// default constructor
+  /// get the UTC time now
+  static DateTime nowUTC();
+
+  /// get the current UTC offset
+  static double localOffsetUTC();
+
+  /// default constructor, UTC time is assumed
   DateTime();
 
-  /// constructor from Date
+  /// constructor from Date, UTC time is assumed
   DateTime(const Date& date);
 
-  /// constructor from Date and Time
+  /// constructor from Date and Time, UTC time is assumed
   DateTime(const Date& date, const Time& timeFromDate);
+
+  /// constructor from Date and Time and UTC Offset
+  DateTime(const Date& date, const Time& timeFromDate, double utcOffset);
 
   /// copy constructor
   DateTime(const DateTime& other);
 
-  /// constructor from string
+  /// constructor from simple string format, UTC time is assumed
   DateTime(const std::string& string);
 
   /// from system tm struct
@@ -106,24 +124,33 @@ class UTILITIES_API DateTime {
   bool operator>= (const DateTime& rhs) const;
 
   /// getter to date member
-  const Date& date() const;
+  Date date() const;
 
   /// getter to time member
-  const Time& time() const;
+  Time time() const;
 
-  /// convert to string
+  /// UTC offset in hours, local time = UTC time + UTC offset
+  double utcOffset() const;
+
+  /// convert to simple string format in UTC
   std::string toString() const;
 
   /// convert to ISO 8601 string
   std::string toISO8601() const;
 
-  /// convert to epoch time_t
+  /// convert to xsd:dateTime format
+  std::string toXsdDateTime() const;
+
+  /// convert to epoch time_t in UTC time
   time_t toEpoch() const;
   
   /// construct from ISO 8601 string
   static boost::optional<DateTime> fromISO8601(const std::string& str);
     
-  /// construct from epoch time_t
+  /// construct from xsd:dateTime string
+  static boost::optional<DateTime> fromXsdDateTime(const std::string& str);
+
+  /// construct from epoch time_t in UTC
   static DateTime fromEpoch(const std::time_t& time);
 
  private:
@@ -133,6 +160,7 @@ class UTILITIES_API DateTime {
 
   Date m_date;
   Time m_time;
+  double m_utcOffset;
 };
 
 /// optional DateTime

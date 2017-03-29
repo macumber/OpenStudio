@@ -1,21 +1,30 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
- *  All rights reserved.
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
  *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
  *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
  *
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "HVACTemplates.hpp"
 #include "Model.hpp"
@@ -196,58 +205,7 @@ ZoneHVACPackagedTerminalAirConditioner addSystemType1(Model & model)
 
   model::CoilHeatingWater heatingCoil(model,availabilitySchedule);
 
-  model::CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
-  coolingCurveFofTemp.setCoefficient1Constant(0.942587793);
-  coolingCurveFofTemp.setCoefficient2x(0.009543347);
-  coolingCurveFofTemp.setCoefficient3xPOW2(0.000683770);
-  coolingCurveFofTemp.setCoefficient4y(-0.011042676);
-  coolingCurveFofTemp.setCoefficient5yPOW2(0.000005249);
-  coolingCurveFofTemp.setCoefficient6xTIMESY(-0.000009720);
-  coolingCurveFofTemp.setMinimumValueofx(17.0);
-  coolingCurveFofTemp.setMaximumValueofx(22.0);
-  coolingCurveFofTemp.setMinimumValueofy(13.0);
-  coolingCurveFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
-  coolingCurveFofFlow.setCoefficient1Constant(0.8);
-  coolingCurveFofFlow.setCoefficient2x(0.2);
-  coolingCurveFofFlow.setCoefficient3xPOW2(0.0);
-  coolingCurveFofFlow.setMinimumValueofx(0.5);
-  coolingCurveFofFlow.setMaximumValueofx(1.5);
-
-  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
-  energyInputRatioFofTemp.setCoefficient1Constant(0.342414409);
-  energyInputRatioFofTemp.setCoefficient2x(0.034885008);
-  energyInputRatioFofTemp.setCoefficient3xPOW2(-0.000623700);
-  energyInputRatioFofTemp.setCoefficient4y(0.004977216);
-  energyInputRatioFofTemp.setCoefficient5yPOW2(0.000437951);
-  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.000728028);
-  energyInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
-  energyInputRatioFofFlow.setCoefficient1Constant(1.1552);
-  energyInputRatioFofFlow.setCoefficient2x(-0.1808);
-  energyInputRatioFofFlow.setCoefficient3xPOW2(0.0256);
-  energyInputRatioFofFlow.setMinimumValueofx(0.5);
-  energyInputRatioFofFlow.setMaximumValueofx(1.5);
-
-  CurveQuadratic partLoadFraction = CurveQuadratic(model);
-  partLoadFraction.setCoefficient1Constant(0.85);
-  partLoadFraction.setCoefficient2x(0.15);
-  partLoadFraction.setCoefficient3xPOW2(0.0);
-  partLoadFraction.setMinimumValueofx(0.0);
-  partLoadFraction.setMaximumValueofx(1.0);
-
-  CoilCoolingDXSingleSpeed coolingCoil = CoilCoolingDXSingleSpeed( model,
-                                                                   availabilitySchedule,
-                                                                   coolingCurveFofTemp,
-                                                                   coolingCurveFofFlow,
-                                                                   energyInputRatioFofTemp,
-                                                                   energyInputRatioFofFlow,
-                                                                   partLoadFraction );
+  CoilCoolingDXSingleSpeed coolingCoil = CoilCoolingDXSingleSpeed(model);
 
 
   model::ZoneHVACPackagedTerminalAirConditioner ptac( model,
@@ -337,106 +295,11 @@ ZoneHVACPackagedTerminalHeatPump addSystemType2(Model & model)
   model::FanConstantVolume fan(model,availabilitySchedule);
   fan.setPressureRise(300);
 
-  model::CoilHeatingElectric supplementalHeatingCoil(model,availabilitySchedule);
+  model::CoilHeatingElectric supplementalHeatingCoil(model);
 
-  model::CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
-  coolingCurveFofTemp.setCoefficient1Constant(0.942587793);
-  coolingCurveFofTemp.setCoefficient2x(0.009543347);
-  coolingCurveFofTemp.setCoefficient3xPOW2(0.0018423);
-  coolingCurveFofTemp.setCoefficient4y(-0.011042676);
-  coolingCurveFofTemp.setCoefficient5yPOW2(0.000005249);
-  coolingCurveFofTemp.setCoefficient6xTIMESY(-0.000009720);
-  coolingCurveFofTemp.setMinimumValueofx(17.0);
-  coolingCurveFofTemp.setMaximumValueofx(22.0);
-  coolingCurveFofTemp.setMinimumValueofy(13.0);
-  coolingCurveFofTemp.setMaximumValueofy(46.0);
+  CoilCoolingDXSingleSpeed coolingCoil = CoilCoolingDXSingleSpeed(model);
 
-  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
-  coolingCurveFofFlow.setCoefficient1Constant(0.718954);
-  coolingCurveFofFlow.setCoefficient2x(0.435436);
-  coolingCurveFofFlow.setCoefficient3xPOW2(-0.154193);
-  coolingCurveFofFlow.setMinimumValueofx(0.75);
-  coolingCurveFofFlow.setMaximumValueofx(1.25);
-
-  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
-  energyInputRatioFofTemp.setCoefficient1Constant(0.342414409);
-  energyInputRatioFofTemp.setCoefficient2x(0.034885008);
-  energyInputRatioFofTemp.setCoefficient3xPOW2(-0.000623700);
-  energyInputRatioFofTemp.setCoefficient4y(0.004977216);
-  energyInputRatioFofTemp.setCoefficient5yPOW2(0.000437951);
-  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.000728028);
-  energyInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
-  energyInputRatioFofFlow.setCoefficient1Constant(1.1552);
-  energyInputRatioFofFlow.setCoefficient2x(-0.1808);
-  energyInputRatioFofFlow.setCoefficient3xPOW2(0.0256);
-  energyInputRatioFofFlow.setMinimumValueofx(0.5);
-  energyInputRatioFofFlow.setMaximumValueofx(1.5);
-
-  CurveQuadratic partLoadFraction = CurveQuadratic(model);
-  partLoadFraction.setCoefficient1Constant(0.75);
-  partLoadFraction.setCoefficient2x(0.25);
-  partLoadFraction.setCoefficient3xPOW2(0.0);
-  partLoadFraction.setMinimumValueofx(0.0);
-  partLoadFraction.setMaximumValueofx(1.0);
-
-  CoilCoolingDXSingleSpeed coolingCoil = CoilCoolingDXSingleSpeed( model,
-                                                                   availabilitySchedule,
-                                                                   coolingCurveFofTemp,
-                                                                   coolingCurveFofFlow,
-                                                                   energyInputRatioFofTemp,
-                                                                   energyInputRatioFofFlow,
-                                                                   partLoadFraction );
-
-  CurveCubic totalHeatingCapacityFunctionofTemperatureCurve(model);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient1Constant(0.758746);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient2x(0.027626);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient3xPOW2(0.000148716);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient4xPOW3(0.0000034992);
-  totalHeatingCapacityFunctionofTemperatureCurve.setMinimumValueofx(-20.0);
-  totalHeatingCapacityFunctionofTemperatureCurve.setMaximumValueofx(20.0);
-
-  CurveCubic totalHeatingCapacityFunctionofFlowFractionCurve(model);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient1Constant(0.84);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient2x(0.16);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient3xPOW2(0.0);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient4xPOW3(0.0);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setMinimumValueofx(0.5);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setMaximumValueofx(1.5);
-
-  CurveCubic energyInputRatioFunctionofTemperatureCurve(model);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient1Constant(1.19248);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient2x(-0.0300438);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient3xPOW2(0.00103745);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient4xPOW3(-0.000023328);
-  energyInputRatioFunctionofTemperatureCurve.setMinimumValueofx(-20.0);
-  energyInputRatioFunctionofTemperatureCurve.setMaximumValueofx(20.0);
-
-  CurveQuadratic energyInputRatioFunctionofFlowFractionCurve(model);
-  energyInputRatioFunctionofFlowFractionCurve.setCoefficient1Constant(1.3824);
-  energyInputRatioFunctionofFlowFractionCurve.setCoefficient2x(-0.4336);
-  energyInputRatioFunctionofFlowFractionCurve.setCoefficient3xPOW2(0.0512);
-  energyInputRatioFunctionofFlowFractionCurve.setMinimumValueofx(0.0);
-  energyInputRatioFunctionofFlowFractionCurve.setMaximumValueofx(1.0);
-
-  CurveQuadratic partLoadFractionCorrelationCurve(model);
-  partLoadFractionCorrelationCurve.setCoefficient1Constant(0.75);
-  partLoadFractionCorrelationCurve.setCoefficient2x(0.25);
-  partLoadFractionCorrelationCurve.setCoefficient3xPOW2(0.0);
-  partLoadFractionCorrelationCurve.setMinimumValueofx(0.0);
-  partLoadFractionCorrelationCurve.setMaximumValueofx(1.0);
-
-  CoilHeatingDXSingleSpeed heatingCoil( model,
-                                        availabilitySchedule,
-                                        totalHeatingCapacityFunctionofTemperatureCurve,
-                                        totalHeatingCapacityFunctionofFlowFractionCurve,
-                                        energyInputRatioFunctionofTemperatureCurve,
-                                        energyInputRatioFunctionofFlowFractionCurve,
-                                        partLoadFractionCorrelationCurve ); 
+  CoilHeatingDXSingleSpeed heatingCoil(model);
 
   model::ZoneHVACPackagedTerminalHeatPump pthp( model,
                                                 availabilitySchedule, 
@@ -496,63 +359,12 @@ Loop addSystemType3(Model & model)
   sizingSystem.setHeatingDesignAirFlowRate(0.0);
   sizingSystem.setSystemOutdoorAirMethod("ZoneSum");
 
-  FanConstantVolume fan = FanConstantVolume(model,_alwaysOnSchedule);
+  FanConstantVolume fan = FanConstantVolume(model);
   fan.setPressureRise(500);
 
   CoilHeatingGas coilHeatingGas = CoilHeatingGas(model,_alwaysOnSchedule);
 
-  CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
-  coolingCurveFofTemp.setCoefficient1Constant(0.42415);
-  coolingCurveFofTemp.setCoefficient2x(0.04426);
-  coolingCurveFofTemp.setCoefficient3xPOW2(-0.00042);
-  coolingCurveFofTemp.setCoefficient4y(0.00333);
-  coolingCurveFofTemp.setCoefficient5yPOW2(-0.00008);
-  coolingCurveFofTemp.setCoefficient6xTIMESY(-0.00021);
-  coolingCurveFofTemp.setMinimumValueofx(17.0);
-  coolingCurveFofTemp.setMaximumValueofx(22.0);
-  coolingCurveFofTemp.setMinimumValueofy(13.0);
-  coolingCurveFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
-  coolingCurveFofFlow.setCoefficient1Constant(0.77136);
-  coolingCurveFofFlow.setCoefficient2x(0.34053);
-  coolingCurveFofFlow.setCoefficient3xPOW2(-0.11088);
-  coolingCurveFofFlow.setMinimumValueofx(0.75918);
-  coolingCurveFofFlow.setMaximumValueofx(1.13877);
-
-  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
-  energyInputRatioFofTemp.setCoefficient1Constant(1.23649);
-  energyInputRatioFofTemp.setCoefficient2x(-0.02431);
-  energyInputRatioFofTemp.setCoefficient3xPOW2(0.00057);
-  energyInputRatioFofTemp.setCoefficient4y(-0.01434);
-  energyInputRatioFofTemp.setCoefficient5yPOW2(0.00063);
-  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.00038);
-  energyInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
-  energyInputRatioFofFlow.setCoefficient1Constant(1.20550);
-  energyInputRatioFofFlow.setCoefficient2x(-0.32953);
-  energyInputRatioFofFlow.setCoefficient3xPOW2(0.12308);
-  energyInputRatioFofFlow.setMinimumValueofx(0.75918);
-  energyInputRatioFofFlow.setMaximumValueofx(1.13877);
-
-  CurveQuadratic partLoadFraction = CurveQuadratic(model);
-  partLoadFraction.setCoefficient1Constant(0.77100);
-  partLoadFraction.setCoefficient2x(0.22900);
-  partLoadFraction.setCoefficient3xPOW2(0.0);
-  partLoadFraction.setMinimumValueofx(0.0);
-  partLoadFraction.setMaximumValueofx(1.0);
-
-  CoilCoolingDXSingleSpeed coilCooling = CoilCoolingDXSingleSpeed( model,
-                                                                   _alwaysOnSchedule,
-                                                                   coolingCurveFofTemp,
-                                                                   coolingCurveFofFlow,
-                                                                   energyInputRatioFofTemp,
-                                                                   energyInputRatioFofFlow,
-                                                                   partLoadFraction );
+  CoilCoolingDXSingleSpeed coilCooling = CoilCoolingDXSingleSpeed(model);
 
   SetpointManagerSingleZoneReheat setpointMSZR(model);
 
@@ -616,106 +428,11 @@ Loop addSystemType4(Model & model)
   FanConstantVolume supplyFan(model,_alwaysOnSchedule);
   supplyFan.setPressureRise(500);
 
-  CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
-  coolingCurveFofTemp.setCoefficient1Constant(0.766956);
-  coolingCurveFofTemp.setCoefficient2x(0.0107756);
-  coolingCurveFofTemp.setCoefficient3xPOW2(-0.0000414703);
-  coolingCurveFofTemp.setCoefficient4y(0.00134961);
-  coolingCurveFofTemp.setCoefficient5yPOW2(-0.000261144);
-  coolingCurveFofTemp.setCoefficient6xTIMESY(0.000457488);
-  coolingCurveFofTemp.setMinimumValueofx(17.0);
-  coolingCurveFofTemp.setMaximumValueofx(22.0);
-  coolingCurveFofTemp.setMinimumValueofy(13.0);
-  coolingCurveFofTemp.setMaximumValueofy(46.0);
+  CoilCoolingDXSingleSpeed coolingCoil = CoilCoolingDXSingleSpeed(model);
 
-  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
-  coolingCurveFofFlow.setCoefficient1Constant(0.8);
-  coolingCurveFofFlow.setCoefficient2x(0.2);
-  coolingCurveFofFlow.setCoefficient3xPOW2(0.0);
-  coolingCurveFofFlow.setMinimumValueofx(0.5);
-  coolingCurveFofFlow.setMaximumValueofx(1.5);
+  CoilHeatingDXSingleSpeed heatingCoil(model);
 
-  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
-  energyInputRatioFofTemp.setCoefficient1Constant(0.297145);
-  energyInputRatioFofTemp.setCoefficient2x(0.0430933);
-  energyInputRatioFofTemp.setCoefficient3xPOW2(-0.000748766);
-  energyInputRatioFofTemp.setCoefficient4y(0.00597727);
-  energyInputRatioFofTemp.setCoefficient5yPOW2(0.000482112);
-  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.000956448);
-  energyInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
-  energyInputRatioFofFlow.setCoefficient1Constant(1.156);
-  energyInputRatioFofFlow.setCoefficient2x(-0.1816);
-  energyInputRatioFofFlow.setCoefficient3xPOW2(0.0256);
-  energyInputRatioFofFlow.setMinimumValueofx(0.5);
-  energyInputRatioFofFlow.setMaximumValueofx(1.5);
-
-  CurveQuadratic partLoadFraction = CurveQuadratic(model);
-  partLoadFraction.setCoefficient1Constant(0.75);
-  partLoadFraction.setCoefficient2x(0.25);
-  partLoadFraction.setCoefficient3xPOW2(0.0);
-  partLoadFraction.setMinimumValueofx(0.0);
-  partLoadFraction.setMaximumValueofx(1.0);
-
-  CoilCoolingDXSingleSpeed coolingCoil = CoilCoolingDXSingleSpeed( model,
-                                                                   _alwaysOnSchedule,
-                                                                   coolingCurveFofTemp,
-                                                                   coolingCurveFofFlow,
-                                                                   energyInputRatioFofTemp,
-                                                                   energyInputRatioFofFlow,
-                                                                   partLoadFraction );
-
-  CurveCubic  totalHeatingCapacityFunctionofTemperatureCurve(model);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient1Constant(0.758746);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient2x(0.027626);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient3xPOW2(0.000148716);
-  totalHeatingCapacityFunctionofTemperatureCurve.setCoefficient4xPOW3(0.0000034992);
-  totalHeatingCapacityFunctionofTemperatureCurve.setMinimumValueofx(-20.0);
-  totalHeatingCapacityFunctionofTemperatureCurve.setMaximumValueofx(20.0);
-
-  CurveCubic  totalHeatingCapacityFunctionofFlowFractionCurve(model);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient1Constant(0.84);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient2x(0.16);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient3xPOW2(0.0);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setCoefficient4xPOW3(0.0);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setMinimumValueofx(0.5);
-  totalHeatingCapacityFunctionofFlowFractionCurve.setMaximumValueofx(1.5);
-
-  CurveCubic  energyInputRatioFunctionofTemperatureCurve(model);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient1Constant(1.19248);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient2x(-0.0300438);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient3xPOW2(0.00103745);
-  energyInputRatioFunctionofTemperatureCurve.setCoefficient4xPOW3(-0.000023328);
-  energyInputRatioFunctionofTemperatureCurve.setMinimumValueofx(-20.0);
-  energyInputRatioFunctionofTemperatureCurve.setMaximumValueofx(20.0);
-
-  CurveQuadratic  energyInputRatioFunctionofFlowFractionCurve(model);
-  energyInputRatioFunctionofFlowFractionCurve.setCoefficient1Constant(1.3824);
-  energyInputRatioFunctionofFlowFractionCurve.setCoefficient2x(-0.4336);
-  energyInputRatioFunctionofFlowFractionCurve.setCoefficient3xPOW2(0.0512);
-  energyInputRatioFunctionofFlowFractionCurve.setMinimumValueofx(0.0);
-  energyInputRatioFunctionofFlowFractionCurve.setMaximumValueofx(1.0);
-
-  CurveQuadratic  partLoadFractionCorrelationCurve(model);
-  partLoadFractionCorrelationCurve.setCoefficient1Constant(0.75);
-  partLoadFractionCorrelationCurve.setCoefficient2x(0.25);
-  partLoadFractionCorrelationCurve.setCoefficient3xPOW2(0.0);
-  partLoadFractionCorrelationCurve.setMinimumValueofx(0.0);
-  partLoadFractionCorrelationCurve.setMaximumValueofx(1.0);
-
-  CoilHeatingDXSingleSpeed heatingCoil( model,
-                                        _alwaysOnSchedule,
-                                        totalHeatingCapacityFunctionofTemperatureCurve,
-                                        totalHeatingCapacityFunctionofFlowFractionCurve,
-                                        energyInputRatioFunctionofTemperatureCurve,
-                                        energyInputRatioFunctionofFlowFractionCurve,
-                                        partLoadFractionCorrelationCurve ); 
-
-  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model,_alwaysOnSchedule);
+  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model);
 
   ControllerOutdoorAir controllerOutdoorAir = ControllerOutdoorAir(model);
 
@@ -758,93 +475,12 @@ Loop addSystemType5(Model & model)
   sizingSystem.setCentralCoolingDesignSupplyAirTemperature(12.8);
   sizingSystem.setCentralHeatingDesignSupplyAirTemperature(12.8);
 
-  FanVariableVolume fan = FanVariableVolume(model,_alwaysOnSchedule);
+  FanVariableVolume fan = FanVariableVolume(model);
   fan.setPressureRise(500);
 
-  CoilHeatingWater coilHeatingWater = CoilHeatingWater(model,_alwaysOnSchedule);
+  CoilHeatingWater coilHeatingWater = CoilHeatingWater(model);
 
-  CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
-  coolingCurveFofTemp.setCoefficient1Constant(0.42415);
-  coolingCurveFofTemp.setCoefficient2x(0.04426);
-  coolingCurveFofTemp.setCoefficient3xPOW2(-0.00042);
-  coolingCurveFofTemp.setCoefficient4y(0.00333);
-  coolingCurveFofTemp.setCoefficient5yPOW2(-0.00008);
-  coolingCurveFofTemp.setCoefficient6xTIMESY(-0.00021);
-  coolingCurveFofTemp.setMinimumValueofx(17.0);
-  coolingCurveFofTemp.setMaximumValueofx(22.0);
-  coolingCurveFofTemp.setMinimumValueofy(13.0);
-  coolingCurveFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
-  coolingCurveFofFlow.setCoefficient1Constant(0.77136);
-  coolingCurveFofFlow.setCoefficient2x(0.34053);
-  coolingCurveFofFlow.setCoefficient3xPOW2(-0.11088);
-  coolingCurveFofFlow.setMinimumValueofx(0.75918);
-  coolingCurveFofFlow.setMaximumValueofx(1.13877);
-
-  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
-  energyInputRatioFofTemp.setCoefficient1Constant(1.23649);
-  energyInputRatioFofTemp.setCoefficient2x(-0.02431);
-  energyInputRatioFofTemp.setCoefficient3xPOW2(0.00057);
-  energyInputRatioFofTemp.setCoefficient4y(-0.01434);
-  energyInputRatioFofTemp.setCoefficient5yPOW2(0.00063);
-  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.00038);
-  energyInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
-  energyInputRatioFofFlow.setCoefficient1Constant(1.20550);
-  energyInputRatioFofFlow.setCoefficient2x(-0.32953);
-  energyInputRatioFofFlow.setCoefficient3xPOW2(0.12308);
-  energyInputRatioFofFlow.setMinimumValueofx(0.75918);
-  energyInputRatioFofFlow.setMaximumValueofx(1.13877);
-
-  CurveQuadratic partLoadFraction = CurveQuadratic(model);
-  partLoadFraction.setCoefficient1Constant(0.77100);
-  partLoadFraction.setCoefficient2x(0.22900);
-  partLoadFraction.setCoefficient3xPOW2(0.0);
-  partLoadFraction.setMinimumValueofx(0.0);
-  partLoadFraction.setMaximumValueofx(1.0);
-
-  CurveBiquadratic coolingLowSpdCurveFofTemp = CurveBiquadratic(model);
-  coolingLowSpdCurveFofTemp.setCoefficient1Constant(0.42415);
-  coolingLowSpdCurveFofTemp.setCoefficient2x(0.04426);
-  coolingLowSpdCurveFofTemp.setCoefficient3xPOW2(-0.00042);
-  coolingLowSpdCurveFofTemp.setCoefficient4y(0.00333);
-  coolingLowSpdCurveFofTemp.setCoefficient5yPOW2(-0.00008);
-  coolingLowSpdCurveFofTemp.setCoefficient6xTIMESY(-0.00021);
-  coolingLowSpdCurveFofTemp.setMinimumValueofx(17.0);
-  coolingLowSpdCurveFofTemp.setMaximumValueofx(22.0);
-  coolingLowSpdCurveFofTemp.setMinimumValueofy(13.0);
-  coolingLowSpdCurveFofTemp.setMaximumValueofy(46.0);
-
-  CurveBiquadratic energyLowSpdInputRatioFofTemp = CurveBiquadratic(model);
-  energyLowSpdInputRatioFofTemp.setCoefficient1Constant(1.23649);
-  energyLowSpdInputRatioFofTemp.setCoefficient2x(-0.02431);
-  energyLowSpdInputRatioFofTemp.setCoefficient3xPOW2(0.00057);
-  energyLowSpdInputRatioFofTemp.setCoefficient4y(-0.01434);
-  energyLowSpdInputRatioFofTemp.setCoefficient5yPOW2(0.00063);
-  energyLowSpdInputRatioFofTemp.setCoefficient6xTIMESY(-0.00038);
-  energyLowSpdInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyLowSpdInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyLowSpdInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyLowSpdInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CoilCoolingDXTwoSpeed coilCooling = CoilCoolingDXTwoSpeed( model,
-                                                                   _alwaysOnSchedule,
-                                                                   coolingCurveFofTemp,
-                                                                   coolingCurveFofFlow,
-                                                                   energyInputRatioFofTemp,
-                                                                   energyInputRatioFofFlow,
-                                                                   partLoadFraction, 
-                                                                   coolingLowSpdCurveFofTemp,
-                                                                   energyLowSpdInputRatioFofTemp);
-
-  coilCooling.setRatedLowSpeedSensibleHeatRatio(0.69);
-  coilCooling.setBasinHeaterCapacity(10);
-  coilCooling.setBasinHeaterSetpointTemperature(2.0);
+  CoilCoolingDXTwoSpeed coilCooling = CoilCoolingDXTwoSpeed(model);
 
   SetpointManagerScheduled deckTempSPM = SetpointManagerScheduled(model,_deckTempSchedule);
 
@@ -925,93 +561,12 @@ Loop addSystemType6(Model & model)
 
   AirLoopHVAC airLoopHVAC = AirLoopHVAC(model);
   airLoopHVAC.setName("Packaged Rooftop VAV with PFP Boxes and Reheat");
-  FanVariableVolume fan = FanVariableVolume(model,_alwaysOnSchedule);
+  FanVariableVolume fan = FanVariableVolume(model);
   fan.setPressureRise(500);
 
-  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model,_alwaysOnSchedule);
+  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model);
 
-  CurveBiquadratic coolingCurveFofTemp = CurveBiquadratic(model);
-  coolingCurveFofTemp.setCoefficient1Constant(0.42415);
-  coolingCurveFofTemp.setCoefficient2x(0.04426);
-  coolingCurveFofTemp.setCoefficient3xPOW2(-0.00042);
-  coolingCurveFofTemp.setCoefficient4y(0.00333);
-  coolingCurveFofTemp.setCoefficient5yPOW2(-0.00008);
-  coolingCurveFofTemp.setCoefficient6xTIMESY(-0.00021);
-  coolingCurveFofTemp.setMinimumValueofx(17.0);
-  coolingCurveFofTemp.setMaximumValueofx(22.0);
-  coolingCurveFofTemp.setMinimumValueofy(13.0);
-  coolingCurveFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic coolingCurveFofFlow = CurveQuadratic(model);
-  coolingCurveFofFlow.setCoefficient1Constant(0.77136);
-  coolingCurveFofFlow.setCoefficient2x(0.34053);
-  coolingCurveFofFlow.setCoefficient3xPOW2(-0.11088);
-  coolingCurveFofFlow.setMinimumValueofx(0.75918);
-  coolingCurveFofFlow.setMaximumValueofx(1.13877);
-
-  CurveBiquadratic energyInputRatioFofTemp = CurveBiquadratic(model);
-  energyInputRatioFofTemp.setCoefficient1Constant(1.23649);
-  energyInputRatioFofTemp.setCoefficient2x(-0.02431);
-  energyInputRatioFofTemp.setCoefficient3xPOW2(0.00057);
-  energyInputRatioFofTemp.setCoefficient4y(-0.01434);
-  energyInputRatioFofTemp.setCoefficient5yPOW2(0.00063);
-  energyInputRatioFofTemp.setCoefficient6xTIMESY(-0.00038);
-  energyInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CurveQuadratic energyInputRatioFofFlow = CurveQuadratic(model);
-  energyInputRatioFofFlow.setCoefficient1Constant(1.20550);
-  energyInputRatioFofFlow.setCoefficient2x(-0.32953);
-  energyInputRatioFofFlow.setCoefficient3xPOW2(0.12308);
-  energyInputRatioFofFlow.setMinimumValueofx(0.75918);
-  energyInputRatioFofFlow.setMaximumValueofx(1.13877);
-
-  CurveQuadratic partLoadFraction = CurveQuadratic(model);
-  partLoadFraction.setCoefficient1Constant(0.77100);
-  partLoadFraction.setCoefficient2x(0.22900);
-  partLoadFraction.setCoefficient3xPOW2(0.0);
-  partLoadFraction.setMinimumValueofx(0.0);
-  partLoadFraction.setMaximumValueofx(1.0);
-
-  CurveBiquadratic coolingLowSpdCurveFofTemp = CurveBiquadratic(model);
-  coolingLowSpdCurveFofTemp.setCoefficient1Constant(0.42415);
-  coolingLowSpdCurveFofTemp.setCoefficient2x(0.04426);
-  coolingLowSpdCurveFofTemp.setCoefficient3xPOW2(-0.00042);
-  coolingLowSpdCurveFofTemp.setCoefficient4y(0.00333);
-  coolingLowSpdCurveFofTemp.setCoefficient5yPOW2(-0.00008);
-  coolingLowSpdCurveFofTemp.setCoefficient6xTIMESY(-0.00021);
-  coolingLowSpdCurveFofTemp.setMinimumValueofx(17.0);
-  coolingLowSpdCurveFofTemp.setMaximumValueofx(22.0);
-  coolingLowSpdCurveFofTemp.setMinimumValueofy(13.0);
-  coolingLowSpdCurveFofTemp.setMaximumValueofy(46.0);
-
-  CurveBiquadratic energyLowSpdInputRatioFofTemp = CurveBiquadratic(model);
-  energyLowSpdInputRatioFofTemp.setCoefficient1Constant(1.23649);
-  energyLowSpdInputRatioFofTemp.setCoefficient2x(-0.02431);
-  energyLowSpdInputRatioFofTemp.setCoefficient3xPOW2(0.00057);
-  energyLowSpdInputRatioFofTemp.setCoefficient4y(-0.01434);
-  energyLowSpdInputRatioFofTemp.setCoefficient5yPOW2(0.00063);
-  energyLowSpdInputRatioFofTemp.setCoefficient6xTIMESY(-0.00038);
-  energyLowSpdInputRatioFofTemp.setMinimumValueofx(17.0);
-  energyLowSpdInputRatioFofTemp.setMaximumValueofx(22.0);
-  energyLowSpdInputRatioFofTemp.setMinimumValueofy(13.0);
-  energyLowSpdInputRatioFofTemp.setMaximumValueofy(46.0);
-
-  CoilCoolingDXTwoSpeed coilCooling = CoilCoolingDXTwoSpeed( model,
-                                                                   _alwaysOnSchedule,
-                                                                   coolingCurveFofTemp,
-                                                                   coolingCurveFofFlow,
-                                                                   energyInputRatioFofTemp,
-                                                                   energyInputRatioFofFlow,
-                                                                   partLoadFraction, 
-                                                                   coolingLowSpdCurveFofTemp,
-                                                                   energyLowSpdInputRatioFofTemp);
-
-  coilCooling.setRatedLowSpeedSensibleHeatRatio(0.69);
-  coilCooling.setBasinHeaterCapacity(10);
-  coilCooling.setBasinHeaterSetpointTemperature(2.0);
+  CoilCoolingDXTwoSpeed coilCooling = CoilCoolingDXTwoSpeed( model );
 
   SetpointManagerScheduled deckTempSPM = SetpointManagerScheduled(model,_deckTempSchedule);
 
@@ -1030,7 +585,7 @@ Loop addSystemType6(Model & model)
   Node node1 = fan.outletModelObject()->cast<Node>();
   deckTempSPM.addToNode(node1);
 
-  CoilHeatingElectric reheatCoil(model,_alwaysOnSchedule);
+  CoilHeatingElectric reheatCoil(model);
   FanConstantVolume piuFan(model,_alwaysOnSchedule);
   piuFan.setPressureRise(300);
   AirTerminalSingleDuctParallelPIUReheat terminal(model,_alwaysOnSchedule,piuFan,reheatCoil);
@@ -1057,12 +612,12 @@ Loop addSystemType7(Model & model)
   sizingSystem.setCentralCoolingDesignSupplyAirTemperature(12.8);
   sizingSystem.setCentralHeatingDesignSupplyAirTemperature(12.8);
 
-  FanVariableVolume fan = FanVariableVolume(model,_alwaysOnSchedule);
+  FanVariableVolume fan = FanVariableVolume(model);
   fan.setPressureRise(500);
 
-  CoilHeatingWater coilHeatingWater = CoilHeatingWater(model,_alwaysOnSchedule);
+  CoilHeatingWater coilHeatingWater = CoilHeatingWater(model);
 
-  CoilCoolingWater coilCoolingWater = CoilCoolingWater(model,_alwaysOnSchedule);
+  CoilCoolingWater coilCoolingWater = CoilCoolingWater(model);
 
   SetpointManagerScheduled deckTempSPM = SetpointManagerScheduled(model,_deckTempSchedule);
 
@@ -1155,37 +710,37 @@ Loop addSystemType7(Model & model)
   pump2.addToNode(chilledWaterInletNode);
 
   CurveBiquadratic ccFofT(model);
-  ccFofT.setCoefficient1Constant(1.0215158);
-  ccFofT.setCoefficient2x(0.037035864);
-  ccFofT.setCoefficient3xPOW2(0.0002332476);
-  ccFofT.setCoefficient4y(-0.003894048);
-  ccFofT.setCoefficient5yPOW2(-6.52536e-005);
-  ccFofT.setCoefficient6xTIMESY(-0.0002680452);
-  ccFofT.setMinimumValueofx(5.0);
-  ccFofT.setMaximumValueofx(10.0);
-  ccFofT.setMinimumValueofy(24.0);
-  ccFofT.setMaximumValueofy(35.0);
+  ccFofT.setCoefficient1Constant(0.258);
+  ccFofT.setCoefficient2x(0.0389);
+  ccFofT.setCoefficient3xPOW2(-0.000217);
+  ccFofT.setCoefficient4y(0.0469);
+  ccFofT.setCoefficient5yPOW2(-0.000943);
+  ccFofT.setCoefficient6xTIMESY(-0.000343);
+  ccFofT.setMinimumValueofx(5);
+  ccFofT.setMaximumValueofx(10);
+  ccFofT.setMinimumValueofy(24);
+  ccFofT.setMaximumValueofy(35);
 
-  CurveBiquadratic eirToCorfOfT(model);
-  eirToCorfOfT.setCoefficient1Constant(0.70176857);
-  eirToCorfOfT.setCoefficient2x(-0.00452016);
-  eirToCorfOfT.setCoefficient3xPOW2(0.0005331096);
-  eirToCorfOfT.setCoefficient4y(-0.005498208);
-  eirToCorfOfT.setCoefficient5yPOW2(0.0005445792);
-  eirToCorfOfT.setCoefficient6xTIMESY(-0.0007290324);
-  eirToCorfOfT.setMinimumValueofx(5.0);
-  eirToCorfOfT.setMaximumValueofx(10.0);
-  eirToCorfOfT.setMinimumValueofy(24.0);
-  eirToCorfOfT.setMaximumValueofy(35.0);
+  CurveBiquadratic eiToCORFofT(model);
+  eiToCORFofT.setCoefficient1Constant(0.934);
+  eiToCORFofT.setCoefficient2x(-0.0582);
+  eiToCORFofT.setCoefficient3xPOW2(0.0045);
+  eiToCORFofT.setCoefficient4y(0.00243);
+  eiToCORFofT.setCoefficient5yPOW2(0.000486);
+  eiToCORFofT.setCoefficient6xTIMESY(-0.00122);
+  eiToCORFofT.setMinimumValueofx(5);
+  eiToCORFofT.setMaximumValueofx(10);
+  eiToCORFofT.setMinimumValueofy(24);
+  eiToCORFofT.setMaximumValueofy(35);
 
-  CurveQuadratic eirToCorfOfPlr(model);
-  eirToCorfOfPlr.setCoefficient1Constant(0.06369119);
-  eirToCorfOfPlr.setCoefficient2x(0.58488832);
-  eirToCorfOfPlr.setCoefficient3xPOW2(0.35280274);
-  eirToCorfOfPlr.setMinimumValueofx(0.0);
-  eirToCorfOfPlr.setMaximumValueofx(1.0);
+  CurveQuadratic eiToCORFofPLR(model);
+  eiToCORFofPLR.setCoefficient1Constant(0.222903);
+  eiToCORFofPLR.setCoefficient2x(0.313387);
+  eiToCORFofPLR.setCoefficient3xPOW2(0.46371);
+  eiToCORFofPLR.setMinimumValueofx(0);
+  eiToCORFofPLR.setMaximumValueofx(1);
 
-  ChillerElectricEIR chiller(model,ccFofT,eirToCorfOfT,eirToCorfOfPlr);
+  ChillerElectricEIR chiller(model,ccFofT,eiToCORFofT,eiToCORFofPLR );
 
   node = chilledWaterPlant.supplySplitter().lastOutletModelObject()->cast<Node>();
   chiller.addToNode(node);
@@ -1277,12 +832,12 @@ Loop addSystemType8(Model & model)
 
   AirLoopHVAC airLoopHVAC = AirLoopHVAC(model);
   airLoopHVAC.setName("VAV with PFP Boxes and Reheat");
-  FanVariableVolume fan = FanVariableVolume(model,_alwaysOnSchedule);
+  FanVariableVolume fan = FanVariableVolume(model);
   fan.setPressureRise(500);
 
-  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model,_alwaysOnSchedule);
+  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model);
 
-  CoilCoolingWater coilCoolingWater = CoilCoolingWater(model,_alwaysOnSchedule);
+  CoilCoolingWater coilCoolingWater = CoilCoolingWater(model);
 
   SetpointManagerScheduled deckTempSPM = SetpointManagerScheduled(model,_deckTempSchedule);
 
@@ -1317,38 +872,7 @@ Loop addSystemType8(Model & model)
 
   pump2.addToNode(chilledWaterInletNode);
 
-  CurveBiquadratic ccFofT(model);
-  ccFofT.setCoefficient1Constant(1.0215158);
-  ccFofT.setCoefficient2x(0.037035864);
-  ccFofT.setCoefficient3xPOW2(0.0002332476);
-  ccFofT.setCoefficient4y(-0.003894048);
-  ccFofT.setCoefficient5yPOW2(-6.52536e-005);
-  ccFofT.setCoefficient6xTIMESY(-0.0002680452);
-  ccFofT.setMinimumValueofx(5.0);
-  ccFofT.setMaximumValueofx(10.0);
-  ccFofT.setMinimumValueofy(24.0);
-  ccFofT.setMaximumValueofy(35.0);
-
-  CurveBiquadratic eirToCorfOfT(model);
-  eirToCorfOfT.setCoefficient1Constant(0.70176857);
-  eirToCorfOfT.setCoefficient2x(-0.00452016);
-  eirToCorfOfT.setCoefficient3xPOW2(0.0005331096);
-  eirToCorfOfT.setCoefficient4y(-0.005498208);
-  eirToCorfOfT.setCoefficient5yPOW2(0.0005445792);
-  eirToCorfOfT.setCoefficient6xTIMESY(-0.0007290324);
-  eirToCorfOfT.setMinimumValueofx(5.0);
-  eirToCorfOfT.setMaximumValueofx(10.0);
-  eirToCorfOfT.setMinimumValueofy(24.0);
-  eirToCorfOfT.setMaximumValueofy(35.0);
-
-  CurveQuadratic eirToCorfOfPlr(model);
-  eirToCorfOfPlr.setCoefficient1Constant(0.06369119);
-  eirToCorfOfPlr.setCoefficient2x(0.58488832);
-  eirToCorfOfPlr.setCoefficient3xPOW2(0.35280274);
-  eirToCorfOfPlr.setMinimumValueofx(0.0);
-  eirToCorfOfPlr.setMaximumValueofx(1.0);
-
-  ChillerElectricEIR chiller(model,ccFofT,eirToCorfOfT,eirToCorfOfPlr);
+  ChillerElectricEIR chiller(model);
 
   Node node = chilledWaterPlant.supplySplitter().lastOutletModelObject()->cast<Node>();
   chiller.addToNode(node);
@@ -1365,7 +889,7 @@ Loop addSystemType8(Model & model)
 
   chilledWaterSPM.addToNode(chilledWaterOutletNode);
 
-  CoilHeatingElectric reheatCoil(model,_alwaysOnSchedule);
+  CoilHeatingElectric reheatCoil(model);
   FanConstantVolume piuFan(model,_alwaysOnSchedule);
   piuFan.setPressureRise(300);
   AirTerminalSingleDuctParallelPIUReheat terminal(model,_alwaysOnSchedule,piuFan,reheatCoil);
@@ -1409,7 +933,7 @@ Loop addSystemType9(Model & model)
   sizingSystem.setHeatingDesignAirFlowRate(0.0);
   sizingSystem.setSystemOutdoorAirMethod("ZoneSum");
 
-  FanConstantVolume fan = FanConstantVolume(model,_alwaysOnSchedule);
+  FanConstantVolume fan = FanConstantVolume(model);
   fan.setPressureRise(500);
 
   CoilHeatingGas coilHeatingGas = CoilHeatingGas(model,_alwaysOnSchedule);
@@ -1471,10 +995,10 @@ Loop addSystemType10(Model & model)
   sizingSystem.setHeatingDesignAirFlowRate(0.0);
   sizingSystem.setSystemOutdoorAirMethod("ZoneSum");
 
-  FanConstantVolume fan = FanConstantVolume(model,_alwaysOnSchedule);
+  FanConstantVolume fan = FanConstantVolume(model);
   fan.setPressureRise(500);
 
-  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model,_alwaysOnSchedule);
+  CoilHeatingElectric coilHeatingElectric = CoilHeatingElectric(model);
 
   SetpointManagerSingleZoneReheat setpointMSZR(model);
 

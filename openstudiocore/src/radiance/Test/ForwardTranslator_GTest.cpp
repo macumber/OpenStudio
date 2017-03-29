@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -48,6 +57,22 @@
 using namespace openstudio;
 using namespace openstudio::model;
 using namespace openstudio::radiance;
+
+std::string printPaths(const std::vector<path>& paths){
+  std::stringstream result;
+  for (auto path : paths){
+    result << toString(path) << std::endl;
+  }
+  return result.str();
+}
+
+std::string printLogMessages(const std::vector<LogMessage>& messages){
+  std::stringstream result;
+  for (auto message : messages){
+    result << message.logMessage() << std::endl;
+  }
+  return result.str();
+}
 
 TEST(Radiance, ForwardTranslator_SurfaceOnlyOnGround)
 {
@@ -164,12 +189,12 @@ TEST(Radiance, ForwardTranslator_ExampleModel)
   Model model = exampleModel();
   
   openstudio::path outpath = toPath("./ForwardTranslator_ExampleModel");
-  boost::filesystem::remove_all(outpath);
-  ASSERT_FALSE(boost::filesystem::exists(outpath));
+  openstudio::filesystem::remove_all(outpath);
+  ASSERT_FALSE(openstudio::filesystem::exists(outpath));
 
   ForwardTranslator ft;
   std::vector<path> outpaths = ft.translateModel(outpath, model);
-  EXPECT_TRUE(boost::filesystem::exists(outpath));
+  EXPECT_TRUE(openstudio::filesystem::exists(outpath));
   EXPECT_FALSE(outpaths.empty());
   EXPECT_TRUE(ft.errors().empty());
   EXPECT_TRUE(ft.warnings().empty());
@@ -190,15 +215,15 @@ TEST(Radiance, ForwardTranslator_ExampleModelWithShadingControl)
   }
 
   openstudio::path outpath = toPath("./ForwardTranslator_ExampleModelWithShadingControl");
-  boost::filesystem::remove_all(outpath);
-  ASSERT_FALSE(boost::filesystem::exists(outpath));
+  openstudio::filesystem::remove_all(outpath);
+  ASSERT_FALSE(openstudio::filesystem::exists(outpath));
 
   ForwardTranslator ft;
   std::vector<path> outpaths = ft.translateModel(outpath, model);
-  EXPECT_TRUE(boost::filesystem::exists(outpath));
-  EXPECT_FALSE(outpaths.empty());
-  EXPECT_TRUE(ft.errors().empty());
-  EXPECT_TRUE(ft.warnings().empty());
+  EXPECT_TRUE(openstudio::filesystem::exists(outpath));
+  EXPECT_FALSE(outpaths.empty()) << printPaths(outpaths);
+  EXPECT_TRUE(ft.errors().empty()) << printLogMessages(ft.errors());
+  EXPECT_TRUE(ft.warnings().empty()) << printLogMessages(ft.warnings());
 }
 
 
@@ -211,12 +236,12 @@ TEST(Radiance, ForwardTranslator_ExampleModel_NoIllumMaps)
   } 
   
   openstudio::path outpath = toPath("./ForwardTranslator_ExampleModel_NoIllumMaps");
-  boost::filesystem::remove_all(outpath);
-  ASSERT_FALSE(boost::filesystem::exists(outpath));
+  openstudio::filesystem::remove_all(outpath);
+  ASSERT_FALSE(openstudio::filesystem::exists(outpath));
 
   ForwardTranslator ft;
   std::vector<path> outpaths = ft.translateModel(outpath, model);
-  EXPECT_FALSE(boost::filesystem::exists(outpath));
+  EXPECT_FALSE(openstudio::filesystem::exists(outpath));
   EXPECT_TRUE(outpaths.empty());
   EXPECT_FALSE(ft.errors().empty());
   EXPECT_TRUE(ft.warnings().empty());
@@ -231,12 +256,12 @@ TEST(Radiance, ForwardTranslator_ExampleModel_NoDaylightingControls)
   } 
   
   openstudio::path outpath = toPath("./ForwardTranslator_ExampleModel_NoDaylightingControls");
-  boost::filesystem::remove_all(outpath);
-  ASSERT_FALSE(boost::filesystem::exists(outpath));
+  openstudio::filesystem::remove_all(outpath);
+  ASSERT_FALSE(openstudio::filesystem::exists(outpath));
 
   ForwardTranslator ft;
   std::vector<path> outpaths = ft.translateModel(outpath, model);
-  EXPECT_FALSE(boost::filesystem::exists(outpath));
+  EXPECT_FALSE(openstudio::filesystem::exists(outpath));
   EXPECT_TRUE(outpaths.empty());
   EXPECT_FALSE(ft.errors().empty());
   EXPECT_TRUE(ft.warnings().empty());
@@ -251,12 +276,12 @@ TEST(Radiance, ForwardTranslator_ExampleModel_NoGlareSensors)
   } 
   
   openstudio::path outpath = toPath("./ForwardTranslator_ExampleModel_NoGlareSensors");
-  boost::filesystem::remove_all(outpath);
-  ASSERT_FALSE(boost::filesystem::exists(outpath));
+  openstudio::filesystem::remove_all(outpath);
+  ASSERT_FALSE(openstudio::filesystem::exists(outpath));
 
   ForwardTranslator ft;
   std::vector<path> outpaths = ft.translateModel(outpath, model);
-  EXPECT_TRUE(boost::filesystem::exists(outpath));
+  EXPECT_TRUE(openstudio::filesystem::exists(outpath));
   EXPECT_FALSE(outpaths.empty());
   EXPECT_TRUE(ft.errors().empty());
   EXPECT_FALSE(ft.warnings().empty());
@@ -273,14 +298,29 @@ TEST(Radiance, ForwardTranslator_ExampleModel_NoThermalZoneLinks)
   } 
   
   openstudio::path outpath = toPath("./ForwardTranslator_ExampleModel_NoThermalZoneLinks");
-  boost::filesystem::remove_all(outpath);
-  ASSERT_FALSE(boost::filesystem::exists(outpath));
+  openstudio::filesystem::remove_all(outpath);
+  ASSERT_FALSE(openstudio::filesystem::exists(outpath));
 
   ForwardTranslator ft;
   std::vector<path> outpaths = ft.translateModel(outpath, model);
-  EXPECT_FALSE(boost::filesystem::exists(outpath));
+  EXPECT_FALSE(openstudio::filesystem::exists(outpath));
   EXPECT_TRUE(outpaths.empty());
   EXPECT_FALSE(ft.errors().empty());
   EXPECT_FALSE(ft.warnings().empty());
 
+}
+
+TEST(Radiance, ForwardTranslator_formatString)
+{
+  EXPECT_EQ("44", formatString(44.12345, 0));
+  EXPECT_EQ("44.1", formatString(44.12345, 1));
+  EXPECT_EQ("44.12", formatString(44.12345, 2));
+
+  EXPECT_EQ("45", formatString(44.6789, 0));
+  EXPECT_EQ("44.7", formatString(44.6789, 1));
+  EXPECT_EQ("44.68", formatString(44.6789, 2));
+
+  EXPECT_EQ("0", formatString(0.4412345, 0));
+  EXPECT_EQ("0.4", formatString(0.4412345, 1));
+  EXPECT_EQ("0.44", formatString(0.4412345, 2));
 }

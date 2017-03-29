@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "Date.hpp"
 #include "../core/Exception.hpp"
@@ -172,7 +181,6 @@ namespace openstudio{
   Date Date::fromDayOfYear(unsigned dayOfYear)
   {
     Date result;
-    result.m_impl.reset();
     result.m_assumedBaseYear = YearDescription().assumedYear();
     result.initFromYearDayOfYear(result.m_assumedBaseYear, dayOfYear);
     return result;
@@ -181,7 +189,6 @@ namespace openstudio{
   Date Date::fromDayOfYear(unsigned dayOfYear, int year)
   {
     Date result;
-    result.m_impl.reset();
     result.m_baseYear = year;
     result.m_assumedBaseYear = year;
     result.initFromYearDayOfYear(year, dayOfYear);
@@ -191,7 +198,6 @@ namespace openstudio{
   Date Date::fromDayOfYear(unsigned dayOfYear, const YearDescription& yearDescription)
   {
     Date result;
-    result.m_impl.reset();
     result.m_assumedBaseYear = yearDescription.assumedYear();
     result.initFromYearDayOfYear(result.m_assumedBaseYear, dayOfYear);
     return result;
@@ -219,10 +225,9 @@ namespace openstudio{
 
   /// from impl
   Date::Date(const Date::ImplType& impl)
-    : m_assumedBaseYear(impl.year())
-  {
-    m_impl = ImplPtr(new ImplType(impl));
-  }
+    : m_impl(impl),
+      m_assumedBaseYear(impl.year())
+  {}
 
   /// Date from month, day of month
   Date::Date(MonthOfYear monthOfYear, unsigned dayOfMonth)
@@ -252,14 +257,14 @@ namespace openstudio{
     boost::gregorian::date date;
     ss >> date;
 
-    m_impl = std::shared_ptr<boost::gregorian::date>(new boost::gregorian::date(date));
+    m_impl = date;
   }
 
   /// from tm
   Date::Date(tm t_tm)
-    : m_impl(new ImplType(boost::gregorian::date_from_tm(t_tm))),
-      m_baseYear(m_impl->year()),
-      m_assumedBaseYear(m_impl->year())
+    : m_impl(boost::gregorian::date_from_tm(t_tm)),
+      m_baseYear(m_impl.year()),
+      m_assumedBaseYear(m_impl.year())
   {
   }
 
@@ -274,7 +279,7 @@ namespace openstudio{
   {
     m_baseYear = other.m_baseYear;
     m_assumedBaseYear = other.m_assumedBaseYear;
-    m_impl = std::shared_ptr<ImplType>(new ImplType(*other.m_impl));
+    m_impl = other.m_impl;
     return *this;
   }
 
@@ -289,7 +294,7 @@ namespace openstudio{
   /// assignment by addition operator
   Date& Date::operator+= (const Time& time)
   {
-    (*m_impl) += date_duration(time.days());
+    m_impl += date_duration(time.days());
     return *this;
   }
 
@@ -304,14 +309,14 @@ namespace openstudio{
   /// assignment by difference operator
   Date& Date::operator-= (const Time& time)
   {
-    (*m_impl) -= date_duration(time.days());
+    m_impl -= date_duration(time.days());
     return *this;
   }
 
   /// time duration
   Time Date::operator- (const Date& date) const
   {
-    boost::gregorian::date_duration duration( (*m_impl)-(*date.m_impl) );
+    boost::gregorian::date_duration duration( (m_impl)-(date.m_impl) );
     return Time(duration.days());
   }
 
@@ -393,25 +398,25 @@ namespace openstudio{
 
   int Date::year() const
   {
-    return m_impl->year();
+    return m_impl.year();
   }
 
   /// month of year
   MonthOfYear Date::monthOfYear() const
   {
-    return m_impl->month().as_enum();
+    return m_impl.month().as_enum();
   }
 
   /// day of month
   unsigned Date::dayOfMonth() const
   {
-    return m_impl->day();
+    return m_impl.day();
   };
 
   /// day of year
   unsigned Date::dayOfYear() const
   {
-    return m_impl->day_of_year();
+    return m_impl.day_of_year();
   };
 
   /// is year a leap year
@@ -423,19 +428,21 @@ namespace openstudio{
   /// day of the week
   DayOfWeek Date::dayOfWeek() const
   {
-    return DayOfWeek(m_impl->day_of_week());
+    return DayOfWeek(m_impl.day_of_week());
   };
 
   // initFromYearMonthDay
   void Date::initFromYearMonthDay(int year, MonthOfYear monthOfYear, unsigned dayOfMonth)
   {
+    bool initialized = false;
     try{
       // construct with year, month, day
-      m_impl = ImplPtr(new ImplType(year, monthOfYear.value(), dayOfMonth));
+      m_impl = ImplType(year, monthOfYear.value(), dayOfMonth);
+      initialized = true;
     }catch(...){
     }
 
-    if (!m_impl || m_impl->is_not_a_date()){
+    if (!initialized || m_impl.is_not_a_date()){
       LOG_AND_THROW("Bad Date: year = " << year << ", month = " << monthOfYear << 
           ", day = " << dayOfMonth << ". ");
     }
@@ -444,6 +451,7 @@ namespace openstudio{
   // initFromYearDayOfYear
   void Date::initFromYearDayOfYear(int year, unsigned dayOfYear)
   {
+    bool initialized = false;
     try{
       // get days in this year, can throw bad_year
       unsigned daysInYear;
@@ -457,24 +465,25 @@ namespace openstudio{
       if ((dayOfYear >= 1) && (dayOfYear <= daysInYear)){
 
         // construct at Jan, 1 of year
-        m_impl = ImplPtr(new ImplType(year, 1, 1));
+        m_impl = ImplType(year, 1, 1);
 
         // add day of year minus one to impl
-        (*m_impl) += date_duration(dayOfYear-1);
+        m_impl += date_duration(dayOfYear-1);
+
+        initialized = true;
       };
 
     }catch(...){
     }
 
-    if (!m_impl || m_impl->is_not_a_date() ){
+    if (!initialized || m_impl.is_not_a_date()){
       LOG_AND_THROW("Bad Date: year = " << year << ", dayOfYear = " << dayOfYear <<  ". ");
     }
   }
 
-  // reference to impl
-  const Date::ImplType& Date::impl() const
+  const Date::ImplType Date::impl() const
   {
-    return *m_impl;
+    return m_impl;
   }
 
   // std::ostream operator<<

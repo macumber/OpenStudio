@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "PlanarSurface.hpp"
 #include "PlanarSurface_Impl.hpp"
@@ -33,6 +42,10 @@
 #include "AirWallMaterial_Impl.hpp"
 #include "SubSurface.hpp"
 #include "SubSurface_Impl.hpp"
+#include "GeneratorPhotovoltaic.hpp"
+#include "GeneratorPhotovoltaic_Impl.hpp"
+#include "SurfacePropertyConvectionCoefficients.hpp"
+#include "SurfacePropertyConvectionCoefficients_Impl.hpp"
 
 #include "../utilities/sql/SqlFile.hpp"
 
@@ -40,6 +53,8 @@
 #include "../utilities/geometry/Transformation.hpp"
 
 #include "../utilities/core/Assert.hpp"
+
+#include <utilities/idd/IddEnums.hxx>
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/lexical_cast.hpp>
@@ -66,7 +81,7 @@ namespace model {
       : ParentObject_Impl(type, model)
     {
       // connect signals
-      connect(this, &PlanarSurface_Impl::onChange, this, &PlanarSurface_Impl::clearCachedVariables);
+      this->PlanarSurface_Impl::onChange.connect<PlanarSurface_Impl, &PlanarSurface_Impl::clearCachedVariables>(this);
     }
 
     // constructor
@@ -76,7 +91,7 @@ namespace model {
       : ParentObject_Impl(idfObject, model, keepHandle)
     {
       // connect signals
-      connect(this, &PlanarSurface_Impl::onChange, this, &PlanarSurface_Impl::clearCachedVariables);
+      this->PlanarSurface_Impl::onChange.connect<PlanarSurface_Impl, &PlanarSurface_Impl::clearCachedVariables>(this);
     }
 
     PlanarSurface_Impl::PlanarSurface_Impl(const openstudio::detail::WorkspaceObject_Impl& other,
@@ -85,7 +100,7 @@ namespace model {
       : ParentObject_Impl(other,model,keepHandle)
     {
       // connect signals
-      connect(this, &PlanarSurface_Impl::onChange, this, &PlanarSurface_Impl::clearCachedVariables);
+      this->PlanarSurface_Impl::onChange.connect<PlanarSurface_Impl, &PlanarSurface_Impl::clearCachedVariables>(this);
     }
 
     PlanarSurface_Impl::PlanarSurface_Impl(const PlanarSurface_Impl& other,
@@ -94,9 +109,9 @@ namespace model {
       : ParentObject_Impl(other,model,keepHandle)
     {
       // connect signals
-      connect(this, &PlanarSurface_Impl::onChange, this, &PlanarSurface_Impl::clearCachedVariables);
+      this->PlanarSurface_Impl::onChange.connect<PlanarSurface_Impl, &PlanarSurface_Impl::clearCachedVariables>(this);
     }
-
+    
     boost::optional<ConstructionBase> PlanarSurface_Impl::construction() const
     {
       boost::optional<std::pair<ConstructionBase, int> > result = this->constructionWithSearchDistance();
@@ -223,8 +238,8 @@ namespace model {
           OS_ASSERT(layers.size() == 1u);
           result = layers[0].optionalCast<AirWallMaterial>();
         }else if (construction.numLayers() == 0) {
-          LOG(Error, "Air wall detected with zero layers, classifying as air wall");
-          result = true;
+          LOG(Info, "Construction detected with zero layers, classifying as non-air wall");
+          result = false;
         }else {
           LOG(Error, "Air wall detected with more than one layer, classifying as non-air wall");
           result = false;
@@ -403,6 +418,7 @@ namespace model {
     boost::optional<double> PlanarSurface_Impl::visibleTransmittance() const
     {
       OptionalDouble result;
+      boost::optional<std::string> surfaceName = this->name();
       OptionalSqlFile sqlFile = model().sqlFile();
       OptionalConstructionBase oConstruction = this->construction();
 
@@ -413,28 +429,26 @@ namespace model {
         // from output
         OptionalDouble outputResult;
         if (sqlFile) {
-          OptionalString constructionName = oConstruction->name();
-          if (constructionName){
-            std::string query = "SELECT RowId FROM tabulardatawithstrings WHERE ReportName='EnvelopeSummary' AND ReportForString='Entire Facility' AND TableName='Exterior Fenestration' AND ColumnName='Construction' AND Value='" + to_upper_copy(*constructionName) + "'";
-            OptionalInt rowId = sqlFile->execAndReturnFirstInt(query);
-            if (rowId) {
+          OptionalString surfaceName = this->name();
+          //OptionalString constructionName = oConstruction->name();
+          std::string query;
+          if (surfaceName){
+
+            if (!outputResult){
               std::stringstream ss;
-              ss << "SELECT Value FROM tabulardatawithstrings WHERE ReportName='EnvelopeSummary' AND ReportForString='Entire Facility' AND TableName='Exterior Fenestration' AND RowId='";
-              ss << *rowId << "' AND ColumnName='Glass Visible Transmittance'";
+              ss << "SELECT Value FROM tabulardatawithstrings WHERE ReportName='EnvelopeSummary' AND ReportForString='Entire Facility' AND TableName='Exterior Fenestration' AND RowName='";
+              ss << to_upper_copy(*surfaceName) << "' AND ColumnName='Glass Visible Transmittance'";
               query = ss.str();
               outputResult = sqlFile->execAndReturnFirstDouble(query);
-            }else{
-              query = "SELECT RowId FROM tabulardatawithstrings WHERE ReportName='EnvelopeSummary' AND ReportForString='Entire Facility' AND TableName='Interior Fenestration' AND ColumnName='Construction' AND Value='" + to_upper_copy(*constructionName) + "'";
-              rowId = sqlFile->execAndReturnFirstInt(query);
-              if (rowId) {
-                std::stringstream ss;
-                ss << "SELECT Value FROM tabulardatawithstrings WHERE ReportName='EnvelopeSummary' AND ReportForString='Entire Facility' AND TableName='Interior Fenestration' AND RowId='";
-                ss << *rowId << "' AND ColumnName='Glass Visible Transmittance'";
-                query = ss.str();
-                outputResult = sqlFile->execAndReturnFirstDouble(query);
-              }
             }
 
+            if (!outputResult){
+              std::stringstream ss;
+              ss << "SELECT Value FROM tabulardatawithstrings WHERE ReportName='EnvelopeSummary' AND ReportForString='Entire Facility' AND TableName='Interior Fenestration' AND RowName='";
+              ss << to_upper_copy(*surfaceName) << "' AND ColumnName='Glass Visible Transmittance'";
+              query = ss.str();
+              outputResult = sqlFile->execAndReturnFirstDouble(query);
+            }
           }
         }
 
@@ -511,20 +525,24 @@ namespace model {
         Transformation faceTransformationInverse = faceTransformation.inverse();
 
         std::vector<Point3d> faceVertices = faceTransformationInverse*this->vertices();
+        std::reverse(faceVertices.begin(), faceVertices.end());
 
         std::vector<std::vector<Point3d> > faceHoles;
         for (const ModelObject& child : this->children()){
           OptionalPlanarSurface surface = child.optionalCast<PlanarSurface>();
           if (surface){
             if (surface->subtractFromGrossArea()){
-              faceHoles.push_back(faceTransformationInverse*surface->vertices());
+              std::vector<Point3d> holeVertices = faceTransformationInverse*surface->vertices();
+              std::reverse(holeVertices.begin(), holeVertices.end());
+              faceHoles.push_back(holeVertices);
             }
           }
         }
 
         std::vector<std::vector<Point3d> > faceTriangulation = computeTriangulation(faceVertices, faceHoles);
 
-        for (const std::vector<Point3d>& faceTriangle : faceTriangulation){
+        for (std::vector<Point3d> faceTriangle : faceTriangulation){
+          std::reverse(faceTriangle.begin(), faceTriangle.end());
           m_cachedTriangulation.push_back(faceTransformation*faceTriangle);
         }
       }
@@ -538,6 +556,34 @@ namespace model {
       return *result;
     }
 
+    std::vector<ModelObject> PlanarSurface_Impl::solarCollectors() const
+    {
+      std::vector<ModelObject> result;
+      for (const ModelObject& modelObject : getObject<ModelObject>().getModelObjectSources<ModelObject>()){
+        switch (modelObject.iddObject().type().value()){
+        case IddObjectType::OS_SolarCollector_FlatPlate_PhotovoltaicThermal: // fall through
+        case IddObjectType::OS_SolarCollector_FlatPlate_Water: // fall through
+        case IddObjectType::OS_SolarCollector_IntegralCollectorStorage: // fall through
+          result.push_back(modelObject);
+          break;
+        default:
+          break;
+        }
+        
+      }
+      return result;
+    }
+
+    std::vector<GeneratorPhotovoltaic> PlanarSurface_Impl::generatorPhotovoltaics() const
+    {
+      return getObject<ModelObject>().getModelObjectSources<GeneratorPhotovoltaic>();
+    }
+
+    std::vector<SurfacePropertyConvectionCoefficients> PlanarSurface_Impl::surfacePropertyConvectionCoefficients() const
+    {
+      return getObject<ModelObject>().getModelObjectSources<SurfacePropertyConvectionCoefficients>();
+    }
+    
     boost::optional<ModelObject> PlanarSurface_Impl::constructionAsModelObject() const
     {
       return static_cast<boost::optional<ModelObject> >(this->construction());
@@ -762,6 +808,21 @@ std::vector<std::vector<Point3d> > PlanarSurface::triangulation() const
 Point3d PlanarSurface::centroid() const
 {
   return getImpl<detail::PlanarSurface_Impl>()->centroid();
+}
+
+std::vector<ModelObject> PlanarSurface::solarCollectors() const
+{
+  return getImpl<detail::PlanarSurface_Impl>()->solarCollectors();
+}
+
+std::vector<GeneratorPhotovoltaic> PlanarSurface::generatorPhotovoltaics() const
+{
+  return getImpl<detail::PlanarSurface_Impl>()->generatorPhotovoltaics();
+}
+
+std::vector<SurfacePropertyConvectionCoefficients> PlanarSurface::surfacePropertyConvectionCoefficients() const
+{
+  return getImpl<detail::PlanarSurface_Impl>()->surfacePropertyConvectionCoefficients();
 }
 
 std::vector<PlanarSurface> PlanarSurface::findPlanarSurfaces(const std::vector<PlanarSurface>& planarSurfaces,

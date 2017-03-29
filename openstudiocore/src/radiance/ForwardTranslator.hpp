@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef RADIANCE_FORWARDTRANSLATOR_HPP
 #define RADIANCE_FORWARDTRANSLATOR_HPP
@@ -40,6 +49,10 @@
 #include "../utilities/core/StringStreamLogSink.hpp"
 
 namespace openstudio {
+
+  class RemoteBCL;
+  class LocalBCL;
+
 namespace radiance {
 
   /* Translates OpenStudio Building Model to Radiance simulation input.
@@ -113,8 +126,13 @@ namespace radiance {
 
       // create materials library for model, shared for all Spaces
       std::set<std::string> m_radMaterials;
+      std::set<std::string> m_radMixMaterials;
       std::set<std::string> m_radMaterialsDC;
-
+      std::set<std::string> m_radMaterialsWG0;
+			std::set<std::string> m_radMaterialsSwitchableBase;
+			
+			std::string switchableGroup_wgMats;
+			
       // materials list for rtcontrib
       std::set<std::string> m_radDCmats;
 
@@ -124,14 +142,21 @@ namespace radiance {
       // create space geometry, hashes of space name to file contents
       std::map<std::string, std::string> m_radSpaces;
       std::map<std::string, std::string> m_radSensors;
+      std::map<std::string, std::string> m_radSensorViews;
       std::map<std::string, std::string> m_radGlareSensors;
+      std::map<std::string, std::string> m_radGlareSensorViewsVTA;
+      std::map<std::string, std::string> m_radGlareSensorViewsVTV;
       std::map<std::string, std::string> m_radMaps;
       std::map<std::string, openstudio::Handle> m_radMapHandles;
       std::map<std::string, std::string> m_radViewPoints;
-      std::map<std::string, std::string> m_radWindowGroups; 
+      std::map<std::string, std::string> m_radWindowGroups;
+      std::map<std::string, std::string> m_radWindowGroupShades;
+      int m_windowGroupId;
+      std::string shadeBSDF;
 
       // get window group
-      WindowGroup getWindowGroup(double azimuth, const model::Space& space, const model::ConstructionBase& construction, 
+      WindowGroup getWindowGroup(const openstudio::Vector3d& outwardNormal, const model::Space& space, 
+                                 const model::ConstructionBase& construction, 
                                  const boost::optional<model::ShadingControl>& shadingControl,
                                  const openstudio::Point3dVector& polygon);
       std::vector<WindowGroup> m_windowGroups;
@@ -147,16 +172,25 @@ namespace radiance {
       void buildingSpaces(const openstudio::path &t_radDir, 
           const std::vector<openstudio::model::Space> &t_spaces,
           std::vector<openstudio::path> &t_outpaths);
-    
+
+    // get a bsdf possibly from the BCL
+    boost::optional<openstudio::path> getBSDF(double vlt, double vltSpecular, const std::string& shadeType);
+    boost::optional<std::string> getBSDF(openstudio::LocalBCL& bcl, double vlt, double vltSpecular, const std::string& shadeType, const std::string& searchTerm, unsigned tid);
+    boost::optional<std::string> getBSDF(openstudio::RemoteBCL& bcl, double vlt, double vltSpecular, const std::string& shadeType, const std::string& searchTerm, unsigned tid);
+
+
     StringStreamLogSink m_logSink;
 
     REGISTER_LOGGER("openstudio.radiance.ForwardTranslator");
 
   };
 
-  std::string formatString(double t_d, unsigned t_prec = 15);
+  RADIANCE_API std::string formatString(double t_d, unsigned t_prec = 15);
 
-  std::string cleanName(const std::string& name);
+  RADIANCE_API std::string cleanName(const std::string& name);
+
+  // simplify model for initial E+ run to calculate window parameters, new model is returned, input model is not changed
+  RADIANCE_API openstudio::model::Model modelToRadPreProcess(const openstudio::model::Model & model);
 
 } // radiance
 } // openstudio

@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include "QuantityConverter.hpp"
 #include "Quantity.hpp"
@@ -133,6 +142,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::SI, "sr", "sr", 1.0, 0 },
     { UnitSystem::SI, "people", "people", 1.0, 0 },
     { UnitSystem::SI, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::SI, "$", "$", 1.0, 0 },
     { UnitSystem::IP, "lb_m", "kg", .45359237, 0 },
     { UnitSystem::IP, "ft", "m", 0.3048, 0 },
     { UnitSystem::IP, "R", "K", 0.55555555555555556, 0 },
@@ -179,6 +189,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::IP, "sr", "sr", 1.0, 0 },
     { UnitSystem::IP, "people", "people", 1.0, 0 },
     { UnitSystem::IP, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::IP, "$", "$", 1.0, 0 },
     { UnitSystem::BTU, "kg", "Btu*h^2/ft^2", 6.79437437047e-12, 0 },
     { UnitSystem::BTU, "m", "ft", 3.28083989501, 0 },
     { UnitSystem::BTU, "s", "h", 2.77777777777778e-4, 0 },
@@ -190,6 +201,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::BTU, "sr", "sr", 1.0, 0 },
     { UnitSystem::BTU, "people", "people", 1.0, 0 },
     { UnitSystem::BTU, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::BTU, "$", "$", 1.0, 0 },
     { UnitSystem::CFM, "kg", "ton*min^3/ft^2", 1.22298738668e-10, 0 },
     { UnitSystem::CFM, "m", "ft", 3.28083989501, 0 },
     { UnitSystem::CFM, "s", "min", 0.0166666666666667, 0 },
@@ -201,6 +213,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::CFM, "sr", "sr", 1.0, 0 },
     { UnitSystem::CFM, "people", "people", 1.0, 0 },
     { UnitSystem::CFM, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::CFM, "$", "$", 1.0, 0 },
     { UnitSystem::GPD, "kg", "inH_{2}O*crgal*day^2", 3.45075198328e-12, 0 },
     { UnitSystem::GPD, "m", "crgal", 6.41646195293, 0 },
     { UnitSystem::GPD, "s", "day", 1.157407407407e-5, 0 },
@@ -212,6 +225,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::GPD, "sr", "sr", 1.0, 0 },
     { UnitSystem::GPD, "people", "people", 1.0, 0 },
     { UnitSystem::GPD, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::GPD, "$", "$", 1.0, 0 },
     { UnitSystem::MPH, "kg", "inHg*mi*h^2", 1.41582434758e-14, 0 },
     { UnitSystem::MPH, "m", "mi", 6.21371192237e-4, 0 },
     { UnitSystem::MPH, "s", "h", 2.77777777777778e-4, 0 },
@@ -223,6 +237,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::MPH, "sr", "sr", 1.0, 0 },
     { UnitSystem::MPH, "people", "people", 1.0, 0 },
     { UnitSystem::MPH, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::MPH, "$", "$", 1.0, 0 },
     { UnitSystem::Wh, "kg", "W*h^3/m^2", 2.1433470507544582e-11, 0 },
     { UnitSystem::Wh, "m", "m", 1.0, 0 },
     { UnitSystem::Wh, "s", "h", 2.77777777777778e-4, 0 },
@@ -234,6 +249,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::Wh, "sr", "sr", 1.0, 0 },
     { UnitSystem::Wh, "people", "people", 1.0, 0 },
     { UnitSystem::Wh, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::Wh, "$", "$", 1.0, 0 },
     { UnitSystem::Therm, "kg", "therm*h^2/ft^2", 6.79437437047e-17, 0 },
     { UnitSystem::Therm, "m", "ft", 3.28083989501, 0 },
     { UnitSystem::Therm, "s", "h", 2.77777777777778e-4, 0 },
@@ -245,6 +261,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::Therm, "sr", "sr", 1.0, 0 },
     { UnitSystem::Therm, "people", "people", 1.0, 0 },
     { UnitSystem::Therm, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::Therm, "$", "$", 1.0, 0 },
     { UnitSystem::Misc1, "kg", "ftH_{2}O*crL*day^2", 4.48163906187e-13, 0 },
     { UnitSystem::Misc1, "m", "crL", 10.0, 0 },
     { UnitSystem::Misc1, "s", "day", 1.157407407407e-5, 0 },
@@ -256,6 +273,7 @@ QuantityConverterSingleton::QuantityConverterSingleton()
     { UnitSystem::Misc1, "sr", "sr", 1.0, 0 },
     { UnitSystem::Misc1, "people", "people", 1.0, 0 },
     { UnitSystem::Misc1, "cycle", "cycle", 1.0, 0 },
+    { UnitSystem::Misc1, "$", "$", 1.0, 0 },
     { UnitSystem::Celsius, "K", "C", 1.0, -273.15 },
     { UnitSystem::Fahrenheit, "K", "F", 1.8, -459.67 },
     { UnitSystem::Mixed, "", "", 0, 0 }
@@ -341,7 +359,7 @@ boost::optional<Quantity> QuantityConverterSingleton::m_convertToSI(const Quanti
 }
 
 Quantity QuantityConverterSingleton::m_convertFromSI(const Quantity &original,
-                                                     const UnitSystem targetSys) const
+                                                     const UnitSystem &targetSys) const
 {
   Quantity working(original);
 

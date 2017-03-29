@@ -1,207 +1,39 @@
-/**********************************************************************
- *  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
- *  All rights reserved.
- *  
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *  
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
- *  
- *  You should have received a copy of the GNU Lesser General Public
- *  License along with this library; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- **********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #ifndef OPENSTUDIO_SPACETYPEINSPECTORVIEW_HPP
 #define OPENSTUDIO_SPACETYPEINSPECTORVIEW_HPP
 
 #include "ModelObjectInspectorView.hpp"
-#include "ModelObjectVectorController.hpp"
-
-#include "../model/SpaceType.hpp"
-
-class QLabel;
-class QPushButton;
-class QColor;
-class QComboBox;
 
 namespace openstudio {
 
-class OSDropZone;
-class OSLineEdit;
-class OSQuantityEdit;
-class SpaceLoadInstancesWidget;
-class RenderingColorWidget;
-
-class SpaceTypeDefaultConstructionSetVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeDefaultConstructionSetVectorController() {}
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onRemoveItem(OSItem* item);
-
-  virtual void onReplaceItem(OSItem * currentItem, const OSItemId& replacementItemId);
-
-  virtual void onDrop(const OSItemId& itemId);
-};
-
-class SpaceTypeDefaultScheduleSetVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeDefaultScheduleSetVectorController() {}
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onRemoveItem(OSItem* item);
-
-  virtual void onReplaceItem(OSItem * currentItem, const OSItemId& replacementItemId);
-
-  virtual void onDrop(const OSItemId& itemId);
-};
-
-class SpaceTypeDesignSpecificationOutdoorAirVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeDesignSpecificationOutdoorAirVectorController() {}
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onRemoveItem(OSItem* item);
-
-  virtual void onReplaceItem(OSItem * currentItem, const OSItemId& replacementItemId);
-
-  virtual void onDrop(const OSItemId& itemId);
-
-  virtual void onMakeNewItem();
-};
-
-class SpaceTypeSpaceInfiltrationDesignFlowRateVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeSpaceInfiltrationDesignFlowRateVectorController() {}
-
-  virtual void attach(const model::ModelObject& modelObject);
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onObjectAdded(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-  
-  virtual void onObjectRemoved(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-  
-  virtual void onRemoveItem(OSItem* item);
-
-  virtual void onDrop(const OSItemId& itemId);
-
-  virtual void onMakeNewItem();
-};
-
-class SpaceTypeSpaceInfiltrationEffectiveLeakageAreaVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeSpaceInfiltrationEffectiveLeakageAreaVectorController() {}
-
-  virtual void attach(const model::ModelObject& modelObject);
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onObjectAdded(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-  
-  virtual void onObjectRemoved(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-  
-  virtual void onRemoveItem(OSItem* item);
-
-  virtual void onDrop(const OSItemId& itemId);
-
-  virtual void onMakeNewItem();
-};
-
-class SpaceTypeSpacesVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeSpacesVectorController() {}
-
-  virtual void attach(const model::ModelObject& modelObject);
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onObjectAdded(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-  
-  virtual void onObjectRemoved(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-  
-  virtual void onRemoveItem(OSItem* item);
-
-  virtual void onDrop(const OSItemId& itemId);
-};
-
-class SpaceTypeUnassignedSpacesVectorController : public ModelObjectVectorController
-{
-  Q_OBJECT
-
-public:
-
-  virtual ~SpaceTypeUnassignedSpacesVectorController() {}
-
-  virtual void attachModel(const model::Model& model);
-
-protected:
-
-  virtual void onChangeRelationship(const model::ModelObject& modelObject, int index, Handle newHandle, Handle oldHandle);
-
-  virtual std::vector<OSItemId> makeVector();
-
-  virtual void onObjectAdded(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-
-  virtual void onObjectRemoved(const openstudio::model::ModelObject& modelObject, const openstudio::IddObjectType& iddObjectType, const openstudio::UUID& handle);
-};
+class SpaceTypesGridView;
 
 class SpaceTypeInspectorView : public ModelObjectInspectorView
 {
@@ -209,59 +41,33 @@ class SpaceTypeInspectorView : public ModelObjectInspectorView
 
   public:
 
-    SpaceTypeInspectorView(const openstudio::model::Model& model, QWidget * parent = 0 );
+    SpaceTypeInspectorView(bool isIP, const openstudio::model::Model& model, QWidget * parent = nullptr );
 
     virtual ~SpaceTypeInspectorView() {}
 
+    virtual bool supportsMultipleObjectSelection() const override { return true; }
+    virtual std::vector<model::ModelObject> selectedObjects() const override;
+
   protected:
 
-    virtual void onClearSelection();
+    virtual void onClearSelection() override;
 
-    virtual void onSelectModelObject(const openstudio::model::ModelObject& modelObject);
+    virtual void onSelectModelObject(const openstudio::model::ModelObject& modelObject) override;
 
-    virtual void onUpdate();
-
-  protected slots:
-
-    void editStandardsBuildingType(const QString & text);
-    void standardsBuildingTypeChanged(const QString & text);
-
-    void editStandardsSpaceType(const QString & text);
-    void standardsSpaceTypeChanged(const QString & text);
+    virtual void onUpdate() override;
 
   private:
 
-    void attach(openstudio::model::SpaceType& spaceType);
+    void refresh();
 
-    void detach();
+    bool m_isIP;
+    SpaceTypesGridView *m_gridView;
 
-    void populateStandardsBuildingTypes();
+  public slots:
 
-    void populateStandardsSpaceTypes();
-
-    boost::optional<openstudio::model::SpaceType> m_spaceType;
-
-    OSLineEdit* m_nameEdit;
-    SpaceTypeDefaultConstructionSetVectorController* m_defaultConstructionSetVectorController;
-    OSDropZone* m_defaultConstructionSetDropZone;
-    SpaceTypeDefaultScheduleSetVectorController* m_defaultScheduleSetVectorController;
-    OSDropZone* m_defaultScheduleSetDropZone;
-    RenderingColorWidget* m_renderingColorWidget;
-    QComboBox* m_standardsBuildingTypeComboBox;
-    QComboBox* m_standardsSpaceTypeComboBox;
-    SpaceTypeDesignSpecificationOutdoorAirVectorController* m_designSpecificationOutdoorAirVectorController;
-    OSDropZone* m_designSpecificationOutdoorAirDropZone;
-    SpaceTypeSpaceInfiltrationDesignFlowRateVectorController* m_spaceInfiltrationDesignFlowRateVectorController;
-    OSDropZone* m_spaceInfiltrationDesignFlowRateDropZone;
-    SpaceTypeSpaceInfiltrationEffectiveLeakageAreaVectorController* m_spaceInfiltrationEffectiveLeakageAreaVectorController;
-    OSDropZone* m_spaceInfiltrationEffectiveLeakageAreaDropZone;
-    //SpaceTypeSpacesVectorController* m_spacesVectorController;
-    //OSDropZone* m_spacesDropZone;
-    SpaceLoadInstancesWidget* m_spaceLoadInstancesWidget;
+    void toggleUnits(bool displayIP) override;
 };
-
 
 } // openstudio
 
 #endif // OPENSTUDIO_SPACETYPEINSPECTORVIEW_HPP
-

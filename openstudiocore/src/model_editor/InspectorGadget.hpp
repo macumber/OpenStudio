@@ -1,35 +1,51 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.  
-*  All rights reserved.
-*  
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*  
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*  
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
+
 #ifndef MODELEDITOR_INSPECTORGADGET_HPP
 #define MODELEDITOR_INSPECTORGADGET_HPP
 
-#include <QWidget>
 #include <QComboBox>
 #include <QEvent>
+#include <QWidget>
+
 #include "../model/AccessPolicyStore.hpp"
 #include "../model/ModelObject.hpp"
+
 #include "ModelEditorAPI.hpp"
+
+#include <nano/nano_signal_slot.hpp> // Signal-Slot replacement
+
 #include "../utilities/idd/IddField.hpp"
 #include "../utilities/idf/Workspace.hpp"
 #include "../utilities/idf/Workspace_Impl.hpp"
 #include "../utilities/idf/WorkspaceObject.hpp"
 #include "../utilities/idf/WorkspaceObject_Impl.hpp"
+
 #include <string>
 
 class QDoubleSpinBox;
@@ -41,20 +57,13 @@ class QVBoxLayout;
 
 class ComboHighlightBridge;
 
-class IGWidget : public QWidget
+class MODELEDITOR_API IGWidget : public QWidget, public Nano::Observer
 {
   public:
   
-  IGWidget( QWidget * parent = nullptr )
-    : QWidget(parent)
-  {
-    setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Preferred);
-  }
+  IGWidget(QWidget * parent = nullptr);
 
-  QSize sizeHint() const 
-  {
-    return QSize(200,QWidget::sizeHint().height());
-  }
+  QSize sizeHint() const override;
 };
 
 class IGComboBox : public QComboBox
@@ -68,7 +77,7 @@ class IGComboBox : public QComboBox
 
   protected:
 
-  bool event ( QEvent * e )
+  bool event ( QEvent * e ) override
   {
     if( e->type() == QEvent::Wheel )
     {
@@ -92,7 +101,7 @@ class IGComboBox : public QComboBox
  * Choice is displayed as a ComboBox
  *
  */
-class MODELEDITOR_API InspectorGadget : public QWidget
+class MODELEDITOR_API InspectorGadget : public QWidget, public Nano::Observer
 {
 
   Q_OBJECT
@@ -126,10 +135,11 @@ public:
 
   /*! \brief lays out the WorkspaceObj
    *
-   * \param modelObj the modelObj to layout
+   * \param workObj the current workspace
    * \param force forces a layout even if we just laid out this modelObj
-   * \param if true, delete the children and rebuild them
+   * \param recursive if true, delete the children and rebuild them
    * \param locked set all the FREE items to LOCKED
+   * \param hideChildren shows or hides the children
    *
    * This call lays out a model. It will ask the Model for its AttributeVector and use that
    * to decide what to display. If the ModelObject is a ParentChildObejct, then this
@@ -139,7 +149,7 @@ public:
    * Calling this method a 2nd time will delete everything that was previously built and
    * regenerate the QWidgets.
    *
-   * Recursive only effects anything if you are sending in the same modelObj, if you pick a different one, the
+   * Recursive only effects anything if you are sending in the same workObj, if you pick a different one, the
    * children are ALWAYS deleted and rebuilt. (because they are different children!)
    *
    * If you are calling this from a place where the user should not be allowed to edit the fields, set the lock
@@ -165,6 +175,8 @@ public:
   void setPrecision( unsigned int prec, FLOAT_DISPLAY dispType );
 
   void setUnitSystem(const UNIT_SYSTEM unitSystem);
+
+  void removeWorkspaceObject(const openstudio::Handle &); // Middleman nano slot to emit QT signal to simulate signal chaining
 
 public slots:
 
@@ -216,6 +228,7 @@ public slots:
   void setPrec();
 
   void addExtensible();
+
   void removeExtensible();
   /*!
    * Create all fields in the IDD. IDFObjects can be instantiated with some
@@ -229,6 +242,7 @@ public slots:
   void setRecursive( bool recursive);
 
  signals:
+
   void nameChanged(QString);
 
   void toggleUnitsClicked(bool);
@@ -240,24 +254,28 @@ public slots:
    */
   void dirty();
 
+  void workspaceObjectRemoved(const openstudio::Handle &);
+  
+
 protected slots:
 
   void onWorkspaceObjectChanged();
 
   void onTimeout();
 
-  void onWorkspaceObjectRemoved();
+  void onWorkspaceObjectRemoved(const openstudio::Handle &);
 
 protected:
 
 /*! \brief constructor
-    \param parent the owner of all the stuff we just made.
-    \param model the model to get data from
+    \param workspaceObj the current workspace
     \param indent indentation for the child frame
     \param bridge pass in a bridge here if you need signals to get out of the IG (or the IG's children)
     \param precision sets the number of sigfigs to display
     \param style sets the style of floating point display
     \param showComments show or hide idf comment field
+    \param showAllFields show or hide all fields
+    \param recursive recursively create and show fields
     \param locked if true, lock all fields the ACCESS_POLICY sets to FREE
     If model has children, those children will get their own InspectorGadget, indent
     will be passed again to that constructor so the frames will nest.
@@ -274,6 +292,7 @@ protected:
   /*!
     \param layout the layout to attach the items to
     \param parent the widget that owns all the items that will be created.
+    \param hideChildren show or hide children (hidden by default)
     
     
     This function is a big loop over the attributes or fields*, it does the core of the work for 
@@ -370,9 +389,9 @@ protected:
 
   void disconnectWorkspaceObjectSignals() const;
 
-  private:
+private:
 
-    void connectSignalsAndSlots();
+  void connectSignalsAndSlots();
 };
 
 #endif // MODELEDITOR_INSPECTORGADGET_HPP

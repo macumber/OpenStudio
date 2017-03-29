@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 
@@ -27,10 +36,10 @@
 #include "../../data/DataEnums.hpp"
 #include "../../data/TimeSeries.hpp"
 #include "../../filetypes/EpwFile.hpp"
-#include "../../plot/AnnotatedTimeline.hpp"
-#include "../../plot/FloodPlot.hpp"
-#include "../../plot/LinePlot.hpp"
 #include "../../units/UnitFactory.hpp"
+#include "../../core/Application.hpp"
+
+#include <QRegularExpression>
 
 #include <resources.hxx>
 
@@ -155,29 +164,7 @@ TEST_F(SqlFileFixture, TimeSeriesCount)
   EXPECT_FALSE(ts);
 }
 
-TEST_F(SqlFileFixture, AnnotatedTimeline)
-{
-  std::vector<std::string> availableEnvPeriods = sqlFile.availableEnvPeriods();
-  ASSERT_FALSE(availableEnvPeriods.empty());
-
-  // make a timeline
-  openstudio::AnnotatedTimeline annotatedTimeline;
-
-  // populate it
-  openstudio::OptionalTimeSeries ts = sqlFile.timeSeries(availableEnvPeriods[0], "Hourly", "Electricity:Facility",  "");
-  ASSERT_TRUE(ts);
-  annotatedTimeline.addTimeSeries("Electricity:Facility", *ts);
-
-  ts = sqlFile.timeSeries(availableEnvPeriods[0], "Hourly", "Gas:Facility",  "");
-  ASSERT_TRUE(ts);
-  annotatedTimeline.addTimeSeries("Gas:Facility", *ts);
-
-  // save it
-  annotatedTimeline.save(toPath("Building.html"));
-  EXPECT_TRUE(true);
-}
-
-TEST_F(SqlFileFixture, FloodPlot)
+TEST_F(SqlFileFixture, TimeSeries)
 {
   std::vector<std::string> availableEnvPeriods = sqlFile.availableEnvPeriods();
   ASSERT_FALSE(availableEnvPeriods.empty());
@@ -190,29 +177,6 @@ TEST_F(SqlFileFixture, FloodPlot)
 //  Time duration = ts->dateTimes().back() - ts->dateTimes().front();
   Time duration = ts->firstReportDateTime() + Time(ts->daysFromFirstReport(ts->daysFromFirstReport().size()-1)) - ts->firstReportDateTime();
   EXPECT_DOUBLE_EQ(365-1.0/24.0, duration.totalDays());
-
-  // plot it
-  FloodPlot::Ptr fp = FloodPlot::create();
-  fp->timeseriesData(*ts);
-  fp->generateImage(toPath("testFP.png"));
-  EXPECT_TRUE(true);
-}
-
-
-TEST_F(SqlFileFixture, LinePlot)
-{
-  std::vector<std::string> availableEnvPeriods = sqlFile.availableEnvPeriods();
-  ASSERT_FALSE(availableEnvPeriods.empty());
-
-  // make a timeseries
-  openstudio::OptionalTimeSeries ts = sqlFile.timeSeries(availableEnvPeriods[0], "Hourly", "Electricity:Facility",  "");
-  ASSERT_TRUE(ts);
-
-  // plot it
-  LinePlot::Ptr lp = LinePlot::create();
-  lp->timeseriesData(*ts, "Electricity:Facility");
-  lp->generateImage(toPath("testLP.png"));
-  EXPECT_TRUE(true);
 }
 
 TEST_F(SqlFileFixture, BadStatement)
@@ -224,9 +188,9 @@ TEST_F(SqlFileFixture, BadStatement)
 TEST_F(SqlFileFixture, CreateSqlFile)
 {
   openstudio::path outfile = openstudio::tempDir() / openstudio::toPath("OpenStudioSqlFileTest.sql");
-  if (boost::filesystem::exists(outfile))
+  if (openstudio::filesystem::exists(outfile))
   {
-    boost::filesystem::remove(outfile);
+    openstudio::filesystem::remove(outfile);
   }
 
   openstudio::Calendar c(2012);
@@ -243,7 +207,7 @@ TEST_F(SqlFileFixture, CreateSqlFile)
 
   {
     openstudio::SqlFile sql(outfile,
-        openstudio::EpwFile(resourcesPath() / toPath("runmanager/USA_CO_Golden-NREL.724666_TMY3.epw")),
+        openstudio::EpwFile(resourcesPath() / toPath("utilities/Filetypes/USA_CO_Golden-NREL.724666_TMY3.epw")),
         openstudio::DateTime::now(),
         c);
 
@@ -330,4 +294,206 @@ TEST_F(SqlFileFixture, CreateSqlFile)
     EXPECT_EQ(openstudio::toStandardVector(ts->daysFromFirstReport()), openstudio::toStandardVector(timeSeries.daysFromFirstReport()));
   }
 
+}
+
+TEST_F(SqlFileFixture, AnnualTotalCosts) {
+  
+  // Total annual costs for all fuel types
+  EXPECT_NEAR(205284016.81, *(sqlFile2.annualTotalUtilityCost()), 0.1);
+
+  // Costs by fuel type
+  EXPECT_NEAR(28423.6, *(sqlFile2.annualTotalCost(FuelType::Electricity)), 0.1);
+  EXPECT_NEAR(427.75, *(sqlFile2.annualTotalCost(FuelType::Gas)), 0.1);
+  EXPECT_NEAR(331.01, *(sqlFile2.annualTotalCost(FuelType::DistrictCooling)), 0.1);
+  EXPECT_NEAR(833.54, *(sqlFile2.annualTotalCost(FuelType::DistrictHeating)), 0.1);
+  EXPECT_NEAR(0.91, *(sqlFile2.annualTotalCost(FuelType::Water)), 0.1);
+  EXPECT_NEAR(205254000, *(sqlFile2.annualTotalCost(FuelType::FuelOil_1)), 100);
+
+  // Costs by total building area by fuel type
+  EXPECT_NEAR(11.84, *(sqlFile2.annualTotalCostPerBldgArea(FuelType::Electricity)), 0.1);
+  EXPECT_NEAR(0.18, *(sqlFile2.annualTotalCostPerBldgArea(FuelType::Gas)), 0.1);
+
+  // Costs by conditioned building area by fuel type
+  EXPECT_NEAR(11.84, *(sqlFile2.annualTotalCostPerNetConditionedBldgArea(FuelType::Electricity)), 0.1);
+  EXPECT_NEAR(0.18, *(sqlFile2.annualTotalCostPerNetConditionedBldgArea(FuelType::Gas)), 0.1);
+
+}
+
+void regressionTestSqlFile(const std::string& name, double netSiteEnergy, double firstVal, double lastVal)
+{
+  openstudio::path fromPath = resourcesPath() / toPath("utilities/SqlFile") / toPath(name);
+  openstudio::path path = toPath(name);
+
+  if (openstudio::filesystem::exists(path)){
+    openstudio::filesystem::remove(path);
+  }
+  ASSERT_FALSE(openstudio::filesystem::exists(path));
+  ASSERT_TRUE(openstudio::filesystem::exists(fromPath)) << toString(fromPath);
+  openstudio::filesystem::copy(fromPath, path);
+  ASSERT_TRUE(openstudio::filesystem::exists(path));
+
+  boost::optional<SqlFile> sqlFile;
+  EXPECT_NO_THROW(sqlFile = SqlFile(path));
+  ASSERT_TRUE(sqlFile);
+
+  QRegularExpression re("1ZoneEvapCooler-V(.*)\\.sql");
+  QRegularExpressionMatch match = re.match(toQString(name));
+  ASSERT_TRUE(match.hasMatch());
+  VersionString expected(toString(match.captured(1)));
+  VersionString actual(sqlFile->energyPlusVersion());
+  EXPECT_EQ(expected.major(), actual.major());
+  EXPECT_EQ(expected.minor(), actual.minor());
+  EXPECT_EQ(expected.patch(), actual.patch());
+ 
+  ASSERT_TRUE(sqlFile->hoursSimulated());
+  EXPECT_EQ(8760.0, sqlFile->hoursSimulated().get()) << name;
+  ASSERT_TRUE(sqlFile->netSiteEnergy());
+  EXPECT_NEAR(netSiteEnergy, sqlFile->netSiteEnergy().get(), 0.1) << name;
+
+  std::vector<std::string> availableEnvPeriods = sqlFile->availableEnvPeriods();
+  ASSERT_FALSE(availableEnvPeriods.empty());
+  EXPECT_EQ(static_cast<unsigned>(3), availableEnvPeriods.size());
+
+  { // Detailed
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "Detailed", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "HVAC System Timestep", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "HVAC System Timestep", "Zone Mean Air Temperature", "MAIN ZONE");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Detailed", "Zone Mean Air Temperature", "MAIN ZONE");
+    ASSERT_TRUE(ts);
+
+    unsigned N = ts->daysFromFirstReport().size();
+
+    ASSERT_GT(N, 0u);
+    ASSERT_EQ(N, ts->values().size());
+    EXPECT_GE(N, 8760u*6u);
+    // DLM: can't expect these to always be at timestep
+    //EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(0, 0, 10, 0)), ts->firstReportDateTime());
+    //EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(0, 0, 10, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[0]);
+    // DLM: some sort of rounding error is occurring here
+    //EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(0, 23, 59, 59)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+  }
+ 
+  { // Timestep
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "Timestep", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Zone Timestep", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Zone Timestep", "Zone Mean Air Temperature", "MAIN ZONE");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Timestep", "Zone Mean Air Temperature", "MAIN ZONE");
+    ASSERT_TRUE(ts);
+
+    unsigned N = ts->daysFromFirstReport().size();
+
+    ASSERT_GT(N, 0u);
+    ASSERT_EQ(N, ts->values().size());
+    EXPECT_EQ(N, 8760u * 6u);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(0, 0, 10, 0)), ts->firstReportDateTime());
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(0, 0, 10, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[0]);
+    // DLM: some sort of rounding error is occurring here
+    //EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(0, 23, 59, 59)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+  }
+
+  { // Hourly
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "Hourly", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Hourly", "Zone Mean Air Temperature", "MAIN ZONE");
+    ASSERT_TRUE(ts);
+
+    unsigned N = ts->daysFromFirstReport().size();
+
+    ASSERT_GT(N, 0u);
+    ASSERT_EQ(N, ts->values().size());
+    EXPECT_EQ(N, 8760u);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(0, 1, 0, 0)), ts->firstReportDateTime());
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(0, 1, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[0]);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+    EXPECT_DOUBLE_EQ(firstVal, ts->values()[0]) << name;
+    EXPECT_DOUBLE_EQ(lastVal, ts->values()[N-1]) << name;
+  }
+
+  { // Daily
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "Daily", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Daily", "Zone Mean Air Temperature", "MAIN ZONE");
+    ASSERT_TRUE(ts);
+
+    unsigned N = ts->daysFromFirstReport().size();
+
+    ASSERT_GT(N, 0u);
+    ASSERT_EQ(N, ts->values().size());
+    EXPECT_EQ(N, 365u);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(1, 0, 0, 0)), ts->firstReportDateTime());
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 1), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[0]);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+  }
+ 
+  { // Monthly
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "Monthly", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Monthly", "Zone Mean Air Temperature", "MAIN ZONE");
+    ASSERT_TRUE(ts);
+
+    unsigned N = ts->daysFromFirstReport().size();
+
+    ASSERT_GT(N, 0u);
+    ASSERT_EQ(N, ts->values().size());
+    EXPECT_EQ(N, 12u);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime());
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Jan, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[0]);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+  }
+  
+  { // RunPeriod - synonymous with Environment and Annual 
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "RunPeriod", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Run Period", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Run Period", "Zone Mean Air Temperature", "MAIN ZONE");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Environment", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Environment", "Zone Mean Air Temperature", "MAIN ZONE");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Annual", "Zone Mean Air Temperature", "Main Zone");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "Annual", "Zone Mean Air Temperature", "MAIN ZONE");
+    EXPECT_TRUE(ts);
+    ts = sqlFile->timeSeries(availableEnvPeriods[0], "RunPeriod", "Zone Mean Air Temperature", "MAIN ZONE");
+    ASSERT_TRUE(ts);
+
+    unsigned N = ts->daysFromFirstReport().size();
+
+    ASSERT_GT(N, 0u);
+    ASSERT_EQ(N, ts->values().size());
+    EXPECT_EQ(N, 1u);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime());
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[0]);
+    EXPECT_EQ(DateTime(Date(MonthOfYear::Dec, 31), Time(1, 0, 0, 0)), ts->firstReportDateTime() + ts->daysFromFirstReport()[N - 1]);
+  }
+
+  { // Bad key name
+    openstudio::OptionalTimeSeries ts = sqlFile->timeSeries(availableEnvPeriods[0], "Hourly", "Zone Mean Air Temperature", "Zone that does not exist");
+    EXPECT_FALSE(ts);
+  }
+}
+
+TEST_F(SqlFileFixture, Regressions) {
+  // these files were created by running the 1ZoneEvapCooler.idf example file 
+  // adding the Output:SQLite,SimpleAndTabular object as well as several output variables
+  // and using the USA_CO_Golden-NREL.724666_TMY3.epw weather file
+  
+  regressionTestSqlFile("1ZoneEvapCooler-V7-0-0.sql", 42.25, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V7-1-0.sql", 42.05, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V7-2-0.sql", 43.28, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V8-0-0.sql", 43.28, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V8-1-0.sql", 43.28, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V8-2-0.sql", 43.28, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V8-3-0.sql", 43.28, 20, 20);
+  regressionTestSqlFile("1ZoneEvapCooler-V8-4-0.sql", 43.28, 20, 20);
 }

@@ -1,21 +1,30 @@
-/**********************************************************************
-*  Copyright (c) 2008-2014, Alliance for Sustainable Energy.
-*  All rights reserved.
-*
-*  This library is free software; you can redistribute it and/or
-*  modify it under the terms of the GNU Lesser General Public
-*  License as published by the Free Software Foundation; either
-*  version 2.1 of the License, or (at your option) any later version.
-*
-*  This library is distributed in the hope that it will be useful,
-*  but WITHOUT ANY WARRANTY; without even the implied warranty of
-*  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-*  Lesser General Public License for more details.
-*
-*  You should have received a copy of the GNU Lesser General Public
-*  License along with this library; if not, write to the Free Software
-*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-**********************************************************************/
+/***********************************************************************************************************************
+ *  OpenStudio(R), Copyright (c) 2008-2017, Alliance for Sustainable Energy, LLC. All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided that the
+ *  following conditions are met:
+ *
+ *  (1) Redistributions of source code must retain the above copyright notice, this list of conditions and the following
+ *  disclaimer.
+ *
+ *  (2) Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the
+ *  following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  (3) Neither the name of the copyright holder nor the names of any contributors may be used to endorse or promote
+ *  products derived from this software without specific prior written permission from the respective party.
+ *
+ *  (4) Other than as required in clauses (1) and (2), distributions in any form of modifications or other derivative
+ *  works may not use the "OpenStudio" trademark, "OS", "os", or any other confusingly similar designation without
+ *  specific prior written permission from Alliance for Sustainable Energy, LLC.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+ *  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ *  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER, THE UNITED STATES GOVERNMENT, OR ANY CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ *  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ *  AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **********************************************************************************************************************/
 
 #include <gtest/gtest.h>
 #include "IddFixture.hpp"
@@ -25,16 +34,20 @@
 
 #include "../../time/Time.hpp"
 
+
 #include "../../core/String.hpp"
+#include "../../core/StringStreamLogSink.hpp"
 #include "../../core/Path.hpp"
 #include "../../core/Containers.hpp"
 #include "../../core/Compare.hpp"
 
+#include <OpenStudio.hxx>
 #include <resources.hxx>
 
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/fstream.hpp>
 
+
+#include <utilities/idd/IddEnums.hxx>
 
 #include <algorithm>
 
@@ -46,18 +59,36 @@ using namespace openstudio;
 void testIddFile(const IddFile& iddFile);
 
 // test idd file
-TEST_F(IddFixture, IddFile)
+TEST_F(IddFixture, EpIddFile)
 {
   // from factory
-  SCOPED_TRACE("IddFile");
+  SCOPED_TRACE("EpIddFile");
   testIddFile(epIddFile);
+
+  StringStreamLogSink ss;
+  ss.setLogLevel(Debug);
 
   // from file
   path iddPath = resourcesPath()/toPath("energyplus/ProposedEnergy+.idd");
-  boost::filesystem::ifstream inFile(iddPath); ASSERT_TRUE(inFile?true:false);
+  openstudio::filesystem::ifstream inFile(iddPath); ASSERT_TRUE(inFile?true:false);
   OptionalIddFile loadedIddFile = IddFile::load(inFile);
   ASSERT_TRUE(loadedIddFile); inFile.close();
-  EXPECT_EQ("8.1.0.009",loadedIddFile->version());
+
+  for (auto iddObject : loadedIddFile->objects()){
+    for (auto iddField : iddObject.nonextensibleFields()){
+      iddField.properties();
+    }
+    for (auto iddField : iddObject.extensibleGroup()){
+      iddField.properties();
+    }
+  }
+
+  EXPECT_EQ(0, ss.logMessages().size());
+  for (auto logMessage : ss.logMessages()){
+    EXPECT_EQ("", logMessage.logMessage());
+  }
+
+  EXPECT_EQ("8.7.0",loadedIddFile->version());
   EXPECT_EQ(epIddFile.objects().size(),loadedIddFile->objects().size());
   if (epIddFile.objects().size() != loadedIddFile->objects().size()) {
     // get sets of IddObjectType
@@ -103,6 +134,79 @@ TEST_F(IddFixture, IddFile)
   }
 
   testIddFile(*loadedIddFile);
+}
+
+// test idd file
+TEST_F(IddFixture, OSIddFile)
+{
+  // DLM: it is necessary to build openstudio_model_resources to update the OpenStudio.idd that this test works on
+  // I did not want to make utilities tests depend on openstudio_model_resources in cmake but that is an option
+
+  StringStreamLogSink ss;
+  ss.setLogLevel(Debug);
+
+  // from file
+  path iddPath = resourcesPath() / toPath("model/OpenStudio.idd");
+  openstudio::filesystem::ifstream inFile(iddPath); ASSERT_TRUE(inFile ? true : false);
+  OptionalIddFile loadedIddFile = IddFile::load(inFile);
+  ASSERT_TRUE(loadedIddFile); inFile.close();
+
+  for (auto iddObject : loadedIddFile->objects()){
+    for (auto iddField : iddObject.nonextensibleFields()){
+      iddField.properties();
+    }
+    for (auto iddField : iddObject.extensibleGroup()){
+      iddField.properties();
+    }
+  }
+
+  EXPECT_EQ(0, ss.logMessages().size());
+  for (auto logMessage : ss.logMessages()){
+    EXPECT_EQ("", logMessage.logMessage());
+  }
+
+  EXPECT_EQ(openStudioVersion(), loadedIddFile->version());
+  EXPECT_EQ(osIddFile.objects().size(), loadedIddFile->objects().size());
+  if (osIddFile.objects().size() != loadedIddFile->objects().size()) {
+    // get sets of IddObjectType
+    IddObjectTypeSet osIddObjectTypes, loadedIddObjectTypes, diff;
+    for (const IddObject& iddObject : osIddFile.objects()) {
+      EXPECT_TRUE(iddObject.type() != IddObjectType::UserCustom);
+      osIddObjectTypes.insert(iddObject.type());
+    }
+    for (const IddObject& iddObject : loadedIddFile->objects()) {
+      if (iddObject.type() == IddObjectType::UserCustom) {
+        try {
+          IddObjectType iddObjectType(iddObject.name());
+          loadedIddObjectTypes.insert(iddObjectType);
+        } catch (...) {
+          LOG(Debug, "Unable to convert IddObject name '" << iddObject.name() << "' "
+              << "to IddObjectType.");
+        }
+      } else {
+        loadedIddObjectTypes.insert(iddObject.type());
+      }
+    }
+    std::set_difference(osIddObjectTypes.begin(), osIddObjectTypes.end(),
+                        loadedIddObjectTypes.begin(), loadedIddObjectTypes.end(),
+                        std::inserter(diff, diff.begin()));
+    std::stringstream ss;
+    for (const IddObjectType& iddType : diff) {
+      ss << "  " << iddType << std::endl;
+    }
+    diff.clear();
+    LOG(Debug, "The following object types are in osIddFile, but are not in loadedIddFile: "
+        << std::endl << ss.str());
+    ss.str("");
+    std::set_difference(loadedIddObjectTypes.begin(), loadedIddObjectTypes.end(),
+                        osIddObjectTypes.begin(), osIddObjectTypes.end(),
+                        std::inserter(diff, diff.begin()));
+    for (const IddObjectType& iddType : diff) {
+      ss << "  " << iddType << std::endl;
+    }
+    LOG(Debug, "The following object types are in loadedIddFile, but are not in osIddFile: "
+        << std::endl << ss.str());
+  }
 }
 
 // test single object, no fields
@@ -279,7 +383,7 @@ TEST_F(IddFixture, IddFile_EpGroups) {
   std::stringstream ss;
   // uniqueness
   for (StringVector::const_iterator it = groups.begin(), itEnd = groups.end(); it != itEnd; ++it) {
-    StringVector::const_iterator loc = std::find_if(it+1,itEnd,std::bind(istringEqual,*it,std::placeholders::_1));
+    auto loc = std::find_if(it+1,itEnd,std::bind(istringEqual,*it,std::placeholders::_1));
     EXPECT_TRUE(loc == itEnd);
     if (loc != itEnd) {
       LOG(Debug,"The group name '" << *it << "' is repeated in epIddFile.");
