@@ -83,7 +83,8 @@ PreviewView::PreviewView(QWidget *t_parent)
   setLayout(mainLayout);
 
   m_view = new Qt3DRender::QWindow();
-  //mainLayout->addWidget(m_view);
+  QWidget *container = QWidget::createWindowContainer(m_view);
+  mainLayout->addWidget(container);
 
   Qt3DInput::QInputAspect *input = new Qt3DInput::QInputAspect;
   m_view->registerAspect(input);
