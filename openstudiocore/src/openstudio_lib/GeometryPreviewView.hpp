@@ -34,6 +34,8 @@
 
 #include "../model/Model.hpp"
 
+#include <Qt3DRender/QWindow>
+
 namespace openstudio {
 
 class GeometryPreviewView : public QWidget
@@ -50,8 +52,31 @@ class GeometryPreviewView : public QWidget
 
   private:
 
-
 };
+
+// main widget
+
+class PreviewView : public QWidget
+{
+  Q_OBJECT;
+
+  public:
+    PreviewView(QWidget *t_parent = nullptr);
+    virtual ~PreviewView();
+
+  public slots:
+    void onUnitSystemChange(bool t_isIP);
+
+  private slots:
+
+  private:
+    REGISTER_LOGGER("openstudio::PreviewView");
+
+    bool m_isIP;
+
+    Qt3DRender::QWindow* m_view;
+};
+
 
 } // openstudio
 
