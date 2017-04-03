@@ -110,9 +110,7 @@ EditorWebView::EditorWebView(QWidget *t_parent)
   //mainLayout->addWidget(m_view, 10, Qt::AlignTop);
   mainLayout->addWidget(m_view);
 
-  m_view->load(QUrl("http://localhost:5000"));
-  //m_view->load(QUrl("file:///E:/openstudio-geometry-editor/dist/index.html"));
-  //m_view->load(QUrl("file:///E:/test/index.html"));
+  m_view->load(QUrl("qrc:///library/geometry_editor.html"));
 }
 
 EditorWebView::~EditorWebView()
