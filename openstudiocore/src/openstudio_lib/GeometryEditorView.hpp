@@ -34,6 +34,13 @@
 
 #include "../model/Model.hpp"
 
+#include <QWidget>
+#include <QWebEngineView>
+#include <QProgressBar>
+
+class QComboBox;
+class QPushButton;
+
 namespace openstudio {
 
 class GeometryEditorView : public QWidget
@@ -46,10 +53,43 @@ class GeometryEditorView : public QWidget
                       const openstudio::model::Model& model,
                       QWidget * parent = nullptr);
 
-    virtual ~GeometryEditorView() {}
+    virtual ~GeometryEditorView();
 
   private:
 
+};
+
+// main widget
+
+class EditorWebView : public QWidget
+{
+  Q_OBJECT;
+
+  public:
+    EditorWebView(QWidget *t_parent = nullptr);
+    virtual ~EditorWebView();
+
+  public slots:
+    void onUnitSystemChange(bool t_isIP);
+
+  private slots:
+    void refreshClicked();
+
+    // DLM: for debugging
+    void 	onLoadFinished(bool ok);
+    void 	onLoadProgress(int progress);
+    void 	onLoadStarted();
+    void 	onRenderProcessTerminated(QWebEnginePage::RenderProcessTerminationStatus terminationStatus, int exitCode);
+
+  private:
+    REGISTER_LOGGER("openstudio::EditorWebView");
+
+    bool m_isIP;
+
+    QProgressBar * m_progressBar;
+    QPushButton * m_refreshBtn;
+
+    QWebEngineView * m_view;
 };
 
 } // openstudio

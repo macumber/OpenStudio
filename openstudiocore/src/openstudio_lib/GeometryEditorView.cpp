@@ -35,9 +35,13 @@
 #include "../utilities/core/Assert.hpp"
 
 #include <utilities/idd/IddEnums.hxx>
+
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QLabel>
+#include <QPushButton>
+#include <QWebEnginePage>
+#include <QWebEngineSettings>
 
 namespace openstudio {
 
@@ -50,8 +54,117 @@ GeometryEditorView::GeometryEditorView(bool isIP,
   //connect(this, &GeometryEditorView::toggleUnitsClicked, modelObjectInspectorView(), &ModelObjectInspectorView::toggleUnitsClicked);
 
   QVBoxLayout *layout = new QVBoxLayout;
-  layout->addWidget(new QLabel("Editor"));
+  
+  EditorWebView* webView = new EditorWebView(this);
+  layout->addWidget(webView);
+
   setLayout(layout);
+}
+
+GeometryEditorView::~GeometryEditorView()
+{
+
+}
+
+EditorWebView::EditorWebView(QWidget *t_parent)
+  : QWidget(t_parent),
+    m_isIP(true),
+    m_progressBar(new QProgressBar()),
+    m_refreshBtn(new QPushButton("Refresh"))
+{
+
+  auto mainLayout = new QVBoxLayout;
+  setLayout(mainLayout);
+
+  connect(m_refreshBtn, &QPushButton::clicked, this, &EditorWebView::refreshClicked);
+
+  auto hLayout = new QHBoxLayout(this);
+  mainLayout->addLayout(hLayout);
+
+  hLayout->addStretch();
+
+  hLayout->addWidget(m_progressBar, 0, Qt::AlignVCenter);
+  m_progressBar->setMinimum(0);
+  m_progressBar->setMaximum(100);
+  m_progressBar->setValue(0);
+  m_progressBar->setVisible(false); // make visible when load first page
+
+  hLayout->addWidget(m_refreshBtn, 0, Qt::AlignVCenter);
+  m_refreshBtn->setVisible(true);
+
+  m_view = new QWebEngineView(this);
+  m_view->settings()->setAttribute(QWebEngineSettings::WebAttribute::LocalContentCanAccessRemoteUrls, true);
+  m_view->settings()->setAttribute(QWebEngineSettings::WebAttribute::SpatialNavigationEnabled, true);
+
+  connect(m_view, &QWebEngineView::loadFinished, this, &EditorWebView::onLoadFinished);
+  connect(m_view, &QWebEngineView::loadProgress, this, &EditorWebView::onLoadProgress);
+  connect(m_view, &QWebEngineView::loadStarted, this, &EditorWebView::onLoadStarted);
+  connect(m_view, &QWebEngineView::renderProcessTerminated, this, &EditorWebView::onRenderProcessTerminated);
+  
+  // Qt 5.8 and higher
+  //m_view->setAttribute(QWebEngineSettings::WebAttribute::AllowRunningInsecureContent, true);
+
+  //m_view->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  m_view->setContextMenuPolicy(Qt::NoContextMenu);
+
+  //mainLayout->addWidget(m_view, 10, Qt::AlignTop);
+  mainLayout->addWidget(m_view);
+
+  m_view->load(QUrl("http://localhost:5000"));
+  //m_view->load(QUrl("file:///E:/openstudio-geometry-editor/dist/index.html"));
+  //m_view->load(QUrl("file:///E:/test/index.html"));
+}
+
+EditorWebView::~EditorWebView()
+{
+  delete m_view;
+}
+
+void EditorWebView::refreshClicked()
+{
+  m_view->triggerPageAction(QWebEnginePage::ReloadAndBypassCache);
+}
+
+void EditorWebView::onUnitSystemChange(bool t_isIP) 
+{
+  LOG(Debug, "onUnitSystemChange " << t_isIP << " reloading results");
+  m_isIP = t_isIP;
+}
+
+void EditorWebView::onLoadFinished(bool ok)
+{
+  QString title = m_view->title();
+  if (ok){
+    m_progressBar->setStyleSheet("");
+    m_progressBar->setFormat("");
+    m_progressBar->setTextVisible(false);
+  } else{
+    m_progressBar->setStyleSheet("QProgressBar::chunk {background-color: #FF0000;}");
+    m_progressBar->setFormat("Error");
+    m_progressBar->setTextVisible(true);
+  }
+}
+
+void EditorWebView::onLoadProgress(int progress)
+{
+  m_progressBar->setStyleSheet("");
+  m_progressBar->setFormat("");
+  m_progressBar->setTextVisible(false);
+  m_progressBar->setValue(progress);
+}
+
+void EditorWebView::onLoadStarted()
+{
+  m_progressBar->setStyleSheet("");
+  m_progressBar->setFormat("");
+  m_progressBar->setTextVisible(false);
+}
+
+void EditorWebView::onRenderProcessTerminated(QWebEnginePage::RenderProcessTerminationStatus terminationStatus, int exitCode)
+{
+  m_progressBar->setStyleSheet("QProgressBar::chunk {background-color: #FF0000;}");
+  m_progressBar->setFormat("Error");
+  m_progressBar->setTextVisible(true);
 }
 
 
