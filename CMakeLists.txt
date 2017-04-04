@@ -484,8 +484,8 @@ if(BUILD_QT)
       set(QT_BUILD_SCRIPT "build_shared_qt.bat")
     endif()
     ExternalProject_Add(Qt
-      URL http://openstudio-resources.s3.amazonaws.com/dependencies/qt-everywhere-opensource-src-5.6.1.zip
-      URL_MD5 c18a4904d9773894437c10c25f93e50f
+      URL http://openstudio-resources.s3.amazonaws.com/dependencies/qt-everywhere-opensource-src-5.8.0.zip
+      URL_MD5 1e372fabc9d97a32877cb4adb377e7c8
       BUILD_IN_SOURCE 1
       CONFIGURE_COMMAND ""
       PATCH_COMMAND ""
