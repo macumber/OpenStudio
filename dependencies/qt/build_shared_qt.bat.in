@@ -1,3 +1,6 @@
+set INCLUDE=%INCLUDE%;"${ICU_ROOT_DIR}/include"
+set LIB=%LIB%;"${ICU_ROOT_DIR}/lib"
+set PATH=%PATH%;"${ICU_ROOT_DIR}/lib";"${ICU_ROOT_DIR}/bin"
 call .\configure.bat -recheck -platform win32-msvc2013 -debug-and-release -opensource -shared -mp -openssl -I "${OPENSSL_ROOT_DIR}/include" -L "${OPENSSL_ROOT_DIR}/lib/VC" -opengl dynamic -no-ssse3 -sql-sqlite -plugin-sql-sqlite -qt-pcre -qt-libpng -qt-libjpeg -qt-freetype -qt-harfbuzz -skip enginio -no-compile-examples -nomake examples -nomake tests -nomake tools -skip qtmultimedia -confirm-license -prefix "${CMAKE_BINARY_DIR}/Qt-prefix/src/Qt-install"
 nmake
 nmake install

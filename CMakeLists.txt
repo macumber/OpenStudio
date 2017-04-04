@@ -475,7 +475,24 @@ if(BUILD_QT)
     set(QT_INSTALL_DIR "${CMAKE_BINARY_DIR}/Qt-prefix/src/Qt-install/")
     
   else()
+  
+    set(ICU_FILENAME "icu_53_1_msvc_2013_64_devel.7z")
+    set(ICU_EXPECTED_HASH "546157e60617731c5ce8ed6b7884bd07")
+    if(EXISTS "${CMAKE_BINARY_DIR}/${ICU_FILENAME}")
+      file(MD5 "${CMAKE_BINARY_DIR}/${ICU_FILENAME}" ICU_HASH)
+    endif()
+    if(NOT EXISTS "${CMAKE_BINARY_DIR}/${ICU_FILENAME}" OR NOT "${ICU_HASH}" MATCHES "${ICU_EXPECTED_HASH}")
+      message(STATUS "Downloading ICU")
+      file(DOWNLOAD "http://download.qt.io/development_releases/prebuilt/icu/prebuilt/msvc2013/icu_53_1_msvc_2013_64_devel.7z" "${CMAKE_BINARY_DIR}/${ICU_FILENAME}" TIMEOUT 120 INACTIVITY_TIMEOUT 120 SHOW_PROGRESS EXPECTED_MD5 ${ICU_EXPECTED_HASH})
+      execute_process(COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_BINARY_DIR}/icu53_1")
+      execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${ICU_FILENAME}" WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
+    set(ICU_ROOT_DIR "${CMAKE_BINARY_DIR}/icu53_1")
+    
+    # https://wiki.qt.io/Building_Qt_5_from_Git
+    # https://doc.qt.io/qt-5/qtwebengine-platform-notes.html
     # to initialize command prompt run: "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\vcvarsall.bat" amd64
+    
     configure_file("${CMAKE_SOURCE_DIR}/dependencies/qt/build_static_qt.bat.in" "${CMAKE_BINARY_DIR}/build_static_qt.bat")
     configure_file("${CMAKE_SOURCE_DIR}/dependencies/qt/build_shared_qt.bat.in" "${CMAKE_BINARY_DIR}/build_shared_qt.bat")
     if( Qt5Static )
