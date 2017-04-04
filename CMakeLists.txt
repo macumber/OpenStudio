@@ -375,8 +375,8 @@ if(BUILD_BOOST)
   if(APPLE)
     set(apple-flags "-std=c11 -std=c++11 -stdlib=libc++")
     ExternalProject_Add(Boost
-      URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_55_0.tar.gz
-      URL_MD5 93780777cfbf999a600f62883bd54b17
+      URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_63_0.tar.gz
+      URL_MD5 7b493c08bc9557bbde7e29091f28b605
       CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && ./bootstrap.sh
       PATCH_COMMAND ${PATCH_EXE} -p1 < ${CMAKE_SOURCE_DIR}/dependencies/Boost/xcode_51.patch && ${PATCH_EXE} -p1 < ${CMAKE_SOURCE_DIR}/dependencies/Boost/fchmodat.patch
       BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && ./b2 toolset=clang cxxflags=${apple-flags} linkflags=${apple-flags} variant=debug,release define=BOOST_CHRONO_HEADER_ONLY --layout=tagged --with-filesystem --with-regex --with-program_options --with-system --with-thread --with-date_time --with-log --prefix=${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost-install -j${BOOST_CPUCOUNT} install
@@ -386,8 +386,8 @@ if(BUILD_BOOST)
     set(BOOST_LIBRARYDIR ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost-install/lib)
   elseif(UNIX)
     ExternalProject_Add(Boost
-      URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_55_0.tar.gz
-      URL_MD5 93780777cfbf999a600f62883bd54b17
+      URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_63_0.tar.gz
+      URL_MD5 7b493c08bc9557bbde7e29091f28b605
       CONFIGURE_COMMAND cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && ./bootstrap.sh
       PATCH_COMMAND ${PATCH_EXE} -p1 < ${CMAKE_SOURCE_DIR}/dependencies/Boost/gcc_5_no_cxx11.patch
       BUILD_COMMAND cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && ./b2 cxxflags=-fPIC link=static variant=debug,release define=BOOST_CHRONO_HEADER_ONLY --layout=tagged --with-atomic --with-filesystem --with-regex --with-program_options --with-system --with-thread --with-date_time --with-log --prefix=${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost-install -j${BOOST_CPUCOUNT} install
@@ -406,8 +406,8 @@ if(BUILD_BOOST)
 
     if(CMAKE_CL_64)
       ExternalProject_Add(Boost
-        URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_55_0.tar.gz
-        URL_MD5 93780777cfbf999a600f62883bd54b17
+        URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_63_0.tar.gz
+        URL_MD5 7b493c08bc9557bbde7e29091f28b605
         CONFIGURE_COMMAND cmd /C "cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && bootstrap.bat"
         PATCH_COMMAND "${PATCH_EXE}" "${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost/boost/archive/iterators/transform_width.hpp" "${CMAKE_SOURCE_DIR}/dependencies/Boost/transform_width.diff"
         BUILD_COMMAND cmd /C "set VS_UNICODE_OUTPUT=& cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && b2 ${B2_TOOLSET} link=static address-model=64 define=BOOST_CHRONO_HEADER_ONLY --build-type=minimal --with-filesystem --with-regex --with-program_options --with-system --with-thread --with-date_time --with-log --prefix=${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost-install -j${CPUCOUNT}" install
@@ -415,8 +415,8 @@ if(BUILD_BOOST)
       )
     else()
       ExternalProject_Add(Boost
-        URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_55_0.tar.gz
-        URL_MD5 93780777cfbf999a600f62883bd54b17
+        URL http://openstudio-resources.s3.amazonaws.com/dependencies/boost_1_63_0.tar.gz
+        URL_MD5 7b493c08bc9557bbde7e29091f28b605
         CONFIGURE_COMMAND cmd /C "cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && bootstrap.bat"
         PATCH_COMMAND "${PATCH_EXE}" "${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost/boost/archive/iterators/transform_width.hpp" "${CMAKE_SOURCE_DIR}/dependencies/Boost/transform_width.diff"
         BUILD_COMMAND cmd /C "set VS_UNICODE_OUTPUT=& cd ${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost && b2 ${B2_TOOLSET} link=static address-model=32 define=BOOST_CHRONO_HEADER_ONLY --build-type=minimal --with-filesystem --with-regex --with-program_options --with-system --with-thread --with-date_time --with-log --prefix=${CMAKE_BINARY_DIR}/Boost-prefix/src/Boost-install -j${CPUCOUNT}" install
@@ -443,8 +443,8 @@ if(BUILD_QT)
       set(QT_CONFIGURE_COMMAND "-v -release -opensource -qt-pcre -qt-harfbuzz -shared -openssl -no-pch -no-ssse3 -qt-sql-sqlite -plugin-sql-sqlite -skip enginio -no-compile-examples -nomake examples -nomake tests -nomake tools -skip qtmultimedia -confirm-license -prefix ${CMAKE_BINARY_DIR}/Qt-prefix/src/Qt-install")
     endif()
     ExternalProject_Add(Qt
-      URL http://openstudio-resources.s3.amazonaws.com/dependencies/qt-everywhere-opensource-src-5.6.1.tar.gz
-      URL_MD5 ed16ef2a30c674f91f8615678005d44c
+      URL http://openstudio-resources.s3.amazonaws.com/dependencies/qt-everywhere-opensource-src-5.8.0.tar.gz
+      URL_MD5 a9f2494f75f966e2f22358ec367d8f41
       CONFIGURE_COMMAND sh -c "./configure ${QT_CONFIGURE_COMMAND}"
       PATCH_COMMAND ""
       BUILD_COMMAND sh -c "make -j${CPUCOUNT} && make install"
@@ -464,8 +464,8 @@ if(BUILD_QT)
       set(QT_CONFIGURE_COMMAND "-v -release -opensource -shared -openssl -no-pch -no-ssse3 -qt-sql-sqlite -plugin-sql-sqlite -skip enginio -no-compile-examples -nomake examples -nomake tests -nomake tools -skip qtmultimedia -qt-xcb -confirm-license  -no-qml-debug -prefix ${CMAKE_BINARY_DIR}/Qt-prefix/src/Qt-install")
     endif()
     ExternalProject_Add(Qt
-      URL http://openstudio-resources.s3.amazonaws.com/dependencies/qt-everywhere-opensource-src-5.6.1.tar.gz
-      URL_MD5 ed16ef2a30c674f91f8615678005d44c
+      URL http://openstudio-resources.s3.amazonaws.com/dependencies/qt-everywhere-opensource-src-5.8.0.tar.gz
+      URL_MD5 a9f2494f75f966e2f22358ec367d8f41
       CONFIGURE_COMMAND sh -c "./configure ${QT_CONFIGURE_COMMAND}"
       PATCH_COMMAND ${PATCH_EXE} -p1 < ${CMAKE_SOURCE_DIR}/dependencies/qt/qstatic_version_tag.patch
       BUILD_COMMAND sh -c "make -j${CPUCOUNT} && make install"
