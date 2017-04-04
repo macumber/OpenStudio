@@ -13,6 +13,7 @@ test_fails.txt
 /build-profile/
 /core-build/
 /super-build/
+/super-build2/
 
 *.sublime-workspace
 
