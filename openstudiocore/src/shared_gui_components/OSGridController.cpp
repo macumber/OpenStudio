@@ -851,7 +851,7 @@ namespace openstudio {
       loadName->bind(t_mo,
         OptionalStringGetter(std::bind(&LoadNameConcept::get, loadNameConcept.data(), t_mo, true)),
         // If the concept is read only, pass an empty optional
-        boost::none, // DLM fix this loadNameConcept->readOnly() ? boost::optional<StringSetterOptionalStringReturn>() : boost::optional<StringSetterOptionalStringReturn>(std::bind(&LoadNameConcept::set, loadNameConcept.data(), t_mo, std::placeholders::_1)),
+        loadNameConcept->readOnly() ? boost::none : boost::optional<StringSetterOptionalStringReturn>(std::bind(&LoadNameConcept::set, loadNameConcept.data(), t_mo, std::placeholders::_1)),
         boost::optional<NoFailAction>(std::bind(&LoadNameConcept::reset, loadNameConcept.data(), t_mo)));
 
       //connect(loadName, OSLoadNamePixmapLineEdit::itemClicked, gridView(), OSGridView::dropZoneItemClicked);

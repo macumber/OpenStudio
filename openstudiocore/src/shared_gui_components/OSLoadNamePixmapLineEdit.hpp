@@ -75,6 +75,12 @@ class OSLoadNamePixmapLineEdit : public QWidget {
             boost::optional<NoFailAction> reset=boost::none,
             boost::optional<BasicQuery> isDefaulted=boost::none);
 
+  void bind(model::ModelObject& modelObject, 
+          OptionalStringGetter get,
+          boost::optional<StringSetterOptionalStringReturn> set=boost::none,
+          boost::optional<NoFailAction> reset=boost::none,
+          boost::optional<BasicQuery> isDefaulted=boost::none);
+
   void unbind();
 
 signals:

@@ -128,6 +128,19 @@ void OSLoadNamePixmapLineEdit::bind(model::ModelObject& modelObject,
   completeBind();
 }
 
+void OSLoadNamePixmapLineEdit::bind(model::ModelObject& modelObject,
+  OptionalStringGetter get,
+  boost::optional<StringSetterOptionalStringReturn> set,
+  boost::optional<NoFailAction> reset,
+  boost::optional<BasicQuery> isDefaulted)
+{
+  m_modelObject = modelObject;
+
+  m_lineEdit->bind(modelObject, get, set, reset, isDefaulted);
+
+  completeBind();
+}
+
 void OSLoadNamePixmapLineEdit::completeBind() {
 
   setIcon();
