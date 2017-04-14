@@ -270,33 +270,41 @@ namespace openstudio{
   /// generates a Matrix of M*N points randomly drawn between and including a and b.
   Matrix randMatrix(double a, double b, unsigned M, unsigned N)
   {
-    // ETH@20100120. What library does this come from? The user should be able to seed the
-    // generator independently of this function.
-    // seed random number generator
-    static std::minstd_rand generator(42u);
-
-    // define distribution
-    boost::uniform_real<> dist(a,b);
-
-    // create a generator
-    boost::variate_generator<std::minstd_rand&, boost::uniform_real<> > uniformGenerator(generator, dist);
-
-    // ETH@20120723 Started seeing this as DataFixture.Matrix_RandMatrix hanging on Windows 7,
-    // with BoostPro installer.
-    // handle degenerate case
-    OptionalDouble singlePoint;
-    if (equal(a,b)) {
-      singlePoint = (a + b) / 2.0;
+    if (a > b){
+      double c = a;
+      a = b;
+      b = c;
     }
 
     Matrix result(M, N);
-    for (unsigned i = 0; i < M; ++i){
-      for (unsigned j = 0; j < N; ++j){
-        if (singlePoint) {
-          result(i,j) = *singlePoint;
+    if (equal(a, b)) {
+
+      // ETH@20120723 Started seeing this as DataFixture.Matrix_RandMatrix hanging on Windows 7,
+      // with BoostPro installer.
+      // handle degenerate case
+      double singlePoint = (a + b) / 2.0;
+
+      for (unsigned i = 0; i < M; ++i){
+        for (unsigned j = 0; j < N; ++j){
+          result(i, j) = singlePoint;
         }
-        else {
-          result(i,j) = uniformGenerator();
+      }
+    }else{
+
+      // ETH@20100120. What library does this come from? The user should be able to seed the
+      // generator independently of this function.
+      // seed random number generator
+      static std::minstd_rand generator(42u);
+
+      // define distribution
+      boost::uniform_real<> dist(a, b);
+
+      // create a generator
+      boost::variate_generator<std::minstd_rand&, boost::uniform_real<> > uniformGenerator(generator, dist);
+ 
+      for (unsigned i = 0; i < M; ++i){
+        for (unsigned j = 0; j < N; ++j){
+          result(i, j) = uniformGenerator();
         }
       }
     }
