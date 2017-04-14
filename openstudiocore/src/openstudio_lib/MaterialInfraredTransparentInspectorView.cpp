@@ -123,7 +123,7 @@ void MaterialInfraredTransparentInspectorView::attach(openstudio::model::Infrare
   m_nameEdit->bind(
     *m_infraredTransparentMaterial,
     OptionalStringGetter(std::bind(&model::InfraredTransparentMaterial::name, m_infraredTransparentMaterial.get_ptr(),true)),
-    boost::optional<StringSetter>(std::bind(&model::InfraredTransparentMaterial::setName, m_infraredTransparentMaterial.get_ptr(),std::placeholders::_1))
+    boost::optional<StringSetterOptionalStringReturn>(std::bind(&model::InfraredTransparentMaterial::setName, m_infraredTransparentMaterial.get_ptr(),std::placeholders::_1))
   );
 
   m_standardsInformationWidget->attach(infraredTransparentMaterial);

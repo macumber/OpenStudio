@@ -489,7 +489,7 @@ LibraryItem::~LibraryItem()
 
 bool LibraryItem::hasError() const
 {
-  return m_bclMeasure.error();
+  return m_bclMeasure.error().is_initialized();
 }
 
 QString LibraryItem::name() const 

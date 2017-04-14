@@ -1516,7 +1516,7 @@ if (_className::iddObjectType() == typeToCreate) { \
       if (candidate.uuid() == newComponentData.uuid())
       {
         if (candidate.versionUUID() != newComponentData.versionUUID()) {
-          LOG(Warn,"Component '" << newComponentData.name() << "' to be inserted into Model is "
+          LOG(Warn,"Component '" << newComponentData.nameString() << "' to be inserted into Model is "
               << "already in Model as determined by UUID comparison, but has a different version. "
               << "Returning the version already in Model; if you would like to use both versions, "
               << "please create a new UUID for one of the Components.");
@@ -2318,7 +2318,7 @@ void addExampleModelObjects(Model& model)
   window.setSurface(searchResults[0]);
 
   // add overhang to the window
-  bool test = window.addOverhangByProjectionFactor(0.5, 0.1);
+  bool test = window.addOverhangByProjectionFactor(0.5, 0.1).is_initialized();
   OS_ASSERT(test);
 
   // add daylighting control point to center of space2

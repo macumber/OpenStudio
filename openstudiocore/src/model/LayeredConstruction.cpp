@@ -905,9 +905,9 @@ bool LayeredConstruction::layersAreValid(const std::vector<FenestrationMaterial>
   bool previousWasNonGasLayer = false;
   bool gasLayerEnclosed = true;
   for (const auto & fenestrationMaterial : fenestrationMaterials) {
-    bool isGlazing = fenestrationMaterial.optionalCast<Glazing>();
-    bool isSimpleGlazing = fenestrationMaterial.optionalCast<SimpleGlazing>();
-    bool isGasLayer = fenestrationMaterial.optionalCast<GasLayer>();
+    bool isGlazing = fenestrationMaterial.optionalCast<Glazing>().is_initialized();
+    bool isSimpleGlazing = fenestrationMaterial.optionalCast<SimpleGlazing>().is_initialized();
+    bool isGasLayer = fenestrationMaterial.optionalCast<GasLayer>().is_initialized();
     // Rule 1
     if (isSimpleGlazing) {
       if (hasGlazing) { return false; }

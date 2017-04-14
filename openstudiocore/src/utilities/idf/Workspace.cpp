@@ -709,7 +709,7 @@ namespace detail {
               << " to avoid name conflict upon adding it to the Workspace.");
           workingIdfObject = idfObject.clone(); // deep copy
           // clear name of single object--WorkspaceObject_Impl constructor will make new one
-          bool ok = workingIdfObject.setName("");
+          bool ok = workingIdfObject.setName("").is_initialized();
           OS_ASSERT(ok);
         }
       }
@@ -1455,7 +1455,7 @@ namespace detail {
           LOG(Info,"Restoring original name, '" << *newObjectName << "' of "
               << currentObject.briefDescription() << " after a successful swap with "
               << newObject.briefDescription() << ".");
-          ok = currentObject.getImpl<WorkspaceObject_Impl>()->setName(*newObjectName,false);
+          ok = currentObject.getImpl<WorkspaceObject_Impl>()->setName(*newObjectName,false).is_initialized();
           OS_ASSERT(ok);
         }
         // handle add signals

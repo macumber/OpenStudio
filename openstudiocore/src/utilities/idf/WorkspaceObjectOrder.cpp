@@ -52,7 +52,7 @@ namespace detail {
 
   // GETTERS AND SETTERS
 
-  bool WorkspaceObjectOrder_Impl::isDirectOrder() const { return m_directOrder; }
+  bool WorkspaceObjectOrder_Impl::isDirectOrder() const { return m_directOrder.is_initialized(); }
 
   boost::optional< std::vector<Handle> > WorkspaceObjectOrder_Impl::directOrder() const { 
     return m_directOrder; 

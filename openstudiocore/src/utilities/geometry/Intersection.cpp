@@ -118,7 +118,7 @@ namespace openstudio {
   }
 
 }
-
+/*
 namespace boost { namespace geometry
 {
 
@@ -299,11 +299,11 @@ struct remove_spikes<boost::variant<BOOST_VARIANT_ENUM_PARAMS(T)> >
 } // namespace resolve_variant
 
 
-/*!
+///
 \ingroup remove_spikes
 \tparam Geometry geometry type
 \param geometry the geometry to make remove_spikes
-*/
+///
 template <typename Geometry>
 inline void remove_spikes(Geometry& geometry)
 {
@@ -313,7 +313,7 @@ inline void remove_spikes(Geometry& geometry)
 
 }} // namespace boost::geometry
 // remove_spikes 
-
+*/
 
 namespace openstudio{
 

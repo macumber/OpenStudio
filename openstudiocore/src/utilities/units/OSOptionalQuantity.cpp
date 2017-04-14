@@ -71,7 +71,7 @@ bool OSOptionalQuantity::empty() const {
 }
 
 bool OSOptionalQuantity::isSet() const {
-  return m_value;
+  return m_value.is_initialized();
 }
 
 Quantity OSOptionalQuantity::get() const {

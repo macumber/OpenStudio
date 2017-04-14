@@ -596,7 +596,7 @@ namespace detail {
   {
     bool result = false;
     if (name) {
-      result = this->setName(*name);
+      result = this->setName(*name).is_initialized();
     }
     return result;
   }

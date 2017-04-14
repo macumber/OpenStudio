@@ -297,7 +297,7 @@ void IddFileAndFactoryWrapper::setIddFile(IddFileType iddFileType) {
 bool IddFileAndFactoryWrapper::isInFile(IddObjectType objectType) const {
   if (m_iddFile) {
     OptionalIddObject candidate = m_iddFile->getObject(objectType);
-    return candidate;
+    return candidate.is_initialized();
   }
   else if (m_iddFileType) {
     return IddFactory::instance().isInFile(objectType,*m_iddFileType);
@@ -310,7 +310,7 @@ bool IddFileAndFactoryWrapper::isInFile(IddObjectType objectType) const {
 bool IddFileAndFactoryWrapper::isInFile(const std::string& objectName) const {
   if (m_iddFile) {
     OptionalIddObject candidate = m_iddFile->getObject(objectName);
-    return candidate;
+    return candidate.is_initialized();
   }
   else if (m_iddFileType) {
     OptionalIddObject candidate = IddFactory::instance().getObject(objectName);

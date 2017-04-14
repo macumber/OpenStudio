@@ -326,7 +326,7 @@ TEST_F(ModelFixture, Component_CreateScheduleLibrary) {
   ComponentVector components;
   for (const Schedule& schedule : schedules) {
     Component newComponent = schedule.createComponent();
-    bool ok = newComponent.componentData().setName(schedule.name().get());
+    bool ok = newComponent.componentData().setName(schedule.name().get()).is_initialized();
     EXPECT_TRUE(ok);
     components.push_back(newComponent);
   }

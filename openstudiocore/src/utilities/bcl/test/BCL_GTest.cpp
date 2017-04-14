@@ -347,7 +347,7 @@ TEST_F(BCLFixture, RemoteBCLMetaSearchTest)
   typedef std::pair<std::string, uint> PairType;
 
   // get all constructions, via empty first arg and tid
-  bool test = remoteBCL.metaSearchComponentLibrary("",127);
+  bool test = remoteBCL.metaSearchComponentLibrary("",127).is_initialized();
   ASSERT_TRUE(test);
   boost::optional<BCLMetaSearchResult> result = remoteBCL.waitForMetaSearch();
   ASSERT_TRUE(result);
@@ -365,7 +365,7 @@ TEST_F(BCLFixture, RemoteBCLMetaSearchTest)
 
 
   // get all exterior wall constructions, via empty first arg and non-null second string
-  test = remoteBCL.metaSearchComponentLibrary("","Exterior Wall");
+  test = remoteBCL.metaSearchComponentLibrary("","Exterior Wall").is_initialized();
   ASSERT_TRUE(test);
   result = remoteBCL.waitForMetaSearch();
   ASSERT_TRUE(result);
@@ -383,7 +383,7 @@ TEST_F(BCLFixture, RemoteBCLMetaSearchTest)
   EXPECT_FALSE(result->taxonomyTerms().empty());
 
   // get all constructions, via non-null first and second strings
-  test = remoteBCL.metaSearchComponentLibrary("office",127);
+  test = remoteBCL.metaSearchComponentLibrary("office",127).is_initialized();
   ASSERT_TRUE(test);
   result = remoteBCL.waitForMetaSearch();
   ASSERT_TRUE(result);
@@ -401,7 +401,7 @@ TEST_F(BCLFixture, RemoteBCLMetaSearchTest)
   EXPECT_FALSE(result->taxonomyTerms().empty());
 
   // get all things office, via non-null first string and empty second string
-  test = remoteBCL.metaSearchComponentLibrary("office","");
+  test = remoteBCL.metaSearchComponentLibrary("office","").is_initialized();
   ASSERT_TRUE(test);
   result = remoteBCL.waitForMetaSearch();
   ASSERT_TRUE(result);
@@ -419,7 +419,7 @@ TEST_F(BCLFixture, RemoteBCLMetaSearchTest)
   EXPECT_FALSE(result->taxonomyTerms().empty());
 
   // there are no components in this category
-  test = remoteBCL.metaSearchComponentLibrary("","Constructions");
+  test = remoteBCL.metaSearchComponentLibrary("","Constructions").is_initialized();
   ASSERT_TRUE(test);
   result = remoteBCL.waitForMetaSearch();
   ASSERT_TRUE(result);

@@ -114,7 +114,7 @@ void UtilityBillsController::onClearSelection()
   UtilityBillsInspectorView * utilityBillsInspectorView = qobject_cast<UtilityBillsInspectorView *>(inspectorView);
   OS_ASSERT(utilityBillsInspectorView);
 
-  enableAddNewObjectButton(utilityBillsInspectorView->runPeriodDates());
+  enableAddNewObjectButton(utilityBillsInspectorView->runPeriodDates().is_initialized());
 }
 
 ///// SLOTS
