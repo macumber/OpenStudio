@@ -308,7 +308,7 @@ namespace openstudio{
 
   std::string FloorplanJS::makeSurface(const Json::Value& story, const Json::Value& spaceOrShading, const std::string& parentSurfaceName, const std::string& parentSubSurfaceName,
     bool belowFloorPlenum, bool aboveCeilingPlenum, const std::string& surfaceType, const Point3dVectorVector& finalFaceVertices, size_t faceFormat,
-    std::vector<ThreeGeometry>& geometries, std::vector<ThreeSceneChild>& sceneChildren, double illuminanceSetpoint, bool airWall) const
+    std::vector<ThreeGeometry>& geometries, std::vector<ThreeSceneChild>& sceneChildren, double illuminanceSetpoint, bool airWall, const std::string& nameSuffix) const
   {
     std::string finalSurfaceType = surfaceType;
 
@@ -338,6 +338,10 @@ namespace openstudio{
 
     std::string geometryId = std::string("Geometry ") + std::to_string(geometries.size());
     std::string faceId = std::string("Face ") + std::to_string(geometries.size());
+    
+    if (!nameSuffix.empty()) {
+      faceId += (std::string(" - ") + nameSuffix);
+    }
 
     Point3dVector allVertices;
     std::vector<size_t> faceIndices;
@@ -503,6 +507,44 @@ namespace openstudio{
     return faceId;
   }
 
+  struct PointCompare
+  {
+    bool operator()(const Point3d& a, const Point3d& b) const {
+      std::stringstream ssa, ssb;
+      ssa << a;
+      ssb << b;
+      return ssa.str() < ssb.str();
+    }
+  };
+
+  std::string getEdgeIdSuffix(const Point3d& a, const Point3d& b, std::map<Point3d, std::vector<std::string>, PointCompare> point3dToEdgeIds) {
+    std::string result = "EdgeIds ";
+    
+    const std::vector<std::string>& va = point3dToEdgeIds[a];
+    const std::vector<std::string>& vb = point3dToEdgeIds[b];
+
+    std::vector<std::string> vintersect(std::max(va.size(), vb.size())); 
+    const auto intersectit = std::set_intersection(va.begin(), va.end(), vb.begin(), vb.end(), vintersect.begin());
+    vintersect.resize(intersectit - vintersect.begin());
+
+    std::vector<std::string> vunion(va.size() + vb.size());
+    const auto unionit = std::set_union(va.begin(), va.end(), vb.begin(), vb.end(), vunion.begin());
+    vunion.resize(unionit - vunion.begin());
+
+    if (!vintersect.empty()){
+      for (const auto& s : vintersect) {
+        result += (s + " ");
+      }
+    } else {
+      for (const auto& s : vunion) {
+        result += (s + " ");
+      }
+    }
+    result.pop_back();
+
+    return result;
+  }
+
   void FloorplanJS::makeGeometries(const Json::Value& story, const Json::Value& spaceOrShading,
     bool belowFloorPlenum, bool aboveCeilingPlenum, double lengthToMeters, double minZ, double maxZ,
     const Json::Value& vertices, const Json::Value& edges, const Json::Value& faces, const std::string& faceId,
@@ -547,6 +589,8 @@ namespace openstudio{
       }
     }
 
+    std::map<Point3d, std::vector<std::string>, PointCompare> point3dToEdgeIds;
+
     // get the face
     const Json::Value* face = findById(faces, faceId);
     if (face){
@@ -570,6 +614,7 @@ namespace openstudio{
 
           // get the vertices
           const Json::Value* nextVertex;
+          const Json::Value* prevVertex;
           const Json::Value* vertex1 = findById(vertices, vertexIds[0].asString());
           const Json::Value* vertex2 = findById(vertices, vertexIds[1].asString());
 
@@ -578,8 +623,10 @@ namespace openstudio{
 
           if (edgeOrder == 1){
             nextVertex = vertex1;
+            prevVertex = vertex2;
           }else{
             nextVertex = vertex2;
+            prevVertex = vertex1;
           }
           OS_ASSERT(nextVertex);
           OS_ASSERT(vertex1);
@@ -587,7 +634,12 @@ namespace openstudio{
 
           assertKeyAndType(*nextVertex, "x", Json::realValue);
           assertKeyAndType(*nextVertex, "y", Json::realValue);
-          faceVertices.push_back(Point3d(lengthToMeters * nextVertex->get("x", 0.0).asDouble(), lengthToMeters * nextVertex->get("y", 0.0).asDouble(), 0.0));
+          Point3d nextFaceVertex(lengthToMeters * nextVertex->get("x", 0.0).asDouble(), lengthToMeters * nextVertex->get("y", 0.0).asDouble(), 0.0);
+          Point3d prevFaceVertex(lengthToMeters * prevVertex->get("x", 0.0).asDouble(), lengthToMeters * prevVertex->get("y", 0.0).asDouble(), 0.0);
+          faceVertices.push_back(nextFaceVertex);
+
+          point3dToEdgeIds[nextFaceVertex].push_back(edgeId);
+          point3dToEdgeIds[prevFaceVertex].push_back(edgeId);
 
           // check if there are windows on this edge
           if (edgeIdToWindowsMap.find(edgeId) != edgeIdToWindowsMap.end()){
@@ -708,8 +760,8 @@ namespace openstudio{
       allFinalfloorVertices.push_back(finalfloorVertices);
       allFinalRoofCeilingVertices.push_back(finalRoofCeilingVertices);
     }
-    makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "Floor", allFinalfloorVertices, roofCeilingFaceFormat, geometries, sceneChildren, 0, openToBelow);
-    makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "RoofCeiling", allFinalRoofCeilingVertices, roofCeilingFaceFormat, geometries, sceneChildren, 0, false);
+    makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "Floor", allFinalfloorVertices, roofCeilingFaceFormat, geometries, sceneChildren, 0, openToBelow, "FaceId " + faceId);
+    makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "RoofCeiling", allFinalRoofCeilingVertices, roofCeilingFaceFormat, geometries, sceneChildren, 0, false, "FaceId " + faceId);
 
     // create each wall
     std::set<unsigned> mappedWindows;
@@ -720,6 +772,8 @@ namespace openstudio{
       wallVertices.push_back(Point3d(faceVertices[i % numPoints].x(), faceVertices[i % numPoints].y(), maxZ));
       wallVertices.push_back(Point3d(faceVertices[i % numPoints].x(), faceVertices[i % numPoints].y(), minZ));
       wallVertices.push_back(Point3d(faceVertices[i - 1].x(), faceVertices[i - 1].y(), minZ));
+
+      std::string edgeIdSuffix = getEdgeIdSuffix(faceVertices[i - 1], faceVertices[i % numPoints], point3dToEdgeIds);
 
       // find windows that appear on this edge, can't use edge ids after simplify algorithm
       std::vector<Point3d> testSegment;
@@ -968,14 +1022,14 @@ namespace openstudio{
       }
 
       std::string parentSurfaceName;
-      parentSurfaceName = makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "Wall", allFinalWallVertices, finalWallFaceFormat, geometries, sceneChildren, 0, false);
+      parentSurfaceName = makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "Wall", allFinalWallVertices, finalWallFaceFormat, geometries, sceneChildren, 0, false, edgeIdSuffix);
 
       std::vector<std::string> parentSubSurfaceNames;
       size_t finalWindowN = allFinalWindowVertices.size();
       OS_ASSERT(finalWindowN == allFinalWindowTypes.size());
       for (size_t finalWindowIdx = 0; finalWindowIdx < finalWindowN; ++finalWindowIdx){
         const auto& finalWindowVertices = allFinalWindowVertices[finalWindowIdx];
-        std::string parentSubSurfaceName = makeSurface(story, spaceOrShading, parentSurfaceName, "", belowFloorPlenum, aboveCeilingPlenum, allFinalWindowTypes[finalWindowIdx], Point3dVectorVector(1,finalWindowVertices), wallFaceFormat, geometries, sceneChildren, 0, false);
+        std::string parentSubSurfaceName = makeSurface(story, spaceOrShading, parentSurfaceName, "", belowFloorPlenum, aboveCeilingPlenum, allFinalWindowTypes[finalWindowIdx], Point3dVectorVector(1,finalWindowVertices), wallFaceFormat, geometries, sceneChildren, 0, false, "");
         parentSubSurfaceNames.push_back(parentSubSurfaceName);
       }
 
@@ -983,7 +1037,7 @@ namespace openstudio{
       OS_ASSERT(finalDoorN == allFinalDoorTypes.size());
       for (size_t finalDoorIdx = 0; finalDoorIdx < finalDoorN; ++finalDoorIdx){
         const auto& finalDoorVertices = allFinalDoorVertices[finalDoorIdx];
-        std::string parentSubSurfaceName = makeSurface(story, spaceOrShading, parentSurfaceName, "", belowFloorPlenum, aboveCeilingPlenum, allFinalDoorTypes[finalDoorIdx], Point3dVectorVector(1,finalDoorVertices), wallFaceFormat, geometries, sceneChildren, 0, false);
+        std::string parentSubSurfaceName = makeSurface(story, spaceOrShading, parentSurfaceName, "", belowFloorPlenum, aboveCeilingPlenum, allFinalDoorTypes[finalDoorIdx], Point3dVectorVector(1,finalDoorVertices), wallFaceFormat, geometries, sceneChildren, 0, false, "");
         parentSubSurfaceNames.push_back(parentSubSurfaceName);
       }
 
@@ -991,7 +1045,7 @@ namespace openstudio{
       OS_ASSERT(shadeN == allFinalShadeParentSubSurfaceIndices.size());
       for (size_t shadeIdx = 0; shadeIdx < shadeN; ++shadeIdx){
         std::string parentSubSurfaceName = parentSubSurfaceNames[allFinalShadeParentSubSurfaceIndices[shadeIdx]];
-        makeSurface(story, spaceOrShading, "", parentSubSurfaceName, belowFloorPlenum, aboveCeilingPlenum, "SpaceShading", Point3dVectorVector(1,allFinalShadeVertices[shadeIdx]), wallFaceFormat, geometries, sceneChildren, 0, false);
+        makeSurface(story, spaceOrShading, "", parentSubSurfaceName, belowFloorPlenum, aboveCeilingPlenum, "SpaceShading", Point3dVectorVector(1,allFinalShadeVertices[shadeIdx]), wallFaceFormat, geometries, sceneChildren, 0, false, "");
       }
     }
 
@@ -1023,7 +1077,7 @@ namespace openstudio{
           dcVertices.push_back(Point3d(lengthToMeters * vertex->get("x", 0.0).asDouble() + 0.1, lengthToMeters * vertex->get("y", 0.0).asDouble() - 0.1, minZ + height));
           dcVertices.push_back(Point3d(lengthToMeters * vertex->get("x", 0.0).asDouble() - 0.1, lengthToMeters * vertex->get("y", 0.0).asDouble() - 0.1, minZ + height));
 
-          makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "DaylightingControl", Point3dVectorVector(1,dcVertices), wallFaceFormat, geometries, sceneChildren, illuminanceSetpoint, false);
+          makeSurface(story, spaceOrShading, "", "", belowFloorPlenum, aboveCeilingPlenum, "DaylightingControl", Point3dVectorVector(1,dcVertices), wallFaceFormat, geometries, sceneChildren, illuminanceSetpoint, false, "");
         }
       }
     }

@@ -198,7 +198,7 @@ namespace openstudio{
 
     std::string makeSurface(const Json::Value& story, const Json::Value& spaceOrShading, const std::string& parentSurfaceName, const std::string& parentSubSurfaceName,
       bool belowFloorPlenum, bool aboveCeilingPlenum, const std::string& surfaceType, const Point3dVectorVector& finalFaceVertices, size_t faceFormat,
-      std::vector<ThreeGeometry>& geometries, std::vector<ThreeSceneChild>& sceneChildren, double illuminanceSetpoint, bool airWall) const;
+      std::vector<ThreeGeometry>& geometries, std::vector<ThreeSceneChild>& sceneChildren, double illuminanceSetpoint, bool airWall, const std::string& nameSuffix) const;
 
     void makeMaterial(const Json::Value& object, const std::string& iddObjectType, std::vector<ThreeMaterial>& materials, std::map<std::string, std::string>& materialMap) const;
 
